@@ -135,6 +135,8 @@ import Testing
         realTime = true
     }
     private var realTime = false
+    /// Asking the database why the zone is gone fails this many times, as offline.
+    var whyFails = 0
 
     var library: SyncLibrary {
         get { host.library }
@@ -235,7 +237,13 @@ extension FakeMac: SyncEngine {
     var serialization: Data? { nil }
     func start() { if !session.state.merged { cloud.makeZoneAgain() } }
     func stop() {}
-    func zoneDeletion() async -> CKDatabase.DatabaseChange.Deletion.Reason? { cloud.deletion }
+    func zoneDeletion() async throws -> CKDatabase.DatabaseChange.Deletion.Reason? {
+        if whyFails > 0 {
+            whyFails -= 1
+            throw CKError(.networkUnavailable)
+        }
+        return cloud.deletion
+    }
 }
 
 /// iCloud for an `ICloudSync` under test: an account signed in, its private database, and the engines it made.
@@ -1084,6 +1092,43 @@ extension SyncLibrary {
     }
 
     // MARK: Account and settling
+
+    @Test func aFailedCheckOfWhyTheZoneIsGoneLeavesSyncOn() async throws {
+        let cloud = FakeCloud()
+        let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        // The zone is gone, and asking the database why fails (offline): no answer, so nothing is decided.
+        cloud.removeZone(reason: .deleted)
+        try #require(fake.engines.last).whyFails = 1
+        await sync.catchUp()
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(sync.isOn && sync.hasCopy && sync.status == .offline, "\(sync.status)")
+        #expect(sync.retry.isWaiting)
+        #expect(fake.host.library.urls(in: "Personal") == ["a"])
+        // Asked again, it gets its answer: removed, so sync turns off here.
+        await sync.catchUp()
+        #expect(await settled { !sync.isOn }, "\(sync.status)")
+        #expect(sync.status == .removedElsewhere)
+    }
+
+    /// CloudEngine's own question: the deletion the database's changes bring while it asks is the answer, not acted on.
+    @Test func whyTheZoneIsGoneIsTheDeletionTheDatabaseBrings() async throws {
+        let watch = SyncZoneDeletionWatch()
+        // Not asking: acted on at once.
+        #expect(!watch.noted(.deleted))
+        var noted: Bool?
+        #expect(try await watch.ask { noted = watch.noted(.encryptedDataReset) } == .encryptedDataReset)
+        #expect(noted == true && !watch.isAsking)
+        // Nothing brought: removed, as a definite answer.
+        #expect(try await watch.ask {} == nil)
+        // The fetch failed: no answer, unless the deletion came first.
+        await #expect(throws: CKError.self) { try await watch.ask { throw CKError(.networkUnavailable) } }
+        #expect(try await watch.ask { _ = watch.noted(.purged); throw CKError(.networkUnavailable) } == .purged)
+        #expect(!watch.isAsking && !watch.noted(.deleted))
+    }
 
     @Test func anotherAccountIsNeverSyncedWithoutAsking() async {
         let cloud = FakeCloud()

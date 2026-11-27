@@ -679,7 +679,17 @@ final class ICloudSync {
             askingWhyZoneGone = true
             let decided = zoneDecisions
             Task {
-                let reason = await engine.zoneDeletion()
+                let reason: CKDatabase.DatabaseChange.Deletion.Reason?
+                do {
+                    reason = try await engine.zoneDeletion()
+                } catch {
+                    // No answer (offline): nothing is decided; sync stays on, its state kept, and asks again later.
+                    askingWhyZoneGone = false
+                    guard self.session === session else { return }
+                    Self.log.error("asking why the zone is gone failed: \(error.localizedDescription, privacy: .public)")
+                    failed(error)
+                    return
+                }
                 askingWhyZoneGone = false
                 // The database's changes, read meanwhile, may have decided it already.
                 guard self.session === session, zoneDecisions == decided else { return }
@@ -751,7 +761,8 @@ protocol SyncEngine: SyncServer, SyncTransport {
     func start()
     func stop()
     /// Why the zone is gone, as the database's changes say, or nil when they say nothing.
-    func zoneDeletion() async -> CKDatabase.DatabaseChange.Deletion.Reason?
+    /// Throws when the database couldn't be asked (offline): no answer, never taken for one.
+    func zoneDeletion() async throws -> CKDatabase.DatabaseChange.Deletion.Reason?
 }
 
 /// The private database of the signed-in iCloud account.
@@ -777,6 +788,36 @@ final class CloudKitCloud: SyncCloud {
 
     func receivePushes(_ on: Bool) {
         if on { NSApplication.shared.registerForRemoteNotifications() } else { NSApplication.shared.unregisterForRemoteNotifications() }
+    }
+}
+
+/// While sync asks why the zone is gone, the zone's deletion that the database's changes bring is kept for it to
+/// decide, never acted on as it arrives; at other times it's acted on at once.
+final class SyncZoneDeletionWatch {
+    private(set) var isAsking = false
+    private var seen: CKDatabase.DatabaseChange.Deletion.Reason?
+
+    /// The database's changes brought the zone's deletion. Returns whether the one asking takes it; if not, it's
+    /// acted on now.
+    func noted(_ reason: CKDatabase.DatabaseChange.Deletion.Reason) -> Bool {
+        guard isAsking else { return false }
+        seen = reason
+        return true
+    }
+
+    /// The deletion `fetch` brought, or nil when it brought none. Throws when the fetch failed before bringing one:
+    /// no answer, never taken for one.
+    func ask(_ fetch: () async throws -> Void) async throws -> CKDatabase.DatabaseChange.Deletion.Reason? {
+        isAsking = true
+        seen = nil
+        defer { isAsking = false }
+        do {
+            try await fetch()
+        } catch {
+            if let seen { return seen }
+            throw error
+        }
+        return seen
     }
 }
 
@@ -1100,8 +1141,7 @@ final class CloudEngine: SyncEngine, CKSyncEngineDelegate {
     /// When the engine's current send started, by this Mac's clock.
     private var sendStarted: Date?
     /// While `zoneDeletion` asks, the zone's deletion the database's changes bring, kept for it to decide.
-    private var askingWhy = false
-    private var deletion: CKDatabase.DatabaseChange.Deletion.Reason?
+    private let deletionWatch = SyncZoneDeletionWatch()
     private static let log = Logger(subsystem: "wang.zigao.zigzag", category: "sync")
 
     init(container: CKContainer, session: SyncSession, owner: ICloudSync) {
@@ -1170,12 +1210,9 @@ final class CloudEngine: SyncEngine, CKSyncEngineDelegate {
         if session.state.merged { session.fetchFinished() }
     }
     /// Why the zone is gone, as the database's changes say, or nil when they say nothing.
-    func zoneDeletion() async -> CKDatabase.DatabaseChange.Deletion.Reason? {
-        askingWhy = true
-        deletion = nil
-        defer { askingWhy = false }
-        try? await engine?.fetchChanges()
-        return deletion
+    func zoneDeletion() async throws -> CKDatabase.DatabaseChange.Deletion.Reason? {
+        guard let engine else { throw CKError(.operationCancelled) }
+        return try await deletionWatch.ask { try await engine.fetchChanges() }
     }
 
     func sendChanges() async throws {
@@ -1243,12 +1280,12 @@ final class CloudEngine: SyncEngine, CKSyncEngineDelegate {
             }
         case .fetchedDatabaseChanges(let changes):
             for deletion in changes.deletions where deletion.zoneID == ICloudSync.zoneID {
-                if askingWhy { self.deletion = deletion.reason; return }
+                if deletionWatch.noted(deletion.reason) { return }
                 owner?.zoneDeleted(reset: ICloudSync.isReset(deletion.reason))
                 return
             }
         case .didFetchRecordZoneChanges(let fetched):
-            if fetched.zoneID == ICloudSync.zoneID, let error = fetched.error, ICloudSync.isZoneGone(error), !askingWhy { owner?.zoneMissing(error) }
+            if fetched.zoneID == ICloudSync.zoneID, let error = fetched.error, ICloudSync.isZoneGone(error), !deletionWatch.isAsking { owner?.zoneMissing(error) }
         case .fetchedRecordZoneChanges(let changes):
             let records = changes.modifications.map(\.record).filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(Self.remote)
             session.fetched(records, deleted: changes.deletions.filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(\.recordID.recordName),
