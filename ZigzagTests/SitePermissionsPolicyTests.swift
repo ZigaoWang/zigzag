@@ -48,6 +48,46 @@ import WebKit
         }
     }
 
+    /// The tab sleep check asks about every tab's site: read once for the pass, the answers are the same and the
+    /// pass doesn't read the whole store again for each tab.
+    @MainActor @Test func aPassOverEveryTabReadsTheStoreOnce() throws {
+        let suite = "SitePermissionsPolicyTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        do {
+            // 500 kept answers, as a long-used profile has, and 300 tabs.
+            var simple: [String: Bool] = [:], rich: [String: String] = [:]
+            for i in 0..<400 { simple["https://site\(i).com|\(i % 2 == 0 ? PermissionSubject.notifications : PermissionSubject.location)"] = i % 3 == 0 }
+            for i in 0..<100 { rich["https://site\(i).com|\(PermissionSubject.popups)"] = "mini" }
+            defaults.set(simple, forKey: "SitePermissions")
+            defaults.set(rich, forKey: "SitePermissionActions")
+            let origins = (0..<300).map { "https://site\($0).com" }
+            func pass() -> [Bool?] { origins.map { SitePermissions.notifications(origin: $0) } }
+            let t0 = DispatchTime.now().uptimeNanoseconds
+            let each = pass()
+            let t1 = DispatchTime.now().uptimeNanoseconds
+            let once = SitePermissions.reading { pass() }
+            let t2 = DispatchTime.now().uptimeNanoseconds
+            print("site answers for 300 tabs: \(Double(t1 - t0) / 1e6) ms read each time, \(Double(t2 - t1) / 1e6) ms read once")
+            #expect(each == once)
+            #expect(t2 - t1 < (t1 - t0) / 5)
+            // A change made during the pass is seen in it, and stays after it.
+            SitePermissions.reading {
+                SitePermissions.setNotifications(true, origin: "https://new.com")
+                #expect(SitePermissions.notifications(origin: "https://new.com") == true)
+            }
+            #expect(SitePermissions.notifications(origin: "https://new.com") == true)
+            // After the pass, a change made elsewhere is read again.
+            defaults.set(["https://later.com|\(PermissionSubject.notifications)": true], forKey: "SitePermissions")
+            #expect(SitePermissions.notifications(origin: "https://later.com") == true)
+        }
+    }
+
     /// Reset all clears both stores, including destinations.
     @Test func forgetAllClearsBothStores() throws {
         try withDefaults { defaults in

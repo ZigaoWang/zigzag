@@ -2774,6 +2774,11 @@ final class TabManager {
     /// Background tabs nobody has looked at in a while give their memory back (TabSleep says when): every minute,
     /// and at once when macOS says memory is short.
     func sleepIdleTabs() {
+        // Every tab asks about its site's answers and keep-awake choice: each store is read once for all of them.
+        SitePermissions.reading { KeepAwake.reading { checkIdleTabs() } }
+    }
+
+    private func checkIdleTabs() {
         // Kept awake: what's on screen (both halves of a split), calls, floating pages and notifying sites. Favorites
         // and keep-awake sites too, unless memory is critical (TabSleep). Other spaces sleep normally; snapshots cover
         // swipes. With shared tabs (#162) the oldest window checks for all, keeping each one's visible pages.

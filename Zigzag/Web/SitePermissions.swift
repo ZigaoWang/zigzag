@@ -83,8 +83,21 @@ enum SitePermissions {
     /// A site's kept answer changed, from Site Controls, a question or Settings.
     static let changed = Signal<Void>()
 
+    /// The store as read once for a pass over every tab (`reading`), instead of again for each.
+    private static var held: [String: String]?
+
+    /// Runs `body` with the store read once, for a pass that asks about every tab: with hundreds of tabs and
+    /// answers, reading it for each one took the main thread tens of milliseconds.
+    static func reading<Result>(_ body: () -> Result) -> Result {
+        guard held == nil else { return body() }
+        held = stored
+        defer { held = nil }
+        return body()
+    }
+
     private static var stored: [String: String] {
         get {
+            if let held { return held }
             var actions: [String: String] = [:]
             // Also reads a mixed store from builds that wrote actions beside Bools; the next write splits it.
             for (entry, value) in defaults.dictionary(forKey: key) ?? [:] {
@@ -97,6 +110,7 @@ enum SitePermissions {
             return actions
         }
         set {
+            if held != nil { held = newValue }
             // Yes/no goes in the Bool store, everything else in the actions store. Rebuilding both on every write
             // moves stray actions out and drops keys that changed kind.
             var simple: [String: Bool] = [:]

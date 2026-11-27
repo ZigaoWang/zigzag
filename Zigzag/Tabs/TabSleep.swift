@@ -91,8 +91,22 @@ enum KeepAwake {
 
     /// Hosts without "www.".
     static var sites: Set<String> {
-        get { Set(defaults.stringArray(forKey: key) ?? []) }
-        set { defaults.set(Array(newValue).sorted(), forKey: key) }
+        get { held ?? Set(defaults.stringArray(forKey: key) ?? []) }
+        set {
+            if held != nil { held = newValue }
+            defaults.set(Array(newValue).sorted(), forKey: key)
+        }
+    }
+
+    /// The list as read once for a pass over every tab (`reading`).
+    private static var held: Set<String>?
+
+    /// Runs `body` with the list read once, for a pass that asks about every tab.
+    static func reading<Result>(_ body: () -> Result) -> Result {
+        guard held == nil else { return body() }
+        held = sites
+        defer { held = nil }
+        return body()
     }
 
     static func isOn(for url: URL?) -> Bool {
