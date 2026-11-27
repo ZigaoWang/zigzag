@@ -45,6 +45,14 @@
   Test: ArcFolderTests.expandAndCollapseAllReachEveryLevel
 - Collapse All Folders / Expand All Folders in a space's menu → all of that space's folders at once.
   Test: FolderBulkTests.aSpacesFoldersFoldAtOnceWithTheMenuOfferingOnlyWhatChanges
+- A shut folder → it still shows the page you're on and its pages opened since it was shut, never the ones open when you shut it.
+  Test: ShutFolderRowsTests.thePageYouAreOnStillShows
+  Test: ShutFolderRowsTests.aPageOpenedSinceItWasShutShows
+  Test: ShutFolderRowsTests.shuttingHidesThePagesOpenThen
+- ⌘W or the × on a page shown under a shut folder → its row stays there, unloaded. It goes once you switch to another space, open or shut that folder again (Expand All and Collapse All too) or relaunch.
+  Test: ShutFolderClosedPinTests.aClosedPageStaysUnderItsShutFolderUntilYouLeaveTheSpace
+  Test: ShutFolderClosedPinTests.aClosedPageGoesWhenItsFolderIsOpenedAndShutAgain
+  Test: ShutFolderClosedPinTests.anotherFolderOpenedOrShutKeepsTheClosedPage
 
 ## Importing from Arc
 - Arc's folders inside folders → the same tree in Pinned, in Arc's order with their names, shut; empty ones stay behind.
