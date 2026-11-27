@@ -57,7 +57,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Each step it remembers holds on to the tabs it can bring back, closed ones too, so it keeps the last hundred
     /// rather than a whole day's worth.
     let sidebarUndo: UndoManager = {
-        let undo = UndoManager()
+        let undo = WindowUndoManager()
         undo.levelsOfUndo = 100
         return undo
     }()

@@ -689,4 +689,21 @@ struct FolderBulkTests {
             #expect(manager.currentTabs.map(\.id) == [existing.id])
         }
     }
+
+    /// ⌘Z with an undo group still open inside another (page text editing can leave one) is skipped, not an
+    /// exception that quits Zigzag.
+    @Test func undoWithAGroupLeftOpenIsSkippedNotACrash() {
+        let undo = WindowUndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        undo.registerUndo(withTarget: undo) { _ in }
+        undo.beginUndoGrouping()
+        undo.undo()
+        undo.redo()
+        #expect(undo.groupingLevel == 2)
+        undo.endUndoGrouping()
+        undo.endUndoGrouping()
+        #expect(undo.canUndo)
+    }
+
 }

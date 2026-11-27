@@ -4,6 +4,9 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 
 ## [Unreleased]
 
+### Corrigido
+- ⌘Z depois de digitar em uma página não fecha mais o Zigzag de vez em quando.
+
 ## [0.10.0] - 2026-11-25
 
 Sincronizar com o iCloud mantém seus espaços, abas fixadas, favoritos e ajustes iguais em todos os seus Macs, e a barra lateral a partir da borda da tela mostra prévias das páginas ao lado dela. O Zigzag também está em mais onze idiomas, o modo de compatibilidade desativa com um único interruptor o que pode quebrar um site, e as regras de download podem entregar o arquivo salvo.

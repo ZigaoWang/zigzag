@@ -4,6 +4,9 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Corrections
+- ⌘Z après une saisie dans une page ne fait plus quitter Zigzag de temps en temps.
+
 ## [0.10.0] - 2026-11-25
 
 Synchroniser avec iCloud garde vos espaces, onglets épinglés, favoris et réglages identiques sur chaque Mac, et la barre latérale depuis le bord de l’écran affiche un aperçu des pages à côté d’elle. Zigzag est aussi disponible dans onze langues de plus, le mode de compatibilité désactive d’un seul interrupteur ce qui pourrait gêner un site, et les règles de téléchargement peuvent transférer le fichier enregistré.

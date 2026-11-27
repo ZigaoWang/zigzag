@@ -4,6 +4,9 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 
 ## [Unreleased]
 
+### Behoben
+- ⌘Z nach dem Tippen auf einer Webseite beendet Zigzag nicht mehr gelegentlich.
+
 ## [0.10.0] - 2026-11-25
 
 „Mit iCloud synchronisieren“ hält deine Spaces, fixierten Tabs, Favoriten und Einstellungen auf jedem Mac gleich, und die Seitenleiste vom Bildschirmrand zeigt Seiten als Vorschau daneben. Außerdem gibt es Zigzag in elf weiteren Sprachen, der Kompatibilitätsmodus schaltet mit einem Schalter ab, was eine Website stören könnte, und Downloadregeln können die gesicherte Datei übergeben.

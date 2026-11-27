@@ -4,6 +4,9 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
+### Naprawiono
+- ⌘Z po pisaniu na stronie nie zamyka już czasem Zigzaga.
+
 ## [0.10.0] - 2026-11-25
 
 „Synchronizuj z iCloud” utrzymuje twoje przestrzenie, przypięte karty, ulubione i ustawienia takie same na każdym Macu, a pasek boczny wysuwany od krawędzi ekranu pokazuje podgląd stron obok siebie. Zigzag jest też w jedenastu kolejnych językach, tryb zgodności jednym przełącznikiem wyłącza to, co może psuć witrynę, a reguły pobierania mogą przekazać zachowany plik.
