@@ -1032,6 +1032,8 @@ enum DebugBridge {
             let under = sequence(first: TouchTargets.hit(at: point, in: window), next: { $0?.superview }).prefix(6).compactMap { $0.map { String(describing: type(of: $0)) } }
             debugLog("touchtarget under \(Int(point.x)),\(Int(point.y)): \(under.joined(separator: " < "))")
             debugLog("touchtarget \(Int(point.x)),\(Int(point.y)) => \(to.map { "\(Int($0.x)),\(Int($0.y)) \(hit.map { String(describing: type(of: $0)) } ?? "") \(hit?.toolTip ?? "")" } ?? "none")")
+        // edgefollow: one look at the pointer for the floating sidebar, as its timer takes (none runs in a covered window).
+        case "edgefollow": controller.root.followPointer()
         case "edgestate": debugLog("edgestate \(controller.root.isSidebarFloatingVisible ? "out" : controller.root.sidebarVisible ? "docked" : "hidden")")
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
         // holding ⌃ shows them), even with the window not in front. off hides both.
