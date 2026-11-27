@@ -180,7 +180,7 @@ import Testing
         let all = token == 0
         token = changes.token
         session.fetched(changes.records, deleted: all ? [] : changes.deleted)
-        if all { session.readAll(Set(changes.records.map(\.name))) }
+        if all { session.readAll(Set(changes.records.map(\.name)), startedAt: clock) }
     }
 
     func send() {
@@ -1997,12 +1997,17 @@ extension SyncTests {
         let again = FakeMac(cloud, library, clock: b.clock + 3600, state: ICloudSync.stateTurningOn(saved: off))
         again.session.checkAfterLaunch()
         again.session.requeue()
+        // The full read lists the zone in pages; this Mac's pin goes up between them.
+        let started = again.clock
         let snapshot = cloud.changes(since: 0)
-        again.session.fetched(snapshot.records, deleted: [])
+        again.session.fetched(snapshot.records, deleted: [], startedAt: started)
         again.session.updateState { $0.zoneToken = Data(String(snapshot.token).utf8) }
+        again.clock += 1
         again.send()
-        again.session.readAll(Set(snapshot.records.map(\.name)))
+        again.session.readAll(Set(snapshot.records.map(\.name)), startedAt: started)
         again.session.fetchFinished()
+        // Right after the read, not only once a later fetch brought it back.
+        #expect(again.library.urls(in: "Personal") == ["a", "pinned while off"])
         again.sync(); a.sync()
         #expect(again.library.urls(in: "Personal") == ["a", "pinned while off"])
         #expect(a.library.urls(in: "Personal") == ["a", "pinned while off"])

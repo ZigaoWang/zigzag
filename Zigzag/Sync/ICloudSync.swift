@@ -902,7 +902,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             session.updateState { $0.zoneToken = archived }
             more = changes.moreComing
         }
-        if let all { session.readAll(all) }
+        if let all { session.readAll(all, startedAt: started) }
         if session.state.merged { session.fetchFinished() }
     }
     func sendChanges() async throws {

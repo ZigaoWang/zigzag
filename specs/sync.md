@@ -69,6 +69,7 @@
   Test: SyncTests.turningSyncOffRenamingAndOnAgainAddsNoCopy
   Test: SyncTests.turningSyncOnAgainKeepsWhatChangedOnEachSideWhileOff
   Test: SyncTests.turningSyncOnAgainAfterRemoveFromICloudMergesAfresh
+- Something this Mac sends while it reads all of iCloud again (sync turned on again, a pin made meanwhile) → stays here and in iCloud the whole time; what the read's earlier pages didn't list isn't taken as removed when it's this Mac's own save made after the read began.
   Test: SyncTests.aPinSentDuringTheFullReadAfterTurningOnIsntTakenAsRemoved
 - This Mac's library couldn't be read and Zigzag started afresh → merged again as on a first sync, so iCloud fills it in; nothing is removed from iCloud.
   Test: SyncTests.aLibraryThatCouldntBeReadIsFilledFromICloudNotEmptiedInto

@@ -454,11 +454,18 @@ final class SyncSession {
         if !records.isEmpty || !deleted.isEmpty { onChange?() }
     }
 
-    /// A read of the whole zone is done: what iCloud had and doesn't any more was removed there.
-    func readAll(_ names: Set<String>) {
+    /// A read of the whole zone is done: what iCloud had and doesn't any more was removed there. What this Mac saved
+    /// after the read started (`startedAt`) may be missing from pages read before it went up, so it isn't.
+    func readAll(_ names: Set<String>, startedAt: Date) {
         guard !isClosed, state.merged else { return }
-        for name in state.serverPayloads.keys where !names.contains(name) && state.incoming[name] == nil { arrive(name, nil) }
+        for name in state.serverPayloads.keys where !names.contains(name) && state.incoming[name] == nil {
+            if let saved = ownSaves[name], saved >= startedAt { continue }
+            arrive(name, nil)
+        }
     }
+
+    /// When this Mac's own saves went through, by record name, this launch.
+    private var ownSaves: [String: Date] = [:]
 
     /// A fetch is done: the first sync merges, later ones settle what came.
     func fetchFinished() {
@@ -797,6 +804,7 @@ final class SyncSession {
     func saved(_ records: [SyncRemote]) {
         guard !isClosed else { return }
         for record in records {
+            ownSaves[record.name] = now()
             state.systemFields[record.name] = record.systemFields
             state.serverPayloads[record.name] = record.payload
             if let date = record.serverModified { state.serverDates[record.name] = date }
