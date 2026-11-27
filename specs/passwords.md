@@ -80,6 +80,24 @@
 ## Passkeys
 - A site asks for a passkey while its page is waiting on one → the waiting request ends first, so the new one goes through.
   Test: PasskeyRequestsTests.aSecondRequestEndsTheWaitingOneFirst
+- Click a field the site marks for passkeys (autocomplete "webauthn") while its page waits for one → the fill menu lists the passkeys saved on this Mac for that site, by name, before your logins; with Fill saved passwords off, the passkeys alone.
+  Test: PasskeySuggestionsTests.passkeysComeFirstThenLoginsThenPasswords
+- Which passkeys → only those for the page's own site or the parent domain it names, and only those the request allows; never another site's or a public suffix's, never in a frame, a new-password field, a page not served securely, or AI apps' profile.
+  Test: PasskeyRequestsTests.aPageCantListAnotherSitesPasskeys
+  Test: PasskeySuggestionsTests.whichSitesAPageMayAskFor
+  Test: PasskeySuggestionsTests.whereTheMenuMayListPasskeys
+- Pick a passkey → the page's waiting request asks the Mac for that one; the Mac's sheet asks for Touch ID and the site gets the sign-in it waited for. Closed without signing in, the page waits again.
+  Test: PasskeyRequestsTests.aPickedPasskeyAnswersTheWaitingRequest
+  Test: PasskeyRequestsTests.aCancelledSheetWaitsAgain
+- Before macOS has been asked → the menu shows Use a Saved Passkey; picking it, or Allow… beside Passkeys in Settings › Passwords, shows macOS's prompt, and Zigzag is then listed in System Settings › Privacy & Security › Access web browser passkeys. Nothing asks by itself, at launch or on a page.
+  Test: PasskeySuggestionsTests.notAskedOffersToAskAndAsksNothing
+  Test: PasskeySuggestionsTests.eachAnswerIsKept
+- Allowed → the menu comes back on the field with the site's passkeys; Settings › Passwords says so, with Open System Settings to change it.
+  No test yet.
+- Denied → no passkeys are listed and nothing is asked again; a site that asks for a passkey still gets the Mac's own sheet, as before.
+  Test: PasskeySuggestionsTests.deniedListsNothing
+- A password manager extension that brings its own passkeys on in the profile → Zigzag lists none there; iCloud Passwords doesn't count.
+  Test: PasskeySuggestionsTests.whereTheMenuMayListPasskeys
 
 ## Site sign-in sheet
 - A site asks for a name and password (HTTP sign-in) → a sheet on its tab; only the page's own site can ask, other sites' images and frames get nothing.
