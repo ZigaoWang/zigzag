@@ -15,7 +15,7 @@
 		F2A3E9AC0FF6000000000011 /* LivePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000012 /* LivePermissions.swift */; };
 		F2A3E9AC0FF6000000000061 /* PermissionToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000062 /* PermissionToast.swift */; };
 		F2A3E9AC0FF6000000000013 /* LivePermissionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000014 /* LivePermissionsTests.swift */; };
-		F2A3E9AC0FF6000000000043 /* LocationRevokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000044 /* LocationRevokeTests.swift */; };
+		F2A3E9AC0FF6000000000043 /* LocationBlockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000044 /* LocationBlockTests.swift */; };
 		F2A3E9AC0FF6000000000053 /* WebRTCChoiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000054 /* WebRTCChoiceTests.swift */; };
 		F2A3E9AC0FF6000000000073 /* PermissionToastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000074 /* PermissionToastTests.swift */; };
 		77A198DFB4E445EE2C61702E /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3099C3E94756F3E4F4C4782 /* SyncTests.swift */; };
@@ -733,7 +733,7 @@
 		F2A3E9AC0FF6000000000012 /* LivePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePermissions.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF6000000000062 /* PermissionToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionToast.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF6000000000014 /* LivePermissionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePermissionsTests.swift; sourceTree = "<group>"; };
-		F2A3E9AC0FF6000000000044 /* LocationRevokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationRevokeTests.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000044 /* LocationBlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationBlockTests.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF6000000000054 /* WebRTCChoiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCChoiceTests.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF6000000000074 /* PermissionToastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionToastTests.swift; sourceTree = "<group>"; };
 		D3099C3E94756F3E4F4C4782 /* SyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncTests.swift; sourceTree = "<group>"; };
@@ -1999,7 +1999,7 @@
 				05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */,
 				60823191217F3C0F87144EA5 /* AccessibilityTests.swift */,
 				F2A3E9AC0FF6000000000014 /* LivePermissionsTests.swift */,
-				F2A3E9AC0FF6000000000044 /* LocationRevokeTests.swift */,
+				F2A3E9AC0FF6000000000044 /* LocationBlockTests.swift */,
 				F2A3E9AC0FF6000000000054 /* WebRTCChoiceTests.swift */,
 				F2A3E9AC0FF6000000000074 /* PermissionToastTests.swift */,
 				FFDAD5641E480BF83AE887CA /* XPIPackageTests.swift */,
@@ -2981,7 +2981,7 @@
 				8EDD98C71A9B2D031C21E2CC /* HelperLifetimeTests.swift in Sources */,
 				8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */,
 				F2A3E9AC0FF6000000000013 /* LivePermissionsTests.swift in Sources */,
-				F2A3E9AC0FF6000000000043 /* LocationRevokeTests.swift in Sources */,
+				F2A3E9AC0FF6000000000043 /* LocationBlockTests.swift in Sources */,
 				F2A3E9AC0FF6000000000053 /* WebRTCChoiceTests.swift in Sources */,
 				F2A3E9AC0FF6000000000073 /* PermissionToastTests.swift in Sources */,
 				FFFBC7AE9229B53B119F8200 /* FirefoxInstallTests.swift in Sources */,

@@ -155,7 +155,7 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
     /// For a page that is open now: close the connections that are up and refuse new ones until the page loads again,
     /// where the kept Block keeps it out. Measured against WebKit: the preference alone does nothing to a loaded page,
     /// and this does (`closed: true`, `canMakeAnother: false`).
-    private static let revokeScript = """
+    private static let blockScript = """
     (() => {
       for (const peer of (window.__zigzagPeers || [])) { try { peer.close(); } catch (e) {} }
       window.__zigzagPeers = [];
@@ -171,10 +171,10 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
     """
 
     /// Takes WebRTC away from a page that has it now. A page that never had it is left alone.
-    static func revoke(in tab: Tab) {
+    static func block(in tab: Tab) {
         guard isAvailable, let webView = tab.webView else { return }
-        webView.evaluateJavaScript(revokeScript) { _, _ in }
-        Diagnostics.note("WebRTC", site: SiteOrigin.of(webView.url).map(SiteOrigin.label), "revoked on the open page", isPrivate: tab.isPrivate)
+        webView.evaluateJavaScript(blockScript) { _, _ in }
+        Diagnostics.note("WebRTC", site: SiteOrigin.of(webView.url).map(SiteOrigin.label), "blocked on the open page", isPrivate: tab.isPrivate)
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {

@@ -58,10 +58,10 @@ enum LivePermissions {
         case .microphone: allowed ? () : tab.stopMicrophone()
         // Zigzag is the page's location source, so the guard goes on and off live: neither direction waits for a load.
         case .location: allowed ? PageLocation.shared.allow(origin: origin, in: tab)
-                                : PageLocation.shared.revoke(origin: origin, in: tab)
+                                : PageLocation.shared.block(origin: origin, in: tab)
         // The constructor is fixed for the life of the page: a Block closes the calls that are up, and allowing it
         // again is what waits for the next load.
-        case .webRTC: allowed ? () : WebRTCProtection.revoke(in: tab)
+        case .webRTC: allowed ? () : WebRTCProtection.block(in: tab)
         case .notifications: allowed ? () : WebNotifications.shared.removeAll(origin: origin)
         case .popups, .downloads, .apps, .screen: break
         }

@@ -9,7 +9,7 @@ import WebKit
 /// refuses it without a question.
 @MainActor
 @Suite(.serialized)
-struct LocationRevokeTests {
+struct LocationBlockTests {
     private let site = "https://maps.example.com"
 
     @Test func theGuardStopsAPagesWatch() async throws {
@@ -24,7 +24,7 @@ struct LocationRevokeTests {
         }
 
         // A Block, as LivePermissions delivers it to an open page.
-        PageLocation.shared.revoke(origin: site, in: tab)
+        PageLocation.shared.block(origin: site, in: tab)
 
         // A request from that page now fails at once, with the permission error the web platform uses, rather than
         // waiting on a prompt or a watch that will never answer.
@@ -56,7 +56,7 @@ struct LocationRevokeTests {
             if (try? await webView.evaluateJavaScript("!!document.getElementById('\(token)')")) as? Bool == true { break }
         }
 
-        PageLocation.shared.revoke(origin: site, in: tab)
+        PageLocation.shared.block(origin: site, in: tab)
         // The guard is on: the method the guard installed is an own property of `navigator.geolocation`.
         let guarded = (try? await webView.evaluateJavaScript(
             "Object.prototype.hasOwnProperty.call(navigator.geolocation, 'getCurrentPosition')")) as? Bool

@@ -101,10 +101,10 @@ final class PageLocation: NSObject, CLLocationManagerDelegate {
         api.setProvider(manager, Self.provider)
     }
 
-    /// Takes your location away from one page that has it now (#545). The provider is the whole process pool's, so it
+    /// Blocks your location for one page that has it now (#545). The provider is the whole process pool's, so it
     /// can't say which page asked; the page's own `navigator.geolocation` can. Every call fails until the page loads
     /// again, where WebKit's per-page decision refuses a kept Block without asking.
-    private static let revokeScript = """
+    private static let blockScript = """
     (() => {
       const deny = function (success, failure) {
         const error = { code: 1, message: 'Location is blocked for this site.', PERMISSION_DENIED: 1,
@@ -143,10 +143,10 @@ final class PageLocation: NSObject, CLLocationManagerDelegate {
     }
 
     /// Applies the guard to a page that is open now, and stops the device if that page was the one watching.
-    func revoke(origin: String, in tab: Tab) {
+    func block(origin: String, in tab: Tab) {
         guard let webView = tab.webView else { return }
-        webView.evaluateJavaScript(Self.revokeScript) { _, _ in }
-        Diagnostics.note("Location", site: SiteOrigin.label(origin), "revoked on the open page", isPrivate: tab.isPrivate)
+        webView.evaluateJavaScript(Self.blockScript) { _, _ in }
+        Diagnostics.note("Location", site: SiteOrigin.label(origin), "blocked on the open page", isPrivate: tab.isPrivate)
     }
 
     /// What a page's ask gets, as Core Location stands: macOS asks you, the page gets an error, or it gets positions.
