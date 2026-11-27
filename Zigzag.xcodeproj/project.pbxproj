@@ -42,6 +42,7 @@
 		07B8E8D78400474F39A969F4 /* Readability-readerable.js in Resources */ = {isa = PBXBuildFile; fileRef = 5F60DCC2C5651A80DAADE8E8 /* Readability-readerable.js */; };
 		083569CB2712C1AD02A4775E /* SidebarSlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBBEADFD52A2AF79DAA47E0 /* SidebarSlideTests.swift */; };
 		08513A78449385A0CE271CF2 /* ZigzagApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */; };
+		5E0C3A9D1B7F4E2A8C6D0B11 /* ObjCExceptions.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E0C3A9D1B7F4E2A8C6D0B12 /* ObjCExceptions.m */; };
 		087468A86D6129B66892F5D9 /* Autofill.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB39442D06F521CAE1203D0 /* Autofill.swift */; };
 		089B04904C4690F9A9C519AC /* WelcomeWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12B055E9A9D600A2CAA8EAA /* WelcomeWindow.swift */; };
 		08FACDB4874ECAC187142B05 /* FolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFAB9323B9B8363B22FEE73 /* FolderTests.swift */; };
@@ -1065,6 +1066,9 @@
 		886026308794DE28C83F6493 /* AddressDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressDrop.swift; sourceTree = "<group>"; };
 		888D287756137DE5F88678F5 /* FaviconRankTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconRankTests.swift; sourceTree = "<group>"; };
 		88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagApplication.swift; sourceTree = "<group>"; };
+		5E0C3A9D1B7F4E2A8C6D0B12 /* ObjCExceptions.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ObjCExceptions.m; sourceTree = "<group>"; };
+		5E0C3A9D1B7F4E2A8C6D0B13 /* ObjCExceptions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjCExceptions.h; sourceTree = "<group>"; };
+		5E0C3A9D1B7F4E2A8C6D0B14 /* Zigzag-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Zigzag-Bridging-Header.h"; sourceTree = "<group>"; };
 		88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageDialogSheet.swift; sourceTree = "<group>"; };
 		88D86346DE78193D507DCECC /* TabStateCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStateCacheTests.swift; sourceTree = "<group>"; };
 		88E9A925D7802ECE0037DA97 /* AboutWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutWindow.swift; sourceTree = "<group>"; };
@@ -1859,6 +1863,7 @@
 			children = (
 				C31DB0355627F311823B01A6 /* Info.plist */,
 				D3EF002AF6A129FB4291D7A1 /* Zigzag.entitlements */,
+				5E0C3A9D1B7F4E2A8C6D0B14 /* Zigzag-Bridging-Header.h */,
 				6CE05E70848504F5FE346B61 /* ZigzagRelease.entitlements */,
 				B7DBCC2D522A4FC81691E949 /* App */,
 				12003C50E27ADE7FF7DF6102 /* CommandBar */,
@@ -1927,6 +1932,8 @@
 				4363A8C97194CFB82618511C /* main.swift */,
 				A9C34787271E39E26E0156FC /* MainMenu.swift */,
 				C472C971546CFF3A725753ED /* MoveToApplications.swift */,
+				5E0C3A9D1B7F4E2A8C6D0B13 /* ObjCExceptions.h */,
+				5E0C3A9D1B7F4E2A8C6D0B12 /* ObjCExceptions.m */,
 				652311E240EBA758AAC17D38 /* PowerSaving.swift */,
 				DB9026CE3C5C707675A9BEEC /* ProblemReport.swift */,
 				EE1EE7853A66CE1029968DA5 /* Scripting.swift */,
@@ -2923,6 +2930,7 @@
 				2EB548A050B8877233F8E0C8 /* WindowManager.swift in Sources */,
 				B60594BC8CE7FA68B9229435 /* Words.swift in Sources */,
 				08513A78449385A0CE271CF2 /* ZigzagApplication.swift in Sources */,
+				5E0C3A9D1B7F4E2A8C6D0B11 /* ObjCExceptions.m in Sources */,
 				F642AD8EB346945EEB6E2E67 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -3372,6 +3380,7 @@
 					"@executable_path/../Frameworks",
 				);
 				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "Zigzag/Zigzag-Bridging-Header.h";
 			};
 			name = Debug;
 		};
@@ -3513,6 +3522,7 @@
 					"@executable_path/../Frameworks",
 				);
 				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "Zigzag/Zigzag-Bridging-Header.h";
 			};
 			name = Release;
 		};

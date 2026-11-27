@@ -175,6 +175,8 @@ targets:
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: Zigzag/Zigzag.entitlements
+        # Catching an Objective-C exception needs Objective-C (App/ObjCExceptions.m).
+        SWIFT_OBJC_BRIDGING_HEADER: Zigzag/Zigzag-Bridging-Header.h
       configs:
         # Releases add passkeys: Apple granted the browser passkey entitlement to wang.zigao.zigzag only, so the dev
         # build (its own bundle id) can't carry it. The two files are the same apart from that key.
