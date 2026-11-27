@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- Exporting from a web app that hands the file over through a hidden frame, like Feishu Docs' Download as Word, PDF or Markdown, saves the file again instead of doing nothing. A second export after another click goes through too, and a download Zigzag holds back always says so. ([#535](https://github.com/ZigaoWang/zigzag/issues/535))
 - A quick swipe back or forward taps the trackpad again. The arrow fills, with one tap, the moment letting go would go back or forward, a quick flick included, and stays filled while your fingers rest, so a flick, a pause, then letting go now goes as the arrow shows. Coming back a little empties it. Swipes with fingers on a touch screen don't tap.
 - With the sidebar hidden and slid out over the page, opening a menu from it no longer sends the sidebar away and leaves the menu alone over the page. It stays out until the menu closes, then slides back if the pointer isn't on it.
 
