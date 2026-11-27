@@ -4,6 +4,13 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Nouveautés
+- Le mini-lecteur affiche Vidéo précédente et Vidéo suivante quand le site les propose, comme YouTube dans une playlist, pour passer à la suite sans revenir à la page. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
+- Les fichiers Markdown s’ouvrent mis en forme dans un onglet, comme une page : un fichier .md de votre Mac, ou un fichier qu’un site envoie en Markdown ou en texte brut à une adresse en .md. Les tableaux, les listes de tâches et le code s’affichent comme sur GitHub, les liens et les images à côté du fichier fonctionnent, et Source, en haut, affiche le texte brut. Cela fonctionne en Split View, avec la recherche, le zoom, l’impression et Lecteur, et rien dans le fichier ne peut s’exécuter. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+
+### Corrections
+- Zigzag ne quitte plus de temps en temps quand vous fermez un onglet ou qu’un onglet se met en veille, lorsque Temps d’écran de macOS rencontre un problème en libérant la page.
+
 ## [0.10.0] - 2026-11-25
 
 Synchroniser avec iCloud garde vos espaces, onglets épinglés, favoris et réglages identiques sur chaque Mac, et la barre latérale depuis le bord de l’écran affiche un aperçu des pages à côté d’elle. Zigzag est aussi disponible dans onze langues de plus, le mode de compatibilité désactive d’un seul interrupteur ce qui pourrait gêner un site, et les règles de téléchargement peuvent transférer le fichier enregistré.

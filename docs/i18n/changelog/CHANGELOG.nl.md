@@ -4,6 +4,13 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
+### Nieuw
+- De minispeler toont Vorige video en Volgende video als de website die aanbiedt, zoals YouTube in een afspeellijst, zodat je verder kunt zonder terug te gaan naar de pagina. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
+- Markdown-bestanden openen opgemaakt in een tabblad, zoals een pagina: een .md-bestand op je Mac, of een bestand dat een website als Markdown of als platte tekst op een .md-adres stuurt. Tabellen, takenlijsten en code zien eruit zoals op GitHub, links en afbeeldingen naast het bestand werken, en Bron bovenaan toont de platte tekst. Het werkt in Split View, met zoeken, zoomen, afdrukken en Reader, en niets in het bestand kan worden uitgevoerd. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+
+### Opgelost
+- Zigzag stopt niet meer af en toe als je een tabblad sluit of er een in de slaapstand gaat, wanneer Schermtijd van macOS een probleem heeft met het loslaten van de pagina.
+
 ## [0.10.0] - 2026-11-25
 
 Synchroniseer met iCloud houdt je spaces, vastgezette tabbladen, favorieten en instellingen gelijk op elke Mac, en de navigatiekolom vanaf de schermrand toont voorbeelden van pagina’s ernaast. Zigzag is ook in elf extra talen, de compatibiliteitsmodus zet met één schakelaar uit wat een website kan breken, en downloadregels kunnen het bewaarde bestand doorgeven.
