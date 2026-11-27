@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8EDD98C71A9B2D031C21E2CC /* HelperLifetimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */; };
+		C5E205C75B78676838E7A67B /* HelperProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DCAC029985B8485280EC93A /* HelperProbe.swift */; };
 		04ED955E9964B0EBEE95A893 /* HelperLifetime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4918D8BAD599CEF14063B226 /* HelperLifetime.swift */; };
 		A1853A4215FC47C73BF1B030 /* HelperLifetime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4918D8BAD599CEF14063B226 /* HelperLifetime.swift */; };
 		77A198DFB4E445EE2C61702E /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3099C3E94756F3E4F4C4782 /* SyncTests.swift */; };
@@ -715,6 +717,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperLifetimeTests.swift; sourceTree = "<group>"; };
+		9DCAC029985B8485280EC93A /* HelperProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperProbe.swift; sourceTree = "<group>"; };
 		4918D8BAD599CEF14063B226 /* HelperLifetime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperLifetime.swift; sourceTree = "<group>"; };
 		D3099C3E94756F3E4F4C4782 /* SyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncTests.swift; sourceTree = "<group>"; };
 		3DD1F8636E632A6F45792C2E /* SyncSettingsRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsRows.swift; sourceTree = "<group>"; };
@@ -1480,6 +1484,7 @@
 		1A4CDB5B71DD2C4947122E55 /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				9DCAC029985B8485280EC93A /* HelperProbe.swift */,
 				21E69CFF8CE303F5DB6F0073 /* Cookieless.swift */,
 				8551A279CC24B357CC11755E /* CrashReports.swift */,
 				565C64D8120ACF95067FFE91 /* DevDefaults.swift */,
@@ -1965,6 +1970,7 @@
 		DF27ED16EF9BB28D19F995E5 /* ZigzagTests */ = {
 			isa = PBXGroup;
 			children = (
+				05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */,
 				60823191217F3C0F87144EA5 /* AccessibilityTests.swift */,
 				FFDAD5641E480BF83AE887CA /* XPIPackageTests.swift */,
 				FF8B61EA3ED59212399D4BA4 /* FirefoxSurfaceTests.swift */,
@@ -2595,6 +2601,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C5E205C75B78676838E7A67B /* HelperProbe.swift in Sources */,
 				7A6644E5F8E6F88E4D4B80E1 /* AboutWindow.swift in Sources */,
 				C4A7D1E20F3B4C5D6E7F8A90 /* ZigzagCard.swift in Sources */,
 				B0B613E852FA44892B755F04 /* AcknowledgementsWindow.swift in Sources */,
@@ -2936,6 +2943,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8EDD98C71A9B2D031C21E2CC /* HelperLifetimeTests.swift in Sources */,
 				8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */,
 				FFFBC7AE9229B53B119F8200 /* FirefoxInstallTests.swift in Sources */,
 				C4E47500A0B1C2D3E4F50002 /* ChromeExtensionAddressTests.swift in Sources */,
