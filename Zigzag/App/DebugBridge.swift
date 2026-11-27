@@ -745,12 +745,39 @@ enum DebugBridge {
         case "hover": if f.count > 1, let t = tab(f[1]) { edge.hover(t, in: controller) }
         case "preview": if f.count > 1, let t = tab(f[1]) { edge.previewNow(t, in: controller) }
         case "click": if f.count > 1, let t = tab(f[1]) { controller.listSelect(t) }
+        // plus, downloads: the panel's own bottom-bar buttons. pageclick: a click in the middle of the page beside it.
+        // pagekey: the page takes the keyboard, as a click into it gives it. esc: Esc in the panel. key <c>: ⌘<c> sent
+        // to the panel as the app would deliver it.
+        case "plus": controller.edgeSidebar?.showAddMenu()
+        case "downloads":
+            if let button = controller.edgeSidebar?.downloadsButton { controller.sidebarShowDownloads(from: button) }
+        case "pageclick":
+            guard let window = edge.pagePreview?.window else { break }
+            let point = NSPoint(x: window.frame.width / 2, y: window.frame.height / 2)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                    window.sendEvent(event)
+                }
+            }
+        case "pagekey": edge.pagePreview?.window?.makeKey()
+        case "esc": edge.dismissPreview()
+        case "key":
+            guard f.count > 1, let panel = NSApp.windows.first(where: { edge.isPanel($0) }),
+                  let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+                                               windowNumber: panel.windowNumber, context: nil, characters: f[1],
+                                               charactersIgnoringModifiers: f[1], isARepeat: false, keyCode: 0) else { break }
+            panel.makeKey()
+            NSApp.sendEvent(event)
         case "frames":
             let mini = edge.pagePreview
             debugLog("edge showing=\(edge.isShowing) mini=\(mini?.window.map { NSStringFromRect($0.frame) } ?? "-")"
                 + " url=\(mini?.tab.url?.absoluteString ?? "-") card=\(mini?.asleepCardTitle ?? "-")"
                 + " selected=\(controller.tabManager.selectedTab?.url?.lastPathComponent ?? "-")"
-                + " shown=\(controller.root.card.webView.map { $0.window === controller.window } ?? false)")
+                + " shown=\(controller.root.card.webView.map { $0.window === controller.window } ?? false)"
+                + " key=\(NSApp.keyWindow.map { String(describing: type(of: $0)) } ?? "-") active=\(NSApp.isActive)"
+                + " pageVisible=\(mini?.window?.isVisible ?? false) menu=\(MenuPanel.current.map { NSStringFromRect($0.frame) } ?? "-")"
+                + " tabs=\(controller.tabManager.allTabs.count) windowKey=\(controller.window?.isKeyWindow ?? false)")
         default: break
         }
     }
