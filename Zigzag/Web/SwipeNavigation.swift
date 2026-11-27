@@ -96,7 +96,7 @@ final class SwipeNavigator {
     /// so the swipe is dropped now rather than holding over a page that isn't shown.
     func leftWindow() {
         pageArrived()
-        watchdog?.cancel()
+        stopWatchdog()
         stopWatchingRest()
         if state == .tracking || state == .leaning { cancel() }
         state = .idle
@@ -128,7 +128,7 @@ final class SwipeNavigator {
             if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
             stopPageListening()
             pageArrived()
-            watchdog?.cancel()
+            stopWatchdog()
             stopWatchingRest()
             guard webView.window != nil else { state = .idle; stopPageListening(); return false }
             // Fingers dragging the page on the screen scroll it; their own swipe goes back (PageHolder).
@@ -220,8 +220,7 @@ final class SwipeNavigator {
     /// The fingers lifted (`ended`) or the gesture was called off: it goes or springs back, and nothing is left over.
     private func release(at time: TimeInterval, ended: Bool) {
         let wasTracking = state == .tracking
-        watchdog?.cancel()
-        watchdog = nil
+        stopWatchdog()
         stopWatchingRest()
         stopPageListening()
         // Let go before the page answered: it never navigates, as before the arrow showed this early.
@@ -284,7 +283,7 @@ final class SwipeNavigator {
         if state == .tracking || state == .leaning { cancel() }
         if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
         pageArrived()
-        watchdog?.cancel()
+        stopWatchdog()
         stopWatchingRest()
         direction = wanted
         dx = 0; dy = 0; arming = SwipeArming(); samples = []
@@ -364,9 +363,15 @@ final class SwipeNavigator {
     private func armWatchdog() {
         lastStep = ProcessInfo.processInfo.systemUptime
         // Watching a rest: this step shows the fingers are moving again.
-        if restMonitor != nil { stopWatchingRest(); watchdog?.cancel(); watchdog = nil }
+        if restMonitor != nil { stopWatchingRest(); stopWatchdog() }
         // One timer for the swipe, not one a step: when it fires it waits out the rest from the last step.
         if watchdog == nil { checkRest(after: Self.restAfter) }
+    }
+
+    /// The watchdog's timer called off and let go, so the next step sets a new one.
+    private func stopWatchdog() {
+        watchdog?.cancel()
+        watchdog = nil
     }
 
     private func checkRest(after delay: TimeInterval) {
@@ -381,7 +386,9 @@ final class SwipeNavigator {
     }
 
     private func restCheck(_ check: Int) {
-        guard check == restChecks, restMonitor == nil, state == .tracking || state == .leaning else { return }
+        guard check == restChecks else { return }
+        // Nothing to watch: let go, so the next swipe sets its own.
+        guard restMonitor == nil, state == .tracking || state == .leaning else { watchdog = nil; return }
         let still = ProcessInfo.processInfo.systemUptime - lastStep
         if still < Self.restAfter { checkRest(after: Self.restAfter - still); return }
         // Still for a moment: the fingers may be resting (to read a little more before going back), so the swipe
@@ -424,8 +431,7 @@ final class SwipeNavigator {
 
     private func abandonRest() {
         stopWatchingRest()
-        watchdog?.cancel()
-        watchdog = nil
+        stopWatchdog()
         stopPageListening()
         guard state == .tracking || state == .leaning else { return }
         cancel()
@@ -660,8 +666,7 @@ final class SwipeNavigator {
     }
 
     private func go() {
-        watchdog?.cancel()
-        watchdog = nil
+        stopWatchdog()
         stopWatchingRest()
         // Let go after its tab went to the back: it isn't where you're looking, so it doesn't move.
         guard let webView, webView.window != nil else { cancel(); return }
@@ -704,8 +709,7 @@ final class SwipeNavigator {
     }
 
     private func cancel() {
-        watchdog?.cancel()
-        watchdog = nil
+        stopWatchdog()
         stopWatchingRest()
         pageArrived()
         settlePage()
