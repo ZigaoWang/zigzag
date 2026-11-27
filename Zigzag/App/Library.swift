@@ -717,7 +717,8 @@ enum SearchEngine: String, Codable, CaseIterable {
 final class Library {
     static let shared = Library()
 
-    private struct Stored: Codable {
+    /// Library.json as it's written; tests read older Zigzags' files with it.
+    struct Stored: Codable {
         var spaces: [SpaceInfo]
         var favorites: [Bookmark]?
         var siteRoutes: SiteRoutes.StoredRules?
