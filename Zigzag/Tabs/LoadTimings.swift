@@ -46,9 +46,24 @@ final class LoadTimings {
         nonisolated static func seconds(_ value: TimeInterval) -> String { String(format: "%.1f s", value) }
     }
 
+    /// A moment by two clocks: `awake` stops while the Mac sleeps, as the checks' timers do; `total` doesn't.
+    nonisolated struct Instant: Sendable {
+        var awake: TimeInterval
+        var total: TimeInterval
+
+        nonisolated static var now: Instant {
+            Instant(awake: Double(clock_gettime_nsec_np(CLOCK_UPTIME_RAW)) / 1e9,
+                    total: Double(clock_gettime_nsec_np(CLOCK_MONOTONIC)) / 1e9)
+        }
+    }
+    /// Test seam: the clocks.
+    var clock: () -> Instant = { Instant.now }
+    /// More sleep than this between two looks is the Mac's, not the page's.
+    static let sleepSlack: TimeInterval = 2
+
     private var navigation: ObjectIdentifier?
     private var site: String?
-    private var start = Date()
+    private var start = Instant(awake: 0, total: 0)
     private var load: Load?
     /// It was noted as stalled, so how it ends is noted too.
     private var noted = false
@@ -65,7 +80,7 @@ final class LoadTimings {
         }
         self.navigation = navigation.map(ObjectIdentifier.init)
         site = host
-        start = Date()
+        start = clock()
         load = Load()
         schedule(after: limits.firstByte)
     }
@@ -108,7 +123,14 @@ final class LoadTimings {
         noted = false
     }
 
-    private var elapsed: TimeInterval { Date().timeIntervalSince(start) }
+    /// Seconds since the request went out, counted only while the Mac is awake.
+    private var elapsed: TimeInterval { clock().awake - start.awake }
+
+    /// The Mac slept since the request went out: how long the load took says nothing about the site.
+    private var sleptSinceStart: Bool {
+        let now = clock()
+        return (now.total - start.total) - (now.awake - start.awake) > Self.sleepSlack
+    }
 
     private func isCurrent(_ navigation: WKNavigation?) -> Bool {
         guard load != nil else { return false }
@@ -121,9 +143,10 @@ final class LoadTimings {
         check?.cancel()
         check = nil
         self.load = nil
-        // A load that went slow without its check coming in time (a Mac asleep) is noted too.
+        // A load that went slow without its check coming in time (a busy main thread) is noted too; one the Mac
+        // slept through isn't.
         let slow = (load.firstByte ?? elapsed) >= limits.firstByte || (load.commit ?? elapsed) >= limits.commit
-        if noted || (slow && ending != "stopped") {
+        if !sleptSinceStart, noted || (slow && ending != "stopped") {
             Diagnostics.note("Slow page load", site: site, load.outcome(ending, at: elapsed))
         }
         noted = false
@@ -137,7 +160,7 @@ final class LoadTimings {
     }
 
     private func look() {
-        guard let load, load.commit == nil else { return }
+        guard let load, load.commit == nil, !sleptSinceStart else { return }
         let now = elapsed
         if load.firstByte == nil, now >= limits.firstByte, !noted {
             noted = true

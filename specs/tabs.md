@@ -411,5 +411,7 @@
   Test: LoadTimingsTests.eachStepIsSaidInSeconds
 - A page that loads normally → nothing is noted.
   Test: LoadTimingsTests.aNormalLoadNotesNothing
+- A load is timed only while the Mac is awake; one the Mac slept through → nothing is noted.
+  Test: LoadTimingsTests.aLoadTheMacSleptThroughNotesNothing
 - A private window's page → never timed or noted.
   Test: LoadTimingsTests.aPrivateWindowsLoadIsNeverTimed

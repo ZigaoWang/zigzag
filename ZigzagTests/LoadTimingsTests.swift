@@ -64,6 +64,36 @@ struct LoadTimingsTests {
         #expect(notes(since: start).isEmpty)
     }
 
+    /// A load is timed only while the Mac is awake, and one the Mac slept through notes nothing, however long it
+    /// waited by the wall clock.
+    @Test func aLoadTheMacSleptThroughNotesNothing() {
+        let start = Date()
+        var now = LoadTimings.Instant(awake: 100, total: 5000)
+        let timings = LoadTimings()
+        timings.clock = { now }
+        // Far off, so no check comes in the test: only how each load ends is noted.
+        timings.limits = .init(firstByte: 10, commit: 30)
+        let url = URL(string: "http://127.0.0.1:9/timed")!
+        // Asleep for an hour while it waited: nothing.
+        timings.started(nil, url: url, isPrivate: false)
+        now.awake += 0.5
+        now.total += 3600.5
+        timings.finished(nil)
+        #expect(notes(since: start).isEmpty)
+        // Asleep for an hour after it went slow while awake: nothing either.
+        timings.started(nil, url: url, isPrivate: false)
+        now.awake += 12
+        now.total += 3612
+        timings.finished(nil)
+        #expect(notes(since: start).isEmpty)
+        // Awake all along: twelve seconds without an answer is noted, as twelve seconds.
+        timings.started(nil, url: url, isPrivate: false)
+        now.awake += 12
+        now.total += 12
+        timings.finished(nil)
+        #expect(notes(since: start).map(\.detail) == ["loaded at 12.0 s, no answer"])
+    }
+
     @Test func eachStepIsSaidInSeconds() {
         var load = LoadTimings.Load()
         #expect(load.detail(at: 10) == "waiting for the server for 10.0 s")
