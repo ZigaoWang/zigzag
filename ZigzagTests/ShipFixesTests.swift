@@ -373,8 +373,10 @@ struct BookmarkFolderTests {
         // A busy page slow to answer the scroll: before, the arrow waited out the 50 ms; now it comes at 10 points (#508).
         #expect(arrowAfter(step: 3, probe: 4, answer: 90, leans: false) == 56)
         #expect(arrowAfter(step: 3, probe: 4, answer: 90, leans: true) == 32)
-        // The probe asked at touch-down is back before the scroll begins; one not back yet waits as before.
-        #expect(arrowAfter(step: 3, probe: 200, answer: 200, leans: true) == 120)
+        // The probe asked at touch-down is back before the scroll begins; one not back within a frame doesn't hold
+        // the arrow back either, unless the page has cancelled sideways scrolls before.
+        #expect(arrowAfter(step: 3, probe: 200, answer: 200, leans: true) == 32)
+        #expect(arrowAfter(step: 3, probe: 200, answer: 200, leans: false) == 120)
     }
 
     @Test func aTouchDownsProbeIsForTheGestureAtItsSpot() {
@@ -2128,5 +2130,211 @@ struct SwipeGestureTests {
         #expect(sorted[sorted.count / 2] < 1000)
         _ = swipe.handle(try scroll(phase: 8))
         _ = host
+    }
+}
+
+/// A trackpad swipe driven at the trackpad's 120 Hz in real time over a tab's page in a card, a busy one included:
+/// what each step costs, how soon the page first moves, and whether anything animates against the fingers.
+@MainActor
+@Suite(.serialized)
+struct SwipeSmoothnessTests {
+    private final class Host: NSWindowController, SwipeArrowHost {
+        let swipeArrowLayer = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        var tab: Tab?
+    }
+
+    /// A tab's page 800 points wide in a card, showing `html`.
+    private func page(_ html: String) async throws -> (BrowserWebView, Host) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.borderless],
+                              backing: .buffered, defer: true)
+        let host = Host(window: window)
+        let tab = Tab(url: URL(string: "about:blank"), spaceID: UUID())
+        let page = try #require(tab.ensureWebView() as? BrowserWebView)
+        host.tab = tab
+        let card = PageCardView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        window.contentView?.addSubview(card)
+        card.show(page)
+        card.layoutSubtreeIfNeeded()
+        window.contentView?.addSubview(host.swipeArrowLayer)
+        page.swipeNavigator.debugCanGo = (true, false)
+        page.loadHTMLString(html, baseURL: nil)
+        for _ in 0..<60 where page.isLoading || page.url == nil { try await Task.sleep(for: .milliseconds(50)) }
+        try await Task.sleep(for: .milliseconds(300))
+        return (page, host)
+    }
+
+    /// Lots of page, and a script that keeps the page's main thread busy 150 ms at a time.
+    private static let busy = """
+    <html><body><div id=list></div><script>
+    const list = document.getElementById('list');
+    for (let i = 0; i < 20000; i++) { const d = document.createElement('div'); d.textContent = 'Row ' + i; list.appendChild(d); }
+    function work() { const t = performance.now(); while (performance.now() - t < 150) {} setTimeout(work, 5); }
+    setTimeout(work, 0);
+    </script></body></html>
+    """
+    private static let plain = "<html><body><p>Plain</p></body></html>"
+
+    private func scroll(phase: Int64, dx: Int32, at time: TimeInterval) throws -> NSEvent {
+        let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: dx, wheel3: 0))
+        cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+        cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(dx))
+        cg.timestamp = CGEventTimestamp(time * 1_000_000_000)
+        return try #require(NSEvent(cgEvent: cg))
+    }
+
+    private var on: Bool { NSEvent.isSwipeTrackingFromScrollEventsEnabled && SwipeNavigator.isOn }
+
+    private func animates(_ layer: CALayer?) -> Bool {
+        guard let layer else { return false }
+        if !(layer.animationKeys() ?? []).isEmpty { return true }
+        return (layer.sublayers ?? []).contains { animates($0) }
+    }
+
+    /// A step of `dx` for each of `steps` at 120 Hz in real time, the run loop turning between them as it does for a
+    /// trackpad, then the fingers lifting on the next frame.
+    private func drive(_ page: BrowserWebView, host: Host, steps: [Int32]) async throws -> Run {
+        var run = Run()
+        let swipe = page.swipeNavigator
+        let moved = try #require(page.superview?.layer)
+        final class Count { var value = 0 }
+        let wakes = Count()
+        let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.afterWaiting.rawValue, true, 0) { _, _ in wakes.value += 1 }
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+        defer { CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes) }
+        let start = ProcessInfo.processInfo.systemUptime
+        _ = swipe.handle(try scroll(phase: 1, dx: steps[0], at: start))
+        var offsets: [(time: TimeInterval, tx: CGFloat)] = []
+        for (index, dx) in steps.enumerated().dropFirst() {
+            let wait = start + Double(index) / 120 - ProcessInfo.processInfo.systemUptime
+            if wait > 0 { try await Task.sleep(for: .microseconds(Int(wait * 1_000_000))) }
+            let now = ProcessInfo.processInfo.systemUptime
+            let event = try scroll(phase: 2, dx: dx, at: now)
+            let t = DispatchTime.now().uptimeNanoseconds
+            _ = swipe.handle(event)
+            CATransaction.flush()
+            run.steps.append(Double(DispatchTime.now().uptimeNanoseconds - t) / 1000)
+            let tx = moved.affineTransform().tx
+            offsets.append((now, tx))
+            if run.firstMove == nil, tx != 0 { run.firstMove = (now - start) * 1000 }
+            let arrow = host.swipeArrowLayer.subviews.first as? SwipeArrowView
+            if !swipe.isArmed, animates(moved) || animates(arrow?.layer) { run.animated += 1 }
+        }
+        run.wakeups = Double(wakes.value) / (ProcessInfo.processInfo.systemUptime - start)
+        #if DEBUG
+        run.timers = swipe.debugWatchdogTimers
+        #endif
+        try await Task.sleep(for: .milliseconds(8))
+        // The page's own speed over the last few steps, and the spring back's as it starts.
+        if let last = offsets.last, let before = offsets.dropLast(3).last, last.time > before.time {
+            run.pageSpeed = (last.tx - before.tx) / CGFloat(last.time - before.time)
+        }
+        // Held in a transaction of its own: committed, a window that was never shown ends its animations at once.
+        CATransaction.begin()
+        defer { CATransaction.commit() }
+        _ = swipe.handle(try scroll(phase: 4, dx: 0, at: ProcessInfo.processInfo.systemUptime))
+        if let spring = moved.animation(forKey: "swipe.settle") as? CASpringAnimation,
+           let from = (spring.fromValue as? NSValue)?.caTransform3DValue.m41 {
+            // Toward home, in whole distances a second: as a speed in points, the way the page was going.
+            run.settleSpeed = -spring.initialVelocity * from
+        }
+        swipe.pageArrived()
+        return run
+    }
+
+    struct Run {
+        /// Milliseconds from the gesture's first scroll to the page first moving.
+        var firstMove: Double?
+        /// Each step's handling, layers committed, in µs.
+        var steps: [Double] = []
+        /// Main thread run loop wakeups a second while the fingers moved.
+        var wakeups = 0.0
+        /// Timers the swipe set while the fingers moved.
+        var timers = 0
+        /// Steps after which something the swipe moves had an animation on it.
+        var animated = 0
+        /// Points a second the page moved as the fingers lifted, and the spring back's speed as it starts.
+        var pageSpeed: CGFloat = 0
+        var settleSpeed: CGFloat = 0
+    }
+
+    private func report(_ name: String, _ run: Run) {
+        let s = run.steps.sorted()
+        let first = run.firstMove.map { String(format: "%.1f ms", $0) } ?? "never"
+        print("swipe bench \(name): first move \(first), step µs median \(Int(s[s.count / 2])) p95 \(Int(s[s.count * 95 / 100])) max \(Int(s.last ?? 0)) (step \(run.steps.firstIndex(of: s.last ?? 0) ?? -1), first 4: \(run.steps.prefix(4).map { Int($0) })), wakeups \(Int(run.wakeups))/s, timers \(run.timers), steps with animations \(run.animated), page \(Int(run.pageSpeed)) pt/s, spring back starts \(Int(run.settleSpeed)) pt/s")
+    }
+
+    /// Keeps the page's main thread busy for `ms`, as a heavy page's script does, without waiting for it.
+    private func busy(_ page: BrowserWebView, ms: Int) {
+        page.evaluateJavaScript("{ const t = performance.now(); while (performance.now() - t < \(ms)) {} }", in: nil, in: .page) { _ in }
+    }
+
+    /// A calm swipe: past the 10 points that decide it in four steps, a point a step for most of a second, then a little
+    /// quicker as the fingers lift, short of arming.
+    private static let calm: [Int32] = [3, 3, 3, 3] + Array(repeating: 1, count: 96) + Array(repeating: 3, count: 10)
+
+    @Test func aSwipeAtTheTrackpadsRate() async throws {
+        guard on else { return }
+        var runs: [Run] = []
+        for (name, html, busyFor) in [("plain", Self.plain, 0), ("busy", Self.busy, 300)] {
+            let (page, host) = try await page(html)
+            if busyFor > 0 { busy(page, ms: busyFor) }
+            let run = try await drive(page, host: host, steps: Self.calm)
+            report(name, run)
+            runs.append(run)
+            _ = host
+        }
+        for run in runs {
+            // Nothing animates against the fingers, and a second of steps sets a timer or two, not one a step.
+            #expect(run.animated == 0)
+            #expect(run.timers <= 3)
+            // The spring back starts at about the page's own speed.
+            #expect(run.pageSpeed > 10)
+            #expect(abs(run.settleSpeed - run.pageSpeed) <= run.pageSpeed * 0.3)
+        }
+        // A page too busy to answer moves within a frame of a quick one.
+        let plain = try #require(runs[0].firstMove), busy = try #require(runs[1].firstMove)
+        #expect(busy <= plain + 1000.0 / 60 + 2)
+    }
+
+    @Test func aBusyPageLeansWithinAFrame() {
+        func decide(waited: TimeInterval, leans: Bool = true, overFrame: Bool = false) -> SwipeDecision {
+            SwipeDecision.decide(dx: 12, dy: 0, canGoBack: true, canGoForward: true, pageScrolls: nil, page: .unknown,
+                                 waited: waited, overFrame: overFrame, leans: leans)
+        }
+        #expect(SwipeDecision.probeWait <= 1.0 / 60)
+        #expect(decide(waited: 0.01) == .undecided)
+        #expect(decide(waited: SwipeDecision.probeWait) == .lean(-1))
+        // A page that cancelled sideways scrolls before, or one over a frame, waits for its answer as before.
+        #expect(decide(waited: SwipeDecision.probeWait, leans: false) == .undecided)
+        #expect(decide(waited: SwipeDecision.probeWait, overFrame: true) == .undecided)
+        // Not heard from by the usual wait, it's the swipe's.
+        #expect(decide(waited: SwipeDecision.frameWait) == .track(-1))
+    }
+
+    @Test func lettingGoCarriesOnAtThePagesSpeed() {
+        // Unknown speed: the house ease-out, as before.
+        #expect(SwipeExit.carryTiming(distance: 44, velocity: nil) === Tokens.Motion.easeOut)
+        func slope(_ velocity: CGFloat) -> Float {
+            var first: [Float] = [0, 0]
+            SwipeExit.carryTiming(distance: 44, velocity: velocity).getControlPoint(at: 1, values: &first)
+            return first[1] / first[0]
+        }
+        // Starting at the page's speed: 44 points in 0.18 s at an even pace is 244 points a second.
+        #expect(abs(slope(400) - Float(400 * SwipeExit.duration / 44)) < 0.01)
+        // Never slower than an even pace, nor faster than the house ease-out starts.
+        #expect(slope(0) == 1)
+        #expect(slope(-300) == 1)
+        #expect(abs(slope(5000) - 1 / 0.23) < 0.01)
+        // The spring back: toward home at the page's speed, capped where it would go past home.
+        let from = CGAffineTransform(translationX: 40, y: 0)
+        let still = SwipeExit.springHome(from: from, velocity: 0)
+        #expect(still.initialVelocity == 0)
+        let coming = SwipeExit.springHome(from: from, velocity: -80)
+        #expect(abs(coming.initialVelocity - 2) < 0.001)
+        let going = SwipeExit.springHome(from: from, velocity: 80)
+        #expect(abs(going.initialVelocity + 2) < 0.001)
+        let natural = sqrt(still.stiffness / still.mass)
+        #expect(SwipeExit.springHome(from: from, velocity: -100_000).initialVelocity == natural)
     }
 }
