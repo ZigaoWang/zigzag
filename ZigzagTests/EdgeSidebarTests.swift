@@ -339,6 +339,22 @@ struct EdgeSidebarTests {
         #expect(!tabs[1].isLoaded)
     }
 
+    /// A page out in the preview is seen, so it isn't put to sleep; one that sleeps anyway shows its card, not an
+    /// empty pill.
+    @Test func aPreviewedPageStaysAwakeAndShowsItsCardIfItSleeps() async throws {
+        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/first", "https://example.test/second"])
+        defer { done() }
+        tabs[1].ensureWebView()
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(mini.tab === tabs[1] && mini.asleepCardTitle == nil)
+        #expect(!TabManager.mayStillSleep(tabs[1]))
+        // As a crash or a busy page's sleep would, without asking whether it may.
+        tabs[1].suspend(because: EnergyWatch.sleepReason)
+        #expect(await until { tabs[1].isAsleep && !tabs[1].isLoaded })
+        #expect(await until { mini.asleepCardTitle == tabs[1].displayTitle })
+    }
+
     /// A click on a sleeping row's card does what a click on its row does: the panel goes and the window comes forward
     /// with that tab, its page woken there.
     @Test func clickingAnAsleepCardOpensItsTabInTheWindow() async throws {

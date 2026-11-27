@@ -2795,7 +2795,8 @@ final class TabManager {
         let memory = MemoryPressure.shared.level
         let candidates = live.map {
             TabSleep.Candidate(id: $0.id, unseen: now.timeIntervalSince($0.lastActivated),
-                               mustStay: selectedIDs.contains($0.id) || $0.isPlayingAudio || $0.isInUse || $0.notifiesUser,
+                               mustStay: selectedIDs.contains($0.id) || MiniWindowController.shows($0) || $0.isPlayingAudio
+                                   || $0.isInUse || $0.notifiesUser,
                                hasTypedText: $0.pageState?.hasTypedText == true, isFavorite: $0.isFavorite,
                                keptAwake: KeepAwake.isOn(for: $0.url), isLoading: $0.isLoading)
         }
@@ -2898,10 +2899,10 @@ final class TabManager {
         return list[(index + 1)...].first(where: fits) ?? list[..<index].reversed().first(where: fits)
     }
 
-    /// Whether a tab on its way to sleep (TabSleep.queue) still may: it's open and awake, and no window has come to
-    /// show it, alone or beside another in a split, since it was chosen.
+    /// Whether a tab on its way to sleep (TabSleep.queue) still may: it's open and awake, and no window, Mini or edge
+    /// preview has come to show it, alone or beside another in a split, since it was chosen.
     static func mayStillSleep(_ tab: Tab) -> Bool {
-        guard !tab.isClosed, !tab.isSuspended else { return false }
+        guard !tab.isClosed, !tab.isSuspended, !MiniWindowController.shows(tab) else { return false }
         return !WindowManager.shared.everyController.contains { $0.tabManager.shows(tab) }
     }
 

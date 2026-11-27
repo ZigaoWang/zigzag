@@ -185,7 +185,8 @@ final class EnergyWatch {
         // Each window's selected page (and split partner) never sleeps, even when covered or minimized: it would just
         // reload. Sharing windows (#162) list the same tabs; each is checked once and any window's selection is kept.
         // AI apps' own window too: out of sight it shows none (`TabManager.shownTabs`), so only use spares a tab there.
-        let kept = WindowManager.shared.everyController.flatMap(\.tabManager.shownTabs)
+        // A page out in a Mini or the edge sidebar's preview is seen too.
+        let kept = WindowManager.shared.everyController.flatMap(\.tabManager.shownTabs) + MiniWindowController.all.map(\.tab).filter(MiniWindowController.shows)
         do {
             for tab in WindowManager.shared.everyOpenTab where tab.webView.flatMap(Self.processID) == pid && !kept.contains(where: { $0 === tab }) {
                 let mustStay = spared.contains(tab.id)

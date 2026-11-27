@@ -138,6 +138,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private(set) static var all: [MiniWindowController] = []
     /// The one you're in, if any.
     static var key: MiniWindowController? { all.first { $0.window?.isKeyWindow == true } }
+    /// Whether a Mini, or the edge sidebar's preview, has the tab's page out: it's seen, so it doesn't sleep.
+    static func shows(_ tab: Tab) -> Bool { all.contains { $0.tab === tab && !$0.startedWithoutPage } }
 
     /// What the feature is called wherever Zigzag names it.
     static var name: String { String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.") }
@@ -1219,6 +1221,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     // MARK: The page
 
     private func showPage() {
+        asleepCard?.removeFromSuperview()
+        asleepCard = nil
         root.card.show(tab.ensureWebView())
         root.card.hidePlaceholder()
     }
@@ -1265,6 +1269,19 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             // A new web view (the page crashed and came back, or crossed into an extension's page) takes the old one's place.
             // A card preview stays a card: the page, if it wakes, is the browser window's.
             if change == .webView, tab.webView != nil, !movedOut, !startedWithoutPage { showPage() }
+            // Put to sleep while out here anyway: its card, never an empty room. A click on it does what the row's
+            // would for a preview, and wakes the page here for a Mini of its own.
+            if change == .webView, tab.webView == nil, tab.isAsleep, !movedOut, asleepCard == nil {
+                showAsleepCard { [weak self] in
+                    guard let self else { return }
+                    if self.isBorrowingPage, let browser = self.source {
+                        let tab = self.tab
+                        DispatchQueue.main.async { browser.listSelect(tab) }
+                    } else {
+                        self.showPage()
+                    }
+                }
+            }
             if change == .webView || change == .loading { refreshBar(animated: false) }
         case .themeColor, .darkPage:
             refreshBar(animated: true)
