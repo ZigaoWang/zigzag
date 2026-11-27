@@ -12,64 +12,57 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 修复
+- 解锁 Mac 后，Zigzag 的窗口会立即按原样显示。全屏时屏幕不会再先黑一下，在窗口中时后面的窗口也不会再短暂透出来。
+- 和其他 Mac App 一样，按住即可打开菜单，滑到某一项上松开就能选择它：在标签页、收藏、文件夹、空间或边栏上按住右键或按住双指点按，或者按住菜单按钮，比如边栏的 +、… 按钮或下拉菜单，菜单现在会在按下时就打开。在标题栏里右键点按边栏的“后退”或“前进”，又会打开它的列表了。
+- 在固定的页面或收藏上按 ⌘T 再按 ⌘W，会像在普通标签页上那样回到它，而不是回到列表里的某个标签页。
+- 网页不会再在 window 上找到 `browser` 这个名称，与 Chrome 和 Safari 一致，所以检查它的网站不会再把 Zigzag 当成扩展的页面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- 关闭一个固定的页面后又取消了它的固定，这时按 ⇧⌘T，它会回到新标签页打开的位置，而不是标签页的最上方。
+- 显示过 AI 应用窗口后，从屏幕边缘调出的边栏不会再带着那个窗口的标签页出来；它始终是你自己某个窗口的边栏。
+- 在屏幕边缘的边栏旁边或在 Zigzag Mini 里查看的网页，不会再进入休眠、留下一个空白页；如果仍然休眠，会显示它的名称卡片。
+- 通过隐藏框架交出文件的网页应用，比如飞书文档的“下载为 Word、PDF 或 Markdown”，导出时又能存储文件了，不会再没有反应。再点一次后的第二次导出也能完成，Zigzag 拦下的下载总会提示。打开“下载文件前先询问网站”时，它会先询问，和网页自己的下载一样。([#535](https://github.com/ZigaoWang/zigzag/issues/535))
+- 设置代理自动配置脚本的扩展（比如 Hotspot Shield 连接时就会这样做），现在会被告知 Zigzag 拒绝了它，而不会以为代理已经设好，你的网页却没有经过它。([#475](https://github.com/ZigaoWang/zigzag/issues/475))
+- 快速向后或向前轻扫时，触控板又会轻触一下。在松开就会后退或前进的那一刻，箭头会填满并轻触一次，快速一拨也一样。如果手指在滑满距离前停下，箭头会再次变空，这时松开会弹回原处，与 Safari 一致。用手指在触摸屏上轻扫不会轻触，网页可能还要自己处理这次轻扫时也不会。
+- 边栏隐藏并滑出盖在网页上时，从它打开菜单不会再让边栏收回、只留下菜单浮在网页上。边栏会一直保持滑出，直到菜单关闭；如果指针不在边栏上，它才会滑回去。
+- 在标签页概览的搜索里输入时，或者在繁忙的 Mac 上回到正在显示“设置”的窗口时，Zigzag 不会再卡住一秒或更久。
+- 向后、向前轻扫更紧跟手指，即使在繁忙的网页上也更顺滑；打开很多标签页时，Zigzag 也不会再每分钟停顿一下。
+
+### 更改
+- “帮助 › 报告问题”现在会记下服务器 10 秒内没有响应、或 30 秒后仍什么都不显示的网页，包括网站和每一步用了多长时间，以便分清失效的网站和缓慢的网站。无痕浏览窗口不会记下任何内容。([#548](https://github.com/ZigaoWang/zigzag/issues/548))
+
 ## [0.10.0] - 2026-11-25
 
-Zigzag 新增十三种语言，包括日语、韩语、德语、法语、西班牙语和俄语；下载规则可以转交下载好的文件；实时文件夹会显示上次更新的时间；用中文拼音输入中途切换到英文，不会再多出空格。
+“与 iCloud 同步”让你的空间、固定标签页、收藏和设置在每台 Mac 上保持一致，从屏幕边缘调出的边栏可以在旁边预览网页。Zigzag 还新增了十一种语言，“兼容模式”用一个开关就能关掉可能让网站出问题的功能，下载规则也可以转交下载好的文件。
 
 ### 新功能
-- Zigzag 现在支持日语，用词和 Apple 的日语 macOS、Safari 一致。它会跟随 Mac 的语言，也可以在“设置 › 通用 › 语言”里选择。
-- Zigzag 现在支持韩语、德语、法语、意大利语、西班牙语、巴西葡萄牙语、俄语、荷兰语、波兰语和土耳其语，用词和 Apple 在各语言里的一致。它会跟随 Mac 的语言，也可以在“设置 › 通用 › 语言”里选择。
-- 下载规则可以转交文件而不是地址：把“转交”设为“文件”，Zigzag 会先用网页的登录状态下载，再把保存好的文件交给 App、脚本或服务。链接仍然转交地址；转交文件时，模板可以用 {file} 或 {file_url} 取得保存的文件。感谢 [Lakeland97](https://github.com/Lakeland97)。([#529](https://github.com/ZigaoWang/zigzag/issues/529))
-- 实时文件夹的菜单顶部现在会显示上次更新的时间，比如“5分钟前更新”；正在获取时显示“正在更新…”。
-- “新建实时文件夹”和“编辑实时文件夹”先问来源，下拉菜单和输入框对齐，下方会说明文件夹会显示什么，以及每 30 分钟检查一次（低电量模式下每小时一次）。名称留空时会显示将使用的名称，不可能是 GitHub 用户名的输入会被标出。
-- “网站设置”新增“兼容模式”，给不能正常使用的网站用：一个开关就能在这个网站上关掉扩展、广告拦截、Cookie 弹窗和已隐藏的元素，关掉兼容模式后，你之前对它们的选择都会恢复。打开时“网站设置”按钮会变成强调色，“设置 › 隐私 › 网站”也会列出它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
-- “设置 › 外观 › 指向链接时显示链接地址”：关掉后，指向链接时页面角落不会再显示链接地址，浏览器窗口、Zigzag Mini、网页应用和标签页概览都一样。默认仍然打开。感谢 [sarekhamri](https://github.com/sarekhamri)。([#537](https://github.com/ZigaoWang/zigzag/issues/537))
-- “设置 › 外观 › 较短的浮动边栏”：边栏隐藏时，浮现在页面上的边栏高度是窗口的三分之二，上下各留出六分之一。停靠的边栏不变。默认关闭。感谢 [sarekhamri](https://github.com/sarekhamri)。([#538](https://github.com/ZigaoWang/zigzag/issues/538))
-- “设置 › 外观 › 已固定标签页显示为方块”：不在文件夹里的已固定标签页会以方块显示在收藏下方，和收藏在同一个网格里，中间隔一条细线；打开、卸载、右键菜单和拖移都和原来的行一样。文件夹和里面的页面仍然是行。默认关闭。感谢 [sarekhamri](https://github.com/sarekhamri)。([#539](https://github.com/ZigaoWang/zigzag/issues/539))
+- “设置 › 通用”新增“与 iCloud 同步”：你的空间、个人资料、固定标签页、文件夹、收藏、实时文件夹和设置会在登录同一 iCloud 的每台 Mac 上保持一致，存放在你自己 iCloud 的私有数据库里。打开的标签页、历史记录、网站数据和扩展留在各自的 Mac 上，密码仍通过 iCloud 钥匙串同步。打开它时，这台 Mac 的资料库会与 iCloud 里的合在一起：两边都有的内容以较新的修改为准，不经询问不会移除任何内容，并且会先存一份备份。“设置”会显示上次同步的时间，比如“上次同步：5 分钟前”。([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- 从屏幕边缘调出的边栏可以预览网页：把指针停在标签页上，它的网页就会出现在边栏旁边，盖在你正在用的 App 上面，在标签页之间移动时也会一直显示。指针离开标签页和网页时，它会收起。休眠的标签页只显示名称，仍保持休眠；点按它的行或卡片，就会在 Zigzag 里切到这个标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
+- Zigzag 现在支持日语、韩语、德语、法语、意大利语、西班牙语、巴西葡萄牙语、俄语、荷兰语、波兰语和土耳其语，用词和 Apple 在各语言的 macOS 和 Safari 中一致。它会跟随 Mac 的语言，也可以在“设置 › 通用 › 语言”里选择。
+- “兼容模式”是“网站设置”里“此网站”的第一行，给不能正常使用的网站用：一个开关就能在这个网站上关掉扩展、广告拦截、Cookie 弹窗和已隐藏的元素，关掉后你之前对它们的选择都会恢复。打开时“网站设置”会显示为强调色，“设置 › 隐私 › 网站权限”也会列出它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- 下载规则可以转交文件而不是地址：把“转交”设为“文件”，Zigzag 会先用网页的登录状态下载，再把存储好的文件交给 App、脚本或服务。链接仍然转交地址；转交文件时，模板可以用 {file} 或 {file_url} 取得存储的文件。感谢 [Lakeland97](https://github.com/Lakeland97)。([#529](https://github.com/ZigaoWang/zigzag/issues/529))
+- 下载规则可以用 {file_raw} 把存储好的文件本身发送给服务，所以“发送到 rTorrent”现在会交出 .torrent 文件，也能用于私有 Tracker。服务的用户名和密码保存在钥匙串里，而不是写在地址中。感谢 [Lakeland97](https://github.com/Lakeland97)。([#550](https://github.com/ZigaoWang/zigzag/pull/550))
+- 实时文件夹的菜单最上面会显示上次更新的时间，比如“5分钟前更新”，获取时显示“正在更新…”，菜单开着时也会随之变化。文件夹检查新页面时，图标角上的标记会显示一个转动的圆环，就像“邮件”检查邮箱时那样。
+- “新建实时文件夹”和“编辑实时文件夹”先问来源，菜单和输入框对齐，下方会说明文件夹会显示什么，以及每 30 分钟检查一次（低电量模式下每小时一次）。这里会显示文件夹自己的图标，和边栏里一样，点按图标就能更换。名称留空时会显示将使用的名称，GitHub 不可能有的用户名会被标出。
+- “设置 › 外观 › 指向链接时显示链接地址”：关掉后，指向链接时页面角落不会再显示链接地址，浏览器窗口、Zigzag Mini、网页应用和标签页概览都一样。感谢 [sarekhamri](https://github.com/sarekhamri)。([#537](https://github.com/ZigaoWang/zigzag/issues/537))
+- “设置 › 外观 › 较短的浮动边栏”：边栏隐藏时，浮现在页面上的边栏高度是窗口的三分之二，上下各留出六分之一，窗口按钮留在它旁边的栏里。停靠的边栏不变。感谢 [sarekhamri](https://github.com/sarekhamri)。([#538](https://github.com/ZigaoWang/zigzag/issues/538))
+- “设置 › 外观 › 已固定标签页显示为方块”：不在文件夹里的已固定标签页会以方块显示在收藏下方，和收藏在同一个网格里，中间隔一条细线；打开、卸载、菜单和拖移都和它们的行一样。文件夹和里面的页面仍然是行。感谢 [sarekhamri](https://github.com/sarekhamri)。([#539](https://github.com/ZigaoWang/zigzag/issues/539))
 - “设置”里的长列表现在像“网站权限”一样折叠成方框：“快捷键”的每个菜单、每条下载规则（保存的回答在里面）、每类功能标志，以及超过三项时的“开发者模式中的网站”“受信任的证书”和“网页尺寸”。“查找设置”仍会展开匹配项所在的方框。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - “网站权限”自带的搜索和“查找设置”现在也能按权限和选择找网站：输入“摄像头”“通知”或“阻止”，就能看到做了这个选择的每个网站，各自在网站名称下面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
 - “历史记录”的搜索不区分重音和大小写，能按任意顺序找到每个词并标出来，也不会把匹配的结果藏在叠起来的一组里；一天的每个时段只有一个标题，同一网站的两个页面仍是两行，列表还能响应方向键、Delete、⌘Return、⌘F，以及能移除整个网站的右键操作。
-- 实时文件夹检查新页面时，图标角上的标记会显示一个转动的圆环，就像“邮件”检查邮箱时那样，检查一结束就停下。
-- “新建实时文件夹”和“编辑实时文件夹”会显示文件夹自己的图标，和边栏里一样：GitHub 列表是 GitHub 的图标，订阅源是网站的图标，选过图标就是选的那个。点一下就能像“更改图标…”一样更换图标，新建的文件夹会用你选的图标。
-- “设置 › 通用”新增“与 iCloud 同步”：你的空间、个人资料、固定标签页、文件夹、收藏、实时文件夹和设置会在登录同一 iCloud 的每台 Mac 上保持一致，存放在你自己 iCloud 的私有数据库里。打开的标签页、历史记录、网站数据和扩展留在各自的 Mac 上，密码仍通过 iCloud 钥匙串同步。打开它时，这台 Mac 的资料库会与 iCloud 里的合在一起：两边都有的内容以较新的修改为准，不经询问不会移除任何内容，并且会先存一份备份。([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- 从屏幕边缘调出的边栏可以预览网页：把指针停在标签页上，它的网页就会出现在边栏旁边，盖在你正在用的 App 上面。休眠的标签页只显示名称，仍保持休眠，点一下就会在 Zigzag 里切到这个标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
-- 下载规则可以用 {file_raw} 把保存好的文件本身发送给服务，所以“发送到 rTorrent”现在会交出 .torrent 文件，也能用于私有 Tracker。服务的用户名和密码保存在钥匙串里，而不是写在地址中。感谢 [Lakeland97](https://github.com/Lakeland97)。([#550](https://github.com/ZigaoWang/zigzag/pull/550))
 - 在触控显示屏或 Sidecar iPad 上，手指打开的菜单行更高，点一下小按钮的紧邻处就会按到它，在选中的多个标签页之一上触摸并按住会把它们一起带走，手指也更容易抓住边栏的边缘。
 
 ### 更改
 - 双指向后、向前轻扫更顺滑了，滑动距离更短或轻轻一拨就能触发，页面不会上下漂移，也不会留下箭头或让页面错位，在标签页、分屏浏览和 Zigzag Mini 中都一样。
-- “兼容模式”现在是“网站设置”里“此网站”的第一行，在它关掉的那些行上面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
-- “设置 › 通用”里的“与 iCloud 同步”会显示上次同步的时间，比如“上次同步：5 分钟前”；“正在同步…”只在第一次同步或耗时较长的同步时出现，不会在每次快速检查时都出现。([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 - “关于 Zigzag”里的“你的 Zigzag 卡片”重新画成了一张真正的卡片：名字更大，“自”后面带月份和年份，Z 压印在角上，质感可选磨砂玻璃、珠光箔、阳极氧化石墨和亚麻纸，每种的名称写在色样旁边。“存储为图片”和“共享”会生成 2400 × 1500 的图片，卡片放在相配的背景上。
 
 ### 修复
 - 网页上打开 Zigzag Mini 时，在变暗的网页上滚动不会再把后面的网页滚走。感谢 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
-- 允许网站访问这台 Mac 上的 App 之前的说明，现在按顺序写清楚了：先开启这个设置，再在网站设置里开启每个网站，关闭这个设置会停止所有网站。感谢 [Lakeland97](https://github.com/Lakeland97)。([#533](https://github.com/ZigaoWang/zigzag/issues/533))
+- 允许网站访问这台 Mac 上的 App 之前的说明，现在按顺序写清楚了：先开启这个设置，再在“网站设置”里开启每个网站，关闭这个设置会停止所有网站。感谢 [Lakeland97](https://github.com/Lakeland97)。([#533](https://github.com/ZigaoWang/zigzag/issues/533))
 - 在“设置”中，标题旁边有按钮或搜索框的列表，比如“网站存储的数据”或“转交下载和链接”，不会再紧贴在这些控件下面，和其他标题下面留出一样的间距。感谢 [Lakeland97](https://github.com/Lakeland97)。([#527](https://github.com/ZigaoWang/zigzag/issues/527))
-- 拼音输入到一半切换到英文时，字母之间不再留下空格，网页和地址栏里都是，与 Chrome 一致。
-- 玻璃选为“透明”的空间，在 Zigzag 什么都没做时（即使是空白页或“设置”）不会再让 Mac 的图形处理器一直忙碌。之前 macOS 每一帧都要重画整个窗口和它的阴影，现在只在有变化时才重画。更新卡片的进度条在隐藏时也不会再继续滑动。
 - “设置”打开得更快了。每个部分在第一次打开时才生成，折叠的方框在展开或被搜索时才生成，所以在“通用”打开“设置”时不会再生成“下载”“快捷键”或“开发者”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
-- Bitwarden 的“使用生物识别解锁”现在能连上 Bitwarden App 了。之前 Zigzag 告诉 Bitwarden 它已经能和 App 通信，所以 Bitwarden 从不申请，Zigzag 却又不让它连 App。现在 Bitwarden 会申请，Zigzag 会问你是否允许。如果之前打开过生物识别，请在 Bitwarden 的设置里把“使用生物识别解锁”关掉再打开。感谢 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
-- 地址栏放在页面上方、空间设为透明时，播放视频不再让 Mac 的图形处理比关掉地址栏时忙得多。窗口的玻璃现在只留在边栏后面，而不是整个窗口。
-- 在 Mac 内存不足时休眠了几个小时的标签页，醒来后不再退出 Azure DevOps、Microsoft 365 等网站的登录：如果 WebKit 中保存登录 Cookie 的部分停止了（内存紧张时 macOS 可能会让它停止），Zigzag 会在页面加载前把它们放回去。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-- 全屏播放的视频不再被网站自己的顶栏或侧栏盖住，比如 Bilibili。([#543](https://github.com/ZigaoWang/zigzag/issues/543))
-- 在不显示窗口按钮的地方，后退、前进和重新载入按钮前不再留出放窗口按钮的空位，比如菜单栏落下之前的全屏；较短的浮动边栏展开时，窗口按钮也会留在工具栏里。感谢 [Lakeland97](https://github.com/Lakeland97)。([#542](https://github.com/ZigaoWang/zigzag/issues/542))
-- 更新时一直开着的实时文件夹菜单，现在不用关掉就会从“正在更新…”变成“刚刚更新”，或者显示无法更新的原因。
-- “每行收藏数”设为“自动”时，收藏会均匀分布在各行：六个本来能排四个的，会排成两行各三个，而不是四个加两个。
-- 批准一个要求更多权限的扩展更新后，不会再事后收回你已允许的内容，比如 Bitwarden 为“生物识别解锁”与其 App 的连接。感谢 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
-- 在扩展还在启动时移除个人资料，不会再导致 Zigzag 退出。
-- 即使有休眠的标签页，iCloud 密码也能在登录页上设置好：请求休眠标签页的框架不再失败，和 Chrome 一样。
-- The Marvellous Suspender 等会设置闹钟的扩展又能用了：设置闹钟现在会返回 Promise，和 Chrome 一样。
-- 关闭刚用 ⌘T 打开的标签页，会像 Safari 和 Chrome 一样回到你之前所在的标签页，而不是下面的那个。
-- 从屏幕边缘调出的边栏里，网页预览在你从一个标签页移到下一个时不再关上又重新出现；指针离开标签页和网页、移到边栏的空白处时会收起；扩展也不再把它当作一个单独的窗口。感谢 [Lakeland97](https://github.com/Lakeland97)。([#546](https://github.com/ZigaoWang/zigzag/pull/546))
-- 空间的固定标签页折叠时，或者在合上的文件夹下显示时，用 ⌘W 关闭固定标签页不会再让它的行从边栏里消失：它会以未载入的状态留在那里，直到你切换空间，或者再次展开或折叠固定标签页或那个文件夹。
-- Zoom 在 app.zoom.us 的网页版不会再一直空白：询问能否显示通知的网站得到的是错误，而不是答复。网站也不会再看到 `window.browser`，这是 Chrome 从不提供给网站的扩展对象。感谢 [Lakeland97](https://github.com/Lakeland97)。([#551](https://github.com/ZigaoWang/zigzag/issues/551))
-- 退出后再打开 Zigzag 继续上次的会话，会再次保持你在 Azure DevOps、Microsoft 365 等网站上的登录：Zigzag 可能会跳过保存它们的会话 Cookie，然后在下次启动时丢掉之前保留的那些。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-- ⇧⌘T 可以找回用 ⌘W 关闭的固定标签页：它会在原来的行里重新载入，回到当时的网页和历史记录。感谢 [Lakeland97](https://github.com/Lakeland97)。([#549](https://github.com/ZigaoWang/zigzag/issues/549))
-- 设置在“个人资料”里打开时，如果有许多已不在列表中的个人资料数据，不会再卡住：超过三个后，它们会折叠成一个写明数量的框。
+- “设置”在“个人资料”打开时，如果有许多已不在列表中的个人资料数据，不会再卡住：超过三个后，它们会折叠成一个写明数量的方框。
 - 翻译过的网页在变化时仍保持翻译：滚动时载入的帖子和评论、网页更新的文字，以及像 Reddit 这样不重新载入的网站的另一个页面，都会随到随译，长网页也会一直翻译到底，而不是中途停下。
-- 窗口静止不动时，不会再让图形处理器一阵阵忙碌：之前资料库里有不改变当前空间的变化（比如来自同步的变化）或电池报告电量时，整个窗口都会从它的颜色渐变到同样的颜色。
-- 在从屏幕边缘调出的边栏的网页预览里，点一下休眠标签页的卡片，会像点它的行一样在窗口中打开该标签页；面板的菜单不会再画在网页下面；点进网页后按 Esc 或回到边栏，键盘会留在面板上，而不是把浏览器窗口带到前面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- ⇧⌘T 可以找回用 ⌘W 关闭的固定标签页：它会在原来的行里重新载入，回到当时的网页和历史记录。感谢 [Lakeland97](https://github.com/Lakeland97)。([#549](https://github.com/ZigaoWang/zigzag/issues/549))
 
 ## [0.9.6] - 2026-11-27
 
