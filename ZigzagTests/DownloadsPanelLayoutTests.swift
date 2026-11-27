@@ -40,4 +40,20 @@ import Testing
         let overlay = controller.root.overlay.bounds
         #expect(panel.frame.minX >= 0 && panel.frame.maxX <= overlay.maxX)
     }
+
+    /// Settings sets the menu of where downloads go each time its window comes forward: the folder's name and icon
+    /// are asked of Launch Services once, not each time.
+    @Test func theDownloadsFolderIsLookedUpOnce() {
+        let button = DropdownButton()
+        DownloadPlace.configure(button)
+        let asked = DownloadPlace.lookups
+        for _ in 0..<5 { DownloadPlace.configure(button) }
+        _ = DownloadPlace.shown(DownloadManager.folder)
+        #expect(DownloadPlace.lookups == asked)
+        #expect(button.options.first?.title == FileManager.default.displayName(atPath: DownloadManager.folder.path))
+        // Another folder is looked up afresh.
+        let other = FileManager.default.temporaryDirectory
+        #expect(DownloadPlace.shown(other).name == FileManager.default.displayName(atPath: other.path))
+        #expect(DownloadPlace.lookups == asked + 1)
+    }
 }

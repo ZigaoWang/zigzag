@@ -406,7 +406,7 @@ final class DownloadsPanelView: FloatingPanelView {
             }),
             .separator,
             .header(String(localized: "Save Downloads To", comment: "Heading in the downloads panel's … menu, over the folder choices.")),
-            .item(.init(title: FileManager.default.displayName(atPath: folder.path), isChecked: !asks) { DownloadPlace.pick(0) }),
+            .item(.init(title: DownloadPlace.shown(folder).name, isChecked: !asks) { DownloadPlace.pick(0) }),
             .item(.init(title: String(localized: "Ask Each Time", comment: "Item in the downloads panel's … menu: asks where to save each download."), isChecked: asks) { DownloadPlace.pick(1) }),
             .item(.init(title: String(localized: "Choose Folder…", comment: "Item in the downloads panel's … menu: picks the folder downloads are saved to.")) { DownloadPlace.pick(2) }),
         ], from: more)

@@ -4,10 +4,8 @@ import AppKit
 /// (with its own icon), Ask Each Time, and Choose Folder… to pick one.
 enum DownloadPlace {
     static func configure(_ button: DropdownButton) {
-        let folder = DownloadManager.folder
-        let icon = NSWorkspace.shared.icon(forFile: folder.path)
-        icon.size = NSSize(width: 16, height: 16)
-        button.options = [DropdownButton.Option(title: FileManager.default.displayName(atPath: folder.path), image: icon),
+        let (name, icon) = shown(DownloadManager.folder)
+        button.options = [DropdownButton.Option(title: name, image: icon),
                           DropdownButton.Option(title: String(localized: "Ask Each Time", comment: "Choice in the menu of where downloads go, in Settings and the downloads panel."), image: nil),
                           DropdownButton.Option(title: String(localized: "Choose Folder…", comment: "Choice in the menu of where downloads go, in Settings and the downloads panel."), image: nil)]
         button.selectedIndex = DownloadManager.asksWhereToSave ? 1 : 0
@@ -35,4 +33,19 @@ enum DownloadPlace {
     }
 
     @MainActor static let changed = Signal<Void>()
+
+    /// The folder's name and icon as Finder shows them, asked of Launch Services once per folder, not at every refresh.
+    static func shown(_ folder: URL) -> (name: String, icon: NSImage) {
+        if let last = lastShown, last.path == folder.path { return (last.name, last.icon) }
+        let icon = NSWorkspace.shared.icon(forFile: folder.path)
+        icon.size = NSSize(width: 16, height: 16)
+        let name = FileManager.default.displayName(atPath: folder.path)
+        lastShown = (folder.path, name, icon)
+        lookups += 1
+        return (name, icon)
+    }
+
+    private static var lastShown: (path: String, name: String, icon: NSImage)?
+    /// How many times Launch Services was asked, for tests.
+    private(set) static var lookups = 0
 }
