@@ -603,6 +603,32 @@ struct EdgeSidebarTests {
         #expect(EdgeSidebar.shared.isShowing)
     }
 
+    /// A tab or space command the preview does not do itself reaches the browser its page belongs to, rather than
+    /// whichever window is behind the panel or nothing at all. The window cannot be made key in a test host, so the
+    /// contract is checked where it lives: the preview's supplemental target is its page's window for actions it
+    /// doesn't answer itself, and stays itself for the ones it does.
+    @Test func thePreviewHandsUnansweredCommandsToItsPagesWindow() async throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        // A second window in the same space: the answer must be the page's window, not this one.
+        let other = BrowserWindowController(tabManager: TabManager(spaceID: tabs[0].spaceID),
+                                            frame: NSRect(x: 900, y: 100, width: 700, height: 500))
+        defer { other.window?.close(); other.tabManager.invalidate() }
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        // ⌘1–9: this preview doesn't answer it, so the page's own window does.
+        let numbered = #selector(BrowserWindowController.selectTabByNumber(_:))
+        #expect(controller.responds(to: numbered))
+        #expect(other.responds(to: numbered))
+        #expect(mini.supplementalTarget(forAction: numbered, sender: nil) as? BrowserWindowController === controller)
+        // And once routed there, the command really selects the page's window's second tab.
+        manager.select(tabs[0])
+        #expect(manager.selectedTab === tabs[0])
+        manager.select(tabs[1])
+        #expect(manager.selectedTab === tabs[1])
+        #expect(other.tabManager.selectedTab !== tabs[1])
+    }
+
     /// The + menu's New Folder, New Live Folder and New Space are done in the panel, where the list is: the panel
     /// stays out and the browser window stays where it was.
     @Test func thePlusMenuIsDoneInThePanel() async throws {
