@@ -14834,6 +14834,24 @@
         "state": "translated",
         "value": "동기화할 항목 중 일부가 너무 커서 이 Mac에서 보낼 수 없습니다. 고정된 탭과 스페이스는 계속 동기화됩니다."
       }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Vim 키"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "⌃J 및 ⌃K는 사이드바에서, 명령 막대가 열려 있으면 그 목록에서 아래와 위로 이동합니다. ⌃H 및 ⌃L은 이전 및 다음 스페이스로 이동합니다. 페이지와 텍스트 필드는 더 이상 이 키를 받지 않습니다."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc 컨트롤 키보드 탐색 다음 이전 탭 스페이스"
+      }
     }
   },
   "InfoPlist": {

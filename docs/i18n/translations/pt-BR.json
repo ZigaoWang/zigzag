@@ -15543,6 +15543,24 @@
         "state": "translated",
         "value": "Parte do que é sincronizado é grande demais para ser enviada deste Mac. As abas fixadas e os espaços continuam sincronizando."
       }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Teclas do Vim"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "⌃J e ⌃K descem e sobem pela barra lateral e pela lista da barra de comandos enquanto ela estiver aberta. ⌃H e ⌃L vão para o espaço anterior e o próximo. Páginas e campos de texto deixam de receber essas teclas."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl control ctrl j k h l teclado navegação próxima anterior aba espaço arc"
+      }
     }
   },
   "language": "pt-BR"

@@ -15164,6 +15164,24 @@
         "state": "translated",
         "value": "Parte di ciò che viene sincronizzato è troppo grande per essere inviata da questo Mac. I pannelli fissati e gli spazi continuano a sincronizzarsi."
       }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Tasti Vim"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "⌃J e ⌃K scorrono la barra laterale verso il basso e verso l’alto, e l’elenco della barra dei comandi quando è aperta. ⌃H e ⌃L passano allo spazio precedente e successivo. Le pagine e i campi di testo non ricevono più questi tasti."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl control ctrl j k h l tastiera navigazione successivo precedente pannello spazio arc"
+      }
     }
   },
   "InfoPlist": {

@@ -15213,6 +15213,24 @@
         "state": "translated",
         "value": "Une partie de ce qui est synchronisé est trop volumineuse pour être envoyée depuis ce Mac. Les onglets épinglés et les espaces restent synchronisés."
       }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Touches Vim"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "⌃J et ⌃K parcourent la barre latérale vers le bas et vers le haut, ainsi que la liste de la barre de commandes lorsqu’elle est ouverte. ⌃H et ⌃L passent à l’espace précédent et suivant. Les pages et les champs de texte ne reçoivent plus ces touches."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl contrôle control ctrl j k h l clavier navigation suivant précédent onglet espace arc"
+      }
     }
   },
   "language": "fr"

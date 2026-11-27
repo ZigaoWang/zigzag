@@ -15873,6 +15873,24 @@
         "state": "translated",
         "value": "Часть синхронизируемых данных слишком велика для отправки с этого Mac. Закреплённые вкладки и пространства по-прежнему синхронизируются."
       }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Клавиши Vim"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "⌃J и ⌃K перемещают вниз и вверх по боковому меню, а пока открыта командная панель — по её списку. ⌃H и ⌃L переходят к предыдущему и следующему пространству. Страницы и текстовые поля больше не получают эти клавиши."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl control ctrl j k h l клавиатура навигация следующая предыдущая вкладка пространство arc"
+      }
     }
   },
   "language": "ru"

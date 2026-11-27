@@ -15164,6 +15164,24 @@
         "state": "translated",
         "value": "Een deel van wat er wordt gesynchroniseerd is te groot om vanaf deze Mac te versturen. Vastgezette tabbladen en spaces worden nog steeds gesynchroniseerd."
       }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Vim-toetsen"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Met ⌃J en ⌃K ga je omlaag en omhoog in de navigatiekolom, en in de lijst van de opdrachtbalk als die open is. Met ⌃H en ⌃L ga je naar de vorige en volgende space. Pagina’s en tekstvelden krijgen deze toetsen niet meer."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl control ctrl j k h l toetsenbord navigatie volgende vorige tabblad space arc"
+      }
     }
   },
   "InfoPlist": {

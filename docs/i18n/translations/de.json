@@ -15213,6 +15213,24 @@
         "state": "translated",
         "value": "Ein Teil dessen, was synchronisiert wird, ist zu groß, um von diesem Mac gesendet zu werden. Fixierte Tabs und Spaces werden weiter synchronisiert."
       }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Vim-Tasten"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "⌃J und ⌃K gehen in der Seitenleiste nach unten und oben, und in der Liste der Befehlsleiste, solange sie offen ist. ⌃H und ⌃L gehen zum vorherigen und nächsten Space. Seiten und Textfelder erhalten diese Tasten nicht mehr."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl control ctrl steuerung j k h l tastatur navigation nächster vorheriger tab space arc"
+      }
     }
   },
   "language": "de"

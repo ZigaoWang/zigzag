@@ -4626,6 +4626,89 @@
         }
       }
     },
+    "Vim keys" : {
+      "comment" : "A setting in Settings › Tabs: Control with H, J, K and L move between tabs and spaces, as in the Vim editor. Also named in Settings › Shortcuts when these keys are tried for something else.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim-Tasten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teclas de Vim"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touches Vim"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tasti Vim"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vimキー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim 키"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim-toetsen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klawisze Vim"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teclas do Vim"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиши Vim"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim tuşları"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim 键位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim 按鍵"
+          }
+        }
+      }
+    },
     "With the sidebar hidden, it comes out over the page at two thirds of the window’s height." : {
       "comment" : "Explanation under “Shorter floating sidebar” in Settings › Appearance.",
       "localizations" : {
@@ -199336,6 +199419,89 @@
         }
       }
     },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc" : {
+      "comment" : "Words that find the Vim keys setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl steuerung j k h l tastatur navigation nächster vorheriger tab space arc"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l teclado navegación siguiente anterior pestaña espacio arc"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl contrôle control ctrl j k h l clavier navigation suivant précédent onglet espace arc"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l tastiera navigazione successivo precedente pannello spazio arc"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc キーボード 移動 次 前 タブ スペース"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc 컨트롤 키보드 탐색 다음 이전 탭 스페이스"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l toetsenbord navigatie volgende vorige tabblad space arc"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l klawiatura nawigacja następna poprzednia karta przestrzeń arc"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l teclado navegação próxima anterior aba espaço arc"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l клавиатура навигация следующая предыдущая вкладка пространство arc"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l klavye gezinme sonraki önceki sekme space arc"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l 键盘 导航 下一个 上一个 标签页 空间 arc"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l 鍵盤 導覽 下一個 上一個 分頁 空間 arc"
+          }
+        }
+      }
+    },
     "web app dock install application" : {
       "comment" : "Words that find Installed Apps with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -202340,6 +202506,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按住 ⇧ 點一下可輸入縮放比例"
+          }
+        }
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys." : {
+      "comment" : "Explanation under “Vim keys” in Settings › Tabs. ⌃ is the Control key.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J und ⌃K gehen in der Seitenleiste nach unten und oben, und in der Liste der Befehlsleiste, solange sie offen ist. ⌃H und ⌃L gehen zum vorherigen und nächsten Space. Seiten und Textfelder erhalten diese Tasten nicht mehr."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J y ⌃K bajan y suben por la barra lateral, y por la lista de la barra de comandos mientras está abierta. ⌃H y ⌃L van al espacio anterior y al siguiente. Las páginas y los campos de texto dejan de recibir estas teclas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J et ⌃K parcourent la barre latérale vers le bas et vers le haut, ainsi que la liste de la barre de commandes lorsqu’elle est ouverte. ⌃H et ⌃L passent à l’espace précédent et suivant. Les pages et les champs de texte ne reçoivent plus ces touches."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J e ⌃K scorrono la barra laterale verso il basso e verso l’alto, e l’elenco della barra dei comandi quando è aperta. ⌃H e ⌃L passano allo spazio precedente e successivo. Le pagine e i campi di testo non ricevono più questi tasti."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃Jと⌃Kではサイドバーを、コマンドバーが開いているときはそのリストを上下に移動します。⌃Hと⌃Lでは前と次のスペースに移動します。ページやテキストフィールドではこれらのキーが使えなくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J 및 ⌃K는 사이드바에서, 명령 막대가 열려 있으면 그 목록에서 아래와 위로 이동합니다. ⌃H 및 ⌃L은 이전 및 다음 스페이스로 이동합니다. 페이지와 텍스트 필드는 더 이상 이 키를 받지 않습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Met ⌃J en ⌃K ga je omlaag en omhoog in de navigatiekolom, en in de lijst van de opdrachtbalk als die open is. Met ⌃H en ⌃L ga je naar de vorige en volgende space. Pagina’s en tekstvelden krijgen deze toetsen niet meer."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J i ⌃K przechodzą w dół i w górę paska bocznego, a gdy pasek poleceń jest otwarty — po jego liście. ⌃H i ⌃L przechodzą do poprzedniej i następnej przestrzeni. Strony i pola tekstowe nie otrzymują już tych klawiszy."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J e ⌃K descem e sobem pela barra lateral e pela lista da barra de comandos enquanto ela estiver aberta. ⌃H e ⌃L vão para o espaço anterior e o próximo. Páginas e campos de texto deixam de receber essas teclas."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J и ⌃K перемещают вниз и вверх по боковому меню, а пока открыта командная панель — по её списку. ⌃H и ⌃L переходят к предыдущему и следующему пространству. Страницы и текстовые поля больше не получают эти клавиши."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J ve ⌃K kenar çubuğunda, Komut Çubuğu açıkken de onun listesinde aşağı ve yukarı gider. ⌃H ve ⌃L önceki ve sonraki Space’e gider. Sayfalar ve metin alanları artık bu tuşları almaz."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J 和 ⌃K 在边栏里上下移动，命令栏打开时则在它的列表里移动。⌃H 和 ⌃L 前往上一个和下一个空间。网页和文本框不再收到这些按键。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J 和 ⌃K 在側邊欄裡上下移動，指令列開啟時則在它的清單裡移動。⌃H 和 ⌃L 前往上一個和下一個空間。網頁和文字欄位不再收到這些按鍵。"
           }
         }
       }
