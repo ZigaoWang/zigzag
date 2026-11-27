@@ -40,10 +40,8 @@ final class BridgeProxy: BridgeNamespace {
         case "settings.get":
             return describe(for: extensionID)
         case "settings.set":
-            try Self.checkScope(details)
-            guard let value = details["value"] as? [String: Any] else { throw BridgeError("Missing value") }
             // Read first: a setting WebKit can't follow changes nothing, as a failed set in Chrome.
-            let parsed = try ProxyRules.parse(value)
+            let (value, parsed) = try Self.setting(in: details)
             settings[extensionID] = value
             save(value, for: extensionID)
             if case .fixed(let server, _) = parsed, credentials[extensionID]?.server != server { credentials[extensionID] = nil }
@@ -65,6 +63,13 @@ final class BridgeProxy: BridgeNamespace {
         default:
             throw BridgeError.unsupported(Self.name, fn)
         }
+    }
+
+    /// A settings.set's value as Chrome reads it: one for the regular windows that WebKit can follow, else why not.
+    static func setting(in details: [String: Any]) throws -> (value: [String: Any], parsed: ProxyRules.Parsed) {
+        try checkScope(details)
+        guard let value = details["value"] as? [String: Any] else { throw BridgeError("Missing value") }
+        return (value, try ProxyRules.parse(value))
     }
 
     /// Only the regular windows' setting: private windows aren't the extension's to change.

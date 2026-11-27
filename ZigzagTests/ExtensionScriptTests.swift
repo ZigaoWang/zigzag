@@ -197,10 +197,20 @@ struct ExtensionScriptTests {
     }
 
     /// A fake background for bridge.js: WebKit's runtime, a bridge that refuses every call, no namespaces.
-    private static func bridgeWorld(permissions: [String]) -> JSContext {
+    /// `native`: Zigzag's own answer to a call, as the bridge would give it; nil for one it doesn't answer.
+    private static func bridgeWorld(permissions: [String],
+                                    native: @escaping (_ ns: String, _ fn: String, _ args: [Any]) -> [String: Any]? = { _, _, _ in nil }) -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         let list = "[" + permissions.map { "'\($0)'" }.joined(separator: ", ") + "]"
+        // As JSON, the way the answer crosses from Zigzag to the extension.
+        let answer: @convention(block) (String, String, JSValue) -> String = { ns, fn, args in
+            let list = args.toArray() ?? []
+            return MainActor.assumeIsolated {
+                native(ns, fn, list).flatMap { try? JSONSerialization.data(withJSONObject: $0) }.map { String(decoding: $0, as: UTF8.self) } ?? ""
+            }
+        }
+        context.setObject(answer, forKeyedSubscript: "__native" as NSString)
         context.evaluateScript("""
         var __timers = [];
         var setTimeout = (f) => { __timers.push(f); return __timers.length; };
@@ -211,7 +221,10 @@ struct ExtensionScriptTests {
         const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false, hasListeners: () => false });
         var chrome = {
           runtime: { id: 'x', getManifest: () => ({ permissions: \(list) }),
-                     sendNativeMessage: (host, message) => Promise.resolve({ error: message.ns + '.' + message.fn + ' could not be answered' }),
+                     sendNativeMessage: (host, message) => {
+                       const answer = __native(message.ns, message.fn, message.args);
+                       return Promise.resolve(answer ? JSON.parse(answer) : { error: message.ns + '.' + message.fn + ' could not be answered' });
+                     },
                      connectNative: () => ({ onMessage: event(), onDisconnect: event(), postMessage: () => {} }) },
         };
         var browser = chrome;
@@ -306,18 +319,23 @@ struct ExtensionScriptTests {
     }
 
     @Test func aRefusedProxySettingIsLastErrorForACallback() {
-        // Hotspot Shield sets its PAC script with a callback and checks runtime.lastError there (#475).
-        let context = Self.bridgeWorld(permissions: ["proxy"])
+        // Hotspot Shield sets its PAC script with a callback and checks runtime.lastError there (#475). Zigzag's own
+        // proxy reads each setting, so the refusal is the one an extension gets; one it can follow is taken as set.
+        let context = Self.bridgeWorld(permissions: ["proxy"]) { ns, fn, args in
+            guard ns == "proxy", fn == "settings.set" else { return nil }
+            return ExtensionBridge.answer(Result { _ = try BridgeProxy.setting(in: args.first as? [String: Any] ?? [:]); return nil })
+        }
         context.evaluateScript("""
         var __seen = [];
         const heard = (name) => (...args) => __seen.push([name, args.length, chrome.runtime.lastError && chrome.runtime.lastError.message]);
-        chrome.proxy.settings.set({ value: { mode: 'pac_script', pacScript: { data: '' } } }, heard('set'));
-        chrome.proxy.settings.clear({}, heard('clear'));
-        chrome.proxy.settings.set({ value: { mode: 'direct' } }).catch((e) => __seen.push(['rejected', e.message]));
+        chrome.proxy.settings.set({ value: { mode: 'pac_script', pacScript: { data: 'function FindProxyForURL() { return "PROXY p.example:80"; }' } } }, heard('pac'));
+        chrome.proxy.settings.set({ value: { mode: 'direct' }, scope: 'incognito_persistent' }, heard('incognito'));
+        chrome.proxy.settings.set({ value: { mode: 'fixed_servers', rules: { singleProxy: { host: 'p.example' } } } }, heard('fixed'));
+        chrome.proxy.settings.set({ value: { mode: 'auto_detect' } }).catch((e) => __seen.push(['rejected', e.message]));
         """)
         context.evaluateScript("__flush()")
         #expect(context.evaluateScript("__seen.map((s) => JSON.stringify(s)).sort().join(' ')").toString()
-                == #"["clear",0,"proxy.settings.clear could not be answered"] ["rejected","proxy.settings.set could not be answered"] ["set",0,"proxy.settings.set could not be answered"]"#)
+                == #"["fixed",1,null] ["incognito",0,"You do not have permission to access incognito preferences."] ["pac",0,"Zigzag can't run proxy auto-config (PAC) scripts: WebKit takes fixed proxy servers only"] ["rejected","Zigzag can't detect proxies on its own: use \"system\" for the Mac's network settings"]"#)
         #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
     }
 

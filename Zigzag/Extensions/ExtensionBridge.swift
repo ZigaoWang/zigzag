@@ -101,15 +101,24 @@ final class ExtensionBridge {
                     throw BridgeError("The extension is no longer loaded.")
                 }
                 let value = try await namespace.call(fn, args: args, extensionID: id)
-                reply(["value": Self.plain(value) ?? NSNull()], nil)
+                reply(Self.answer(.success(value)), nil)
             } catch {
-                let text = (error as? BridgeError)?.message ?? error.localizedDescription
                 // In the extensions log, so "it didn't work" can be traced to the call that said no.
-                ExtensionLog.write("\(context.webExtension.displayName ?? id) \(ns).\(fn) failed: \(text)")
-                reply(["error": text], nil)
+                ExtensionLog.write("\(context.webExtension.displayName ?? id) \(ns).\(fn) failed: \(Self.reason(error))")
+                reply(Self.answer(.failure(error)), nil)
             }
         }
     }
+
+    /// What a call answers the extension: `{ value }`, or `{ error }` with the reason it can show.
+    static func answer(_ result: Result<Any?, any Error>) -> [String: Any] {
+        switch result {
+        case .success(let value): ["value": plain(value) ?? NSNull()]
+        case .failure(let error): ["error": reason(error)]
+        }
+    }
+
+    private static func reason(_ error: any Error) -> String { (error as? BridgeError)?.message ?? error.localizedDescription }
 
     /// Whether the extension may use a permission: the person granted it (when they approved the extension or an
     /// update, or allowed it later), and its own manifest still asks for it. The manifest alone is never enough: what
