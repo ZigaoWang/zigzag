@@ -1484,6 +1484,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// With more than one profile, what fills forms and isn't a profile's has a group of its own.
     private let cardGroup = FormGroup()
     private let passwordsWindowGroup = FormGroup()
+    /// What the Passkeys row last showed: changed in System Settings meanwhile, it's read again (`refresh`).
+    private var shownPasskeyAccess: PasskeyAccess?
     private let privacyGroup = FormGroup()
     private let sitesGroup = FormGroup()
     /// The one master switch for a page reaching an app on this Mac, above the sites' own answers.
@@ -3508,6 +3510,42 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
                                          detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
                                          control: open))
+        // The Mac's passkeys are every profile's, so this stands with Saved passwords. Only a copy with the entitlement can ask.
+        if PasskeySuggestions.shared.isAvailable { passwordsWindowGroup.add(passkeysRow()) }
+    }
+
+    /// Whether Zigzag lists the passkeys saved on this Mac under sign-in fields: macOS's answer, asked for here or
+    /// from the fill menu, and changed in System Settings.
+    private func passkeysRow() -> FormRow {
+        let access = PasskeySuggestions.shared.access
+        shownPasskeyAccess = access
+        let detail: String
+        let button: PillButton
+        switch access {
+        case .notAsked:
+            detail = String(localized: "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.",
+                            comment: "Explanation under “Passkeys” in Settings › Passwords, before macOS has been asked whether Zigzag may list the passkeys saved on this Mac.")
+            button = PillButton(title: String(localized: "Allow…", comment: "Button beside “Passkeys” in Settings › Passwords: shows macOS's prompt asking whether Zigzag may list the passkeys saved on this Mac."))
+            button.onClick = { [weak self] _ in
+                Task { @MainActor in
+                    _ = await PasskeySuggestions.shared.requestAccess()
+                    self?.reloadPasswords()
+                    self?.layoutDocument()
+                }
+            }
+        case .allowed, .denied:
+            detail = access == .allowed
+                ? String(localized: "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.",
+                         comment: "Explanation under “Passkeys” in Settings › Passwords, with Zigzag allowed to list the passkeys saved on this Mac. System Settings › Privacy & Security are names macOS uses; match them.")
+                : String(localized: "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.",
+                         comment: "Explanation under “Passkeys” in Settings › Passwords, with Zigzag not allowed to list the passkeys saved on this Mac. System Settings › Privacy & Security are names macOS uses; match them.")
+            button = PillButton(title: String(localized: "Open System Settings", comment: "Button beside “Passkeys” in Settings › Passwords: opens Privacy & Security in System Settings, where passkey access is changed."))
+            button.onClick = { _ in NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!) }
+        }
+        let row = FormRow(title: String(localized: "Passkeys", comment: "A setting in Settings › Passwords: whether Zigzag suggests the passkeys saved on this Mac under sign-in fields."),
+                          detail: detail, control: button)
+        row.keywords = String(localized: "passkey webauthn touch id sign in suggest autofill privacy", comment: "Words that find the Passkeys setting with Find a setting in Settings. Not shown.")
+        return row
     }
 
     /// Who saves and fills passwords in `profile`, and whether Zigzag offers to save and fill them.
@@ -4852,6 +4890,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func refresh() {
         refreshEngines()
+        if let shownPasskeyAccess, shownPasskeyAccess != PasskeySuggestions.shared.access {
+            reloadPasswords()
+            if pane == .passwords || isSearching { layoutDocument() }
+        }
         let isDefault = DefaultBrowser.isDefault
         defaultStatus.isHidden = !isDefault
         defaultButton.isHidden = isDefault
