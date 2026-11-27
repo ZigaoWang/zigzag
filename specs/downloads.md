@@ -48,6 +48,10 @@
 ## The downloads panel
 - The sidebar's download button → the five newest downloads, and Open Downloads Folder at the bottom.
   No test yet.
+- While something downloads, the button's circle → a progress ring that reads on every space color, light or dark: a 2pt ring over a full track as heavy, on the icon's own circle and centered on its arrow, in the space's accent where it stands out from the sidebar and its ink where it wouldn't; it eases forward, then fills, fades and shows a check when done.
+  Test: DownloadsRingTests.theRingAndItsTrackLieOnTheIconsCircle
+  Test: DownloadsRingTests.theProgressReadsOnEverySpaceColor
+  Test: DownloadsRingTests.theTrackShowsAndTheProgressStandsApartFromIt
 - A download starting → the panel opens on just that one, with Show All Downloads for the rest; it closes six seconds after the file is done unless you're using it.
   No test yet.
 - The panel's width → wide enough for every label, at the narrowest sidebar, in English and Chinese.

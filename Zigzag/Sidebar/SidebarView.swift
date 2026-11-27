@@ -918,6 +918,7 @@ final class SidebarView: NSView {
     let updateCard = UpdateCard()
 
     /// A circle with an arrow, drawn in code so the progress ring lies exactly on the circle: one center, one size.
+    /// The arrow is the button's glyph; the circle is `downloadsCircle`.
     let downloadsButton: IconButton = {
         let button = SidebarView.chromeButton("arrow.down.circle", toolTip: String(localized: "Downloads", comment: "Tooltip of the sidebar's downloads button."))
         button.glyph = DownloadGlyph.image(.arrow)
@@ -1363,6 +1364,7 @@ final class SidebarView: NSView {
         let pad = round(Tokens.Sidebar.iconColumn + Tokens.Sidebar.favicon / 2 - button / 2)
         let h = bottomBar.bounds.height
         downloadsButton.frame = NSRect(x: pad, y: (h - button) / 2, width: button, height: button)
+        placeDownloadsRing()
         newSpaceButton.frame = NSRect(x: bottomBar.bounds.width - pad - button, y: (h - button) / 2, width: button, height: button)
         let available = newSpaceButton.frame.minX - downloadsButton.frame.maxX - Tokens.Space.x2
         dotStrip.frame = NSRect(x: downloadsButton.frame.maxX + Tokens.Space.x1, y: 0, width: max(0, available), height: h)
@@ -1784,44 +1786,61 @@ final class SidebarView: NSView {
         dots.first { $0.spaceID == spaceID }?.color = color
     }
 
-    /// The accent drawn over the icon's own circle as downloads run, exactly on it, so nothing changes size as one
-    /// starts or ends; a check in the same circle for a moment when they're done.
-    private let downloadsRing = CAShapeLayer()
+    /// The download icon's circle, drawn under its arrow: in the icon's own ink at rest, and while something
+    /// downloads the progress ring's track, a quiet full circle as heavy as the ring. The progress runs over it in the
+    /// space's accent, or the row's ink where the accent wouldn't read on this space (`Theme.badge`). One center and
+    /// one radius for both, the arrow's center, so nothing moves as a download starts or ends; a check in the same
+    /// circle for a moment when they're done.
+    let downloadsCircle: CAShapeLayer = {
+        let layer = CAShapeLayer()
+        layer.fillColor = nil
+        layer.lineWidth = DownloadGlyph.line
+        return layer
+    }()
+    let downloadsRing: CAShapeLayer = {
+        let layer = CAShapeLayer()
+        layer.fillColor = nil
+        layer.lineCap = .round
+        layer.lineWidth = DownloadGlyph.ring
+        layer.strokeEnd = 0
+        layer.opacity = 0
+        return layer
+    }()
     private var wasDownloading = false
     private var shownMark = DownloadGlyph.Mark.arrow
     private var themeToken: SignalToken?
+
+    /// Puts the circle and the ring on the button, centered on it as the mark is; once, and again if it's resized.
+    /// Either may already be showing a download, when the sidebar heard of it before it was laid out.
+    private func placeDownloadsRing() {
+        guard let host = downloadsButton.layer else { return }
+        if downloadsRing.superlayer == nil {
+            host.addSublayer(downloadsCircle)
+            host.addSublayer(downloadsRing)
+            Tokens.Motion.withoutAnimation { tintDownloadsRing() }
+        }
+        let b = downloadsButton.bounds
+        guard downloadsRing.frame != b else { return }
+        // Starts at the top and runs clockwise, like the system's own progress rings. The button's layer counts y
+        // downward, so the top is -90° and growing angles turn clockwise on screen.
+        let ring = CGMutablePath()
+        ring.addArc(center: CGPoint(x: b.midX, y: b.midY), radius: DownloadGlyph.circle / 2, startAngle: -.pi / 2, endAngle: 1.5 * .pi, clockwise: false)
+        Tokens.Motion.withoutAnimation {
+            for layer in [downloadsCircle, downloadsRing] {
+                layer.path = ring
+                layer.frame = b
+            }
+        }
+    }
 
     func updateDownloads(active: Int, hasAny: Bool, progress: Double = 1) {
         // Always there, in the same place, so the space dots never shift; with nothing downloaded, its panel says so.
         downloadsButton.isHidden = false
         let downloading = active > 0
-        if downloadsRing.superlayer == nil, let host = downloadsButton.layer {
-            downloadsRing.fillColor = nil
-            // A hair heavier than the glyph's line, so the accent covers it cleanly.
-            downloadsRing.lineWidth = DownloadGlyph.line + 0.3
-            downloadsRing.lineCap = .round
-            downloadsRing.strokeEnd = 0
-            downloadsRing.opacity = 0
-            host.addSublayer(downloadsRing)
-        }
-        let b = downloadsButton.bounds
-        // The glyph's own circle: the button centers the glyph, so the ring is centered the same way, at its size.
-        let d = DownloadGlyph.circle
-        let rect = CGRect(x: (b.width - d) / 2, y: (b.height - d) / 2, width: d, height: d)
-        // Shape, place and color are set as they are: animating them on every progress tick restarted a fade a few
-        // times a second, which is what made the ring jump.
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        if downloadsRing.frame != b {
-            // Starts at the top and runs clockwise, like the system's own progress rings. The button's layer counts y
-            // downward, so the top is -90° and growing angles turn clockwise on screen.
-            let ring = CGMutablePath()
-            ring.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: d / 2, startAngle: -.pi / 2, endAngle: 1.5 * .pi, clockwise: false)
-            downloadsRing.path = ring
-            downloadsRing.frame = b
-        }
-        tintDownloadsRing()
-        CATransaction.commit()
+        placeDownloadsRing()
+        // Colors are set as they are: animating them on every progress tick restarted a fade a few times a second,
+        // which is what made the ring jump.
+        Tokens.Motion.withoutAnimation { tintDownloadsRing() }
         // The fill only moves forward while a download runs, easing from wherever it is on screen to the new amount.
         let target = downloading ? CGFloat(max(0.04, min(progress, 1))) : (wasDownloading ? 1 : 0)
         let shown = downloadsRing.presentation()?.strokeEnd ?? downloadsRing.strokeEnd
@@ -1832,23 +1851,31 @@ final class SidebarView: NSView {
             ease.toValue = to
             ease.duration = downloading ? 0.35 : 0.2
             ease.timingFunction = CAMediaTimingFunction(name: downloading ? .linear : .easeOut)
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            downloadsRing.strokeEnd = to
-            CATransaction.commit()
+            Tokens.Motion.withoutAnimation { downloadsRing.strokeEnd = to }
             downloadsRing.add(ease, forKey: "progress")
         }
-        // Comes and goes with a short fade, never in a single frame.
+        // Comes and goes with a short fade, never in a single frame; the circle turns into the track and back with it.
         let opacity: Float = downloading ? 1 : 0
         if downloadsRing.opacity != opacity {
-            for layer in [downloadsRing] {
-                let fade = CABasicAnimation(keyPath: "opacity")
-                fade.fromValue = layer.presentation()?.opacity ?? layer.opacity
-                fade.toValue = opacity
-                fade.duration = Tokens.Motion.selection
-                fade.timingFunction = Tokens.Motion.easeOut
-                Tokens.Motion.withoutAnimation { layer.opacity = opacity }
-                layer.add(fade, forKey: "fade")
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = downloadsRing.presentation()?.opacity ?? downloadsRing.opacity
+            fade.toValue = opacity
+            let width = downloading ? DownloadGlyph.ring : DownloadGlyph.line
+            let weight = CABasicAnimation(keyPath: "lineWidth")
+            weight.fromValue = downloadsCircle.presentation()?.lineWidth ?? downloadsCircle.lineWidth
+            weight.toValue = width
+            let color = CABasicAnimation(keyPath: "strokeColor")
+            color.fromValue = downloadsCircle.presentation()?.strokeColor ?? downloadsCircle.strokeColor
+            Tokens.Motion.withoutAnimation {
+                downloadsRing.opacity = opacity
+                downloadsCircle.lineWidth = width
+                tintDownloadsRing(downloading: downloading)
+            }
+            color.toValue = downloadsCircle.strokeColor
+            for (layer, change) in [(downloadsRing, fade), (downloadsCircle, weight), (downloadsCircle, color)] {
+                change.duration = Tokens.Motion.selection
+                change.timingFunction = Tokens.Motion.easeOut
+                layer.add(change, forKey: change.keyPath)
             }
         }
         let mark: DownloadGlyph.Mark = wasDownloading && !downloading ? .check : .arrow
@@ -1866,9 +1893,12 @@ final class SidebarView: NSView {
         wasDownloading = downloading
     }
 
-    /// The ring is in this window's space accent, resolved for light or dark; set again when either changes.
-    private func tintDownloadsRing() {
-        downloadsRing.strokeColor = cgColor(Brand.Theme.for(self).accent)
+    /// The circle in the icon's ink, or the track's while downloading; the ring in this window's `Theme.badge`,
+    /// resolved for light or dark. Set again when either changes.
+    private func tintDownloadsRing(downloading: Bool? = nil) {
+        let track = downloading ?? (downloadsRing.opacity > 0)
+        downloadsCircle.strokeColor = cgColor(track ? Tokens.Color.progressTrack : downloadsButton.tint)
+        downloadsRing.strokeColor = cgColor(Brand.Theme.for(self).badge)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -2667,18 +2697,21 @@ enum DownloadGlyph {
     /// of its line, and the line, as SF's arrow.down.circle has them.
     static let circle: CGFloat = (Tokens.Sidebar.glyph * 1.046 * 10).rounded() / 10
     static let line: CGFloat = LineGlyph.stroke
+    /// The progress ring's weight, its track's too: about Safari's download progress at this size, heavy enough to
+    /// read at a glance on any space.
+    static let ring: CGFloat = 2
+    /// The mark's image: whole points and even, so the button centers it exactly where the circle is (`circle` is
+    /// drawn by the sidebar, centered on the button).
+    static let side: CGFloat = 16
     /// The arrow and the check were drawn for a 13.6pt circle; they grow with it.
     private static let k = circle / 13.6
 
+    /// The arrow or the check alone; the circle around it is a layer of its own, which the progress ring lies on.
     static func image(_ mark: Mark) -> NSImage {
         let line = Self.line, k = Self.k
-        let side = circle + line
         let image = NSImage(size: NSSize(width: side, height: side), flipped: true) { rect in
             NSColor.black.setStroke()
             let c = NSPoint(x: rect.midX, y: rect.midY)
-            let ring = NSBezierPath(ovalIn: rect.insetBy(dx: line / 2, dy: line / 2))
-            ring.lineWidth = line
-            ring.stroke()
             let path = NSBezierPath()
             path.lineWidth = line
             path.lineCapStyle = .round

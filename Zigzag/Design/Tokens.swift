@@ -1422,6 +1422,10 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.12), highDark: hex(0xFFFFFF, alpha: 0.15))
         static let fieldFill = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.06),
             highLight: hex(0x000000, alpha: 0.08), highDark: hex(0xFFFFFF, alpha: 0.11))
+        /// The empty part of a progress ring on the frame (the sidebar's downloads button): plainly there on any space,
+        /// light or dark, and well under the progress drawn over it.
+        static let progressTrack = dynamic(light: hex(0x000000, alpha: 0.16), dark: hex(0xFFFFFF, alpha: 0.2),
+            highLight: hex(0x000000, alpha: 0.3), highDark: hex(0xFFFFFF, alpha: 0.34))
 
         /// The secondary button, a dropdown, a page's search field: white with a hairline and a faint shadow, a lighter
         /// step of the surface in dark mode. Hover is a hair grayer, pressed a step darker; never a scale.
