@@ -1038,7 +1038,7 @@ enum SyncedPreferenceEffects {
     /// Carried preferences whose setters only save them: read each time they're used, so nothing more is needed.
     static let readWhenUsed: Set<String> = [
         "AskBeforeQuitting", "LaunchChoice", "DownloadsAskWhere", "FormsAutofill", "NewSpacesGetOwnProfile", "OpensExternalLinksInMini",
-        "CaptureMode", "CardFinish", "sidebarDoubleClickNewTab", "ShowLinkAddressOnHover", "ReduceMotion", "ControlTabOrder",
+        "CaptureMode", "CardFinish", "sidebarDoubleClickNewTab", "ShowLinkAddressOnHover", "ReduceMotion", "ControlTabOrder", "VimKeys",
         "NestsOpenedLinks", "ArchiveTabsAfter", "SleepsBusyTabs", "NewTabPlace", "NewTabPlaceOtherwise", "PictureInPictureFollowsTabs",
         "PictureInPictureWhenLeaving", "SwipeBetweenPages", "OffersToPinWanderedPage", "InPageMini", "SearchSuggestions",
         "CustomSearchTemplate", "pdfTwoPages", "ProtectsIPFromWebRTC", "JavaScriptAllowed", "JavaScriptOffSites", "CookieBanners",
