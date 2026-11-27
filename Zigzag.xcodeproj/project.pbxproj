@@ -424,6 +424,8 @@
 		9BB31B25E3F5A6DCF01CF154 /* PaneSiteControlsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48773DEB7199082B9EDA7805 /* PaneSiteControlsTests.swift */; };
 		9C1698F934167B4C7F79D557 /* ExtensionSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C20474FB5E7187A87874B1 /* ExtensionSecurityTests.swift */; };
 		9CB768C6CFD15DC9C6468A77 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAEBEA6141A8688342F56A56 /* SidebarView.swift */; };
+		F2A3E9AC0FF6000000000031 /* CaptureToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000032 /* CaptureToggle.swift */; };
+		F2A3E9AC0FF6000000000033 /* CaptureToggleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000034 /* CaptureToggleTests.swift */; };
 		9D02F7D07BA7EFB165D985AE /* AutoPictureInPictureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0F5740003190746ACD4D73 /* AutoPictureInPictureTests.swift */; };
 		9D13ADE0196E39606D06C145 /* PageTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F7FCA5586EF97D50AF36363 /* PageTranslator.swift */; };
 		9D6BFE1BCBCDA42240449F8E /* ad-engine.js in Resources */ = {isa = PBXBuildFile; fileRef = 0AF7047E5A8FD4E834836B5B /* ad-engine.js */; };
@@ -1231,6 +1233,8 @@
 		C9102393493293F365ECD5D6 /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
 		C928420068829E660FA04DC9 /* FormSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormSheetTests.swift; sourceTree = "<group>"; };
 		CAEBEA6141A8688342F56A56 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000032 /* CaptureToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureToggle.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000034 /* CaptureToggleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureToggleTests.swift; sourceTree = "<group>"; };
 		CB18D6F14CA9471B875C9E62 /* SpaceSwitchLookTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceSwitchLookTests.swift; sourceTree = "<group>"; };
 		CC0E8F62B17A23075DFB3BF5 /* FavoritesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesView.swift; sourceTree = "<group>"; };
 		CC57DDCE27AFE0FDF383357E /* ExtensionSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSearch.swift; sourceTree = "<group>"; };
@@ -1545,6 +1549,7 @@
 				3C15F0BEBCCF41FB7B3A6087 /* LiveFeed.swift */,
 				32D47467F8351F9270BAE20A /* SidebarRows.swift */,
 				CAEBEA6141A8688342F56A56 /* SidebarView.swift */,
+				F2A3E9AC0FF6000000000032 /* CaptureToggle.swift */,
 				329A263AB31CE5616542E983 /* EdgeSidebar.swift */,
 				F2A3E9AC0FF6000000000022 /* EdgeHoverRouting.swift */,
 				27025355902590144D7FABA3 /* SpaceEditor.swift */,
@@ -2086,6 +2091,7 @@
 				5D4405F1C80AAC84AE2949B3 /* LoadTimingsTests.swift */,
 				526947BE18F9777C184A4DB9 /* UpgradeFixtureTests.swift */,
 				0D9E4A2C7B1F000100000004 /* PageCaptureTests.swift */,
+				F2A3E9AC0FF6000000000034 /* CaptureToggleTests.swift */,
 				05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */,
 				6B89CCE006086C641D713AAB /* LocalizationTests.swift */,
 				9D02F02DFE20E463010E54EA /* LocalReceiversTests.swift */,
@@ -2859,6 +2865,7 @@
 				D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */,
 				37872776DAE6F6D005D98E10 /* SidebarUndo.swift in Sources */,
 				9CB768C6CFD15DC9C6468A77 /* SidebarView.swift in Sources */,
+				F2A3E9AC0FF6000000000031 /* CaptureToggle.swift in Sources */,
 				FBD68377266A432841C2E71D /* EdgeSidebar.swift in Sources */,
 				F2A3E9AC0FF6000000000021 /* EdgeHoverRouting.swift in Sources */,
 				E7E71F580428AFC67EE93EA2 /* SignInImporter.swift in Sources */,
@@ -3062,6 +3069,7 @@
 				2A316DECE57B53975D458524 /* LoadTimingsTests.swift in Sources */,
 				3BA42935EB35DCF711126500 /* UpgradeFixtureTests.swift in Sources */,
 				0D9E4A2C7B1F000100000003 /* PageCaptureTests.swift in Sources */,
+				F2A3E9AC0FF6000000000033 /* CaptureToggleTests.swift in Sources */,
 				3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */,
 				E3A8ED15A7F4B1612C745407 /* LocalReceiversTests.swift in Sources */,
 				F93332479C4E8E444308AC31 /* LocalServerTrustTests.swift in Sources */,

@@ -27,7 +27,10 @@ final class AddressView: InteractiveView {
     static func button(_ symbol: String, toolTip: String) -> IconButton {
         IconButton(symbol: symbol, size: buttonSide, symbolSize: Tokens.Sidebar.addressGlyph, toolTip: toolTip)
     }
-    let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
+    /// One button per device the page is using, each a toggle: pressed while the page has it, a slash while it's
+    /// muted. A click mutes or picks it up again without ending the call.
+    let cameraButton = AddressView.button("video.fill", toolTip: String(localized: "Camera", comment: "Tooltip of the address bar's camera button, which shows while a page uses the camera."))
+    let microphoneButton = AddressView.button("mic.fill", toolTip: String(localized: "Microphone", comment: "Tooltip of the address bar's microphone button, which shows while a page uses the microphone."))
     /// Shown on articles: turns Reader on and off.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
     /// Shown on pages in another language, in the accent while translating, pressed while translated: opens the
@@ -44,12 +47,25 @@ final class AddressView: InteractiveView {
         reflow(animated: true)
     }
 
-    func setCapture(camera: Bool, microphone: Bool) {
-        wantsCapture = camera || microphone
-        captureButton.symbol = camera ? "video.fill" : "mic.fill"
-        captureButton.tint = .systemOrange
-        captureButton.toolTip = camera && microphone ? String(localized: "Using your camera and microphone", comment: "Tooltip of the address bar's capture button: the page uses both.")
-            : camera ? String(localized: "Using your camera", comment: "Tooltip of the address bar's capture button: the page uses the camera.") : String(localized: "Using your microphone", comment: "Tooltip of the address bar's capture button: the page uses the microphone.")
+    /// A device shows only while the page is capturing it — a blocked device never gets that far, so there is nothing
+    /// to show a blocked state on. The slash is the universal sign for off: the page muted it, and one click picks it
+    /// back up.
+    func setCapture(camera: Bool, microphone: Bool, cameraMuted: Bool = false, microphoneMuted: Bool = false) {
+        wantsCamera = camera
+        wantsMicrophone = microphone
+        cameraButton.symbol = cameraMuted ? "video.slash" : "video.fill"
+        microphoneButton.symbol = microphoneMuted ? "mic.slash" : "mic.fill"
+        cameraButton.isSelected = camera && !cameraMuted
+        microphoneButton.isSelected = microphone && !microphoneMuted
+        // Orange is the colour of a page using the hardware, whether or not it's muted: it's still holding the device.
+        cameraButton.tint = .systemOrange
+        microphoneButton.tint = .systemOrange
+        cameraButton.toolTip = cameraMuted
+            ? String(localized: "Camera Muted", comment: "Tooltip of the address bar's camera button while the page's camera is muted: clicking turns it back on.")
+            : String(localized: "Camera", comment: "Tooltip of the address bar's camera button, which shows while a page uses the camera; clicking mutes it.")
+        microphoneButton.toolTip = microphoneMuted
+            ? String(localized: "Microphone Muted", comment: "Tooltip of the address bar's microphone button while the page's microphone is muted: clicking turns it back on.")
+            : String(localized: "Microphone", comment: "Tooltip of the address bar's microphone button, which shows while a page uses the microphone; clicking mutes it.")
         reflow(animated: true)
     }
 
@@ -423,8 +439,10 @@ final class AddressView: InteractiveView {
         // Set with each name (`lineBreak(forName:)`): a long host never loses the end that says whose site it is.
         label.lineBreakMode = .byTruncatingHead
         addSubview(label)
-        captureButton.isHidden = true
-        addSubview(captureButton)
+        cameraButton.isHidden = true
+        microphoneButton.isHidden = true
+        addSubview(cameraButton)
+        addSubview(microphoneButton)
         readerButton.isHidden = true
         addSubview(readerButton)
         translateButton.isHidden = true
@@ -539,7 +557,7 @@ final class AddressView: InteractiveView {
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsTranslate ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
+        let count = (wantsTranslate ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCamera ? 1 : 0) + (wantsMicrophone ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -575,7 +593,8 @@ final class AddressView: InteractiveView {
 
     private var wantsReader = false
     private var wantsTranslate = false
-    private var wantsCapture = false
+    private var wantsCamera = false
+    private var wantsMicrophone = false
     /// The buttons drawn in the field, those leaving aside.
     private var drawn = Set<ObjectIdentifier>()
     /// The host's text at the last reflow.
@@ -602,7 +621,8 @@ final class AddressView: InteractiveView {
         if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
 
         var others: [IconButton] = []
-        for (button, wanted) in [(translateButton, wantsTranslate), (readerButton, wantsReader), (captureButton, wantsCapture)] {
+        for (button, wanted) in [(translateButton, wantsTranslate), (readerButton, wantsReader),
+                                 (cameraButton, wantsCamera), (microphoneButton, wantsMicrophone)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         // Without the site, buttons get the whole width, including a gap after the last.
@@ -704,7 +724,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [translateButton, readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [translateButton, readerButton, cameraButton, microphoneButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.

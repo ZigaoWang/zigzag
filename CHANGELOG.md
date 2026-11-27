@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- The address bar shows a button for each device the page is using, the camera and the microphone, and a click mutes that device or picks it back up without ending the call; it shows a slash while muted. A tab whose page holds a device shows an orange dot after its title, so a call running in another tab is not invisible.
 - The mini player shows Previous and Next when the site offers them, as YouTube does in a playlist, so you can move on without going back to the page. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 
 ### Fixed
