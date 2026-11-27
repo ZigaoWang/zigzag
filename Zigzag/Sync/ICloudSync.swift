@@ -772,8 +772,9 @@ final class CloudKitCloud: SyncCloud {
 
     var isEntitled: Bool {
         #if DEBUG
-        // The test host never reaches a real iCloud account; tests use their own stand-in.
-        if DevDefaults.testsData != nil { return false }
+        // The test host never reaches a real iCloud account (tests use their own stand-in), and a test copy only when
+        // launched with --sync-with-icloud.
+        if DevDefaults.testsData != nil || !DevDefaults.mayUseICloud() { return false }
         #endif
         return ICloudSync.isEntitled
     }

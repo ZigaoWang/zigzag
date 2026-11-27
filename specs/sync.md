@@ -12,7 +12,7 @@
   Test: SyncTests.withoutABackupSyncStaysOff
 - Zigzag's unit tests → never reach a real iCloud account: the test host's own sync is never entitled, and tests sync through a stand-in for iCloud.
   Test: SyncTests.turningSyncOnAsksFirstThenBacksUpAndMerges
-- A debug build's test copy (its own data folder, ZIGZAG_DATA_DIR) → sync is off, never carried over from the dev build with its account, and stays off at each launch unless the copy is launched with --sync-with-icloud; only then can its syncremove command remove the dev build's iCloud copy. Release builds have no test copies.
+- A debug build's test copy (its own data folder, ZIGZAG_DATA_DIR) → sync is off, never carried over from the dev build with its account. The copy reaches iCloud only during a launch with --sync-with-icloud; launched without it, it can't use iCloud whatever its switch says, and the switch is kept as it is for the next launch that asks. Only then can its syncremove command remove the dev build's iCloud copy. Release builds have no test copies.
   Test: DevDefaultsTests.aTestCopyNeverSyncsWithICloudUnlessAsked
 - Turn it off → everything stays on this Mac as it is, and iCloud keeps its copy.
   Test: SyncTests.turningSyncOffKeepsEverythingHereAndICloudsCopy

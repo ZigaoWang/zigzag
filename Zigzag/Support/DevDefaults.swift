@@ -57,11 +57,18 @@ nonisolated enum DevDefaults {
     static let syncKeys: Set<String> = ["SyncWithICloud", "SyncWithICloudAccount", "SyncWithICloudCopy", "SyncWithICloudPreferenceTimes"]
 
     /// A test copy's settings at launch: a new copy starts from the dev build's, as it did when it shared them, but
-    /// never with sync on or the dev build's account. Launched without `syncArgument`, a copy's sync is off.
+    /// never with sync on or the dev build's account. A copy's own are kept as they are.
     static func copyDomain(existing: [String: Any]?, dev: [String: Any], arguments: [String]) -> [String: Any] {
-        var domain = existing ?? dev.filter { !syncKeys.contains($0.key) }
-        if !arguments.contains(syncArgument) { domain["SyncWithICloud"] = nil }
-        return domain
+        existing ?? dev.filter { !syncKeys.contains($0.key) }
+    }
+
+    /// Whether this launch may reach iCloud: never the test host; a test copy only when launched with
+    /// `syncArgument`, whatever its switch says, so the switch is kept for the next launch that asks.
+    static func mayUseICloud(environment env: [String: String] = ProcessInfo.processInfo.environment,
+                             arguments: [String] = CommandLine.arguments) -> Bool {
+        if env["XCTestConfigurationFilePath"] != nil { return false }
+        guard let dir = env["ZIGZAG_DATA_DIR"], !dir.isEmpty else { return true }
+        return arguments.contains(syncArgument)
     }
 
     /// This test process's settings and data, at exit.

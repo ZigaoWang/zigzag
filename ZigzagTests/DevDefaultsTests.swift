@@ -53,10 +53,18 @@ struct DevDefaultsTests {
         #expect(new[ICloudSync.enabledKey] == nil && new[ICloudSync.accountKey] == nil && new[ICloudSync.copyKey] == nil)
         // Asked for at launch, still off until turned on in the copy.
         #expect(DevDefaults.copyDomain(existing: nil, dev: dev, arguments: ["Zigzag", DevDefaults.syncArgument])[ICloudSync.enabledKey] == nil)
-        // A copy that had it on syncs only while launched with the argument.
+        // A copy that had it on keeps its switch as it is, launched with the argument or not.
         let on: [String: Any] = [ICloudSync.enabledKey: true, "ReaderSize": 14]
-        #expect(DevDefaults.copyDomain(existing: on, dev: dev, arguments: ["Zigzag"])[ICloudSync.enabledKey] as? Bool != true)
-        #expect(DevDefaults.copyDomain(existing: on, dev: dev, arguments: ["Zigzag"])["ReaderSize"] as? Int == 14)
-        #expect(DevDefaults.copyDomain(existing: on, dev: dev, arguments: ["Zigzag", DevDefaults.syncArgument])[ICloudSync.enabledKey] as? Bool == true)
+        for arguments in [["Zigzag"], ["Zigzag", DevDefaults.syncArgument]] {
+            let domain = DevDefaults.copyDomain(existing: on, dev: dev, arguments: arguments)
+            #expect(domain[ICloudSync.enabledKey] as? Bool == true && domain["ReaderSize"] as? Int == 14)
+        }
+        // It reaches iCloud only during a launch with the argument; the dev build itself as always.
+        let copy = ["ZIGZAG_DATA_DIR": "/tmp/copy-one"]
+        #expect(!DevDefaults.mayUseICloud(environment: copy, arguments: ["Zigzag"]))
+        #expect(DevDefaults.mayUseICloud(environment: copy, arguments: ["Zigzag", DevDefaults.syncArgument]))
+        #expect(DevDefaults.mayUseICloud(environment: [:], arguments: ["Zigzag"]))
+        // The test host never does.
+        #expect(!DevDefaults.mayUseICloud(environment: ["XCTestConfigurationFilePath": "/tmp/x"], arguments: ["Zigzag", DevDefaults.syncArgument]))
     }
 }
