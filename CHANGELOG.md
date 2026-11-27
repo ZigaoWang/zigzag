@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A quick swipe back or forward taps the trackpad again. The arrow fills, with one tap, the moment letting go would go back or forward, a quick flick included, and stays filled while your fingers rest, so a flick, a pause, then letting go now goes as the arrow shows. Coming back a little empties it. Swipes with fingers on a touch screen don't tap.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
