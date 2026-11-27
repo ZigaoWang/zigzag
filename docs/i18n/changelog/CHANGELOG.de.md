@@ -4,6 +4,9 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 
 ## [Unreleased]
 
+### Neu
+- „Vim-Tasten“, eine neue Einstellung in „Einstellungen“ › „Tabs“, standardmäßig aus: ⌃J und ⌃K gehen in der Seitenleiste nach unten und oben, ⌃H und ⌃L zum vorherigen und nächsten Space, zusätzlich zu ⌥⌘ mit den Pfeiltasten. Bei geöffneter Befehlsleiste gehen ⌃J und ⌃K durch ihre Liste. Danke an [Laughing0900](https://github.com/Laughing0900). ([#567](https://github.com/ZigaoWang/zigzag/issues/567))
+
 ### Behoben
 - Wenn du deinen Mac entsperrst, zeigt Zigzag sein Fenster sofort so, wie es war. Im Vollbild bleibt der Bildschirm nicht mehr erst einen Moment schwarz, und in einem Fenster scheint das Fenster dahinter nicht mehr kurz durch.
 - Drücken und halten, um ein Menü zu öffnen, auf ein Objekt gleiten und loslassen, um es zu wählen, wie in anderen Mac-Apps: Halte die rechte Maustaste oder einen Zwei-Finger-Klick auf einem Tab, Favoriten, Ordner, Space oder der Seitenleiste gedrückt, oder drücke eine Menütaste wie das + der Seitenleiste, eine …-Taste oder ein Aufklappmenü, das sich jetzt schon beim Herunterdrücken öffnet. Ein Rechtsklick auf „Zurück“ oder „Vorwärts“ der Seitenleiste in der Titelleiste öffnet wieder die Liste dazu.

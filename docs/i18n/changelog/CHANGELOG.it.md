@@ -4,6 +4,9 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ## [Unreleased]
 
+### Novità
+- Tasti Vim, una nuova impostazione in Impostazioni › Pannelli, disattivata per impostazione predefinita: ⌃J e ⌃K scorrono la barra laterale verso il basso e verso l’alto, e ⌃H e ⌃L passano allo spazio precedente e successivo, oltre a ⌥⌘ con le frecce. Con la barra dei comandi aperta, ⌃J e ⌃K scorrono il suo elenco. Grazie a [Laughing0900](https://github.com/Laughing0900). ([#567](https://github.com/ZigaoWang/zigzag/issues/567))
+
 ### Correzioni
 - Sbloccando il Mac, la finestra di Zigzag compare subito, com’era. A schermo intero lo schermo non resta più nero per un attimo, e in una finestra non si vede più per un attimo quella che c’è dietro.
 - Tieni premuto per aprire un menu, scorri su una voce e rilascia per sceglierla, come nelle altre app per Mac: tieni premuto il tasto destro o un clic a due dita su un pannello, un preferito, una cartella, uno spazio o la barra laterale, oppure premi un pulsante di menu come il + della barra laterale, un pulsante … o un menu a comparsa, che ora si apre appena lo premi. Un clic destro su Indietro o Avanti della barra laterale nella barra del titolo apre di nuovo il suo elenco.

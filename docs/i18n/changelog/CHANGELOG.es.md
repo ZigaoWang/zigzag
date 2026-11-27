@@ -4,6 +4,9 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 
 ## [Unreleased]
 
+### Nuevo
+- Teclas de Vim, un ajuste nuevo en Ajustes › Pestañas, desactivado de forma predeterminada: ⌃J y ⌃K bajan y suben por la barra lateral, y ⌃H y ⌃L van al espacio anterior y al siguiente, además de ⌥⌘ con las flechas. Con la barra de comandos abierta, ⌃J y ⌃K recorren su lista. Gracias a [Laughing0900](https://github.com/Laughing0900). ([#567](https://github.com/ZigaoWang/zigzag/issues/567))
+
 ### Correcciones
 - Al desbloquear el Mac, la ventana de Zigzag aparece al instante, tal como estaba. En pantalla completa la pantalla ya no se queda negra un momento antes, y en una ventana ya no se ve un momento la que hay detrás.
 - Mantén pulsado para abrir un menú, desliza hasta un elemento y suelta para elegirlo, como en otras apps del Mac: mantén pulsado el clic derecho o un clic con dos dedos en una pestaña, un favorito, una carpeta, un espacio o la barra lateral, o pulsa un botón de menú como el + de la barra lateral, un botón … o un menú desplegable, que ahora se abre en cuanto lo pulsas. Hacer clic derecho en Atrás o Adelante de la barra lateral en la barra de título vuelve a abrir su lista.

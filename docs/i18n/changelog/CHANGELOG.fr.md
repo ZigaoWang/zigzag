@@ -4,6 +4,9 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Nouveautés
+- Touches Vim, un nouveau réglage dans Réglages › Onglets, désactivé par défaut : ⌃J et ⌃K parcourent la barre latérale vers le bas et vers le haut, et ⌃H et ⌃L passent à l’espace précédent et suivant, en plus de ⌥⌘ avec les flèches. Quand la barre de commandes est ouverte, ⌃J et ⌃K parcourent sa liste. Merci à [Laughing0900](https://github.com/Laughing0900). ([#567](https://github.com/ZigaoWang/zigzag/issues/567))
+
 ### Corrections
 - Déverrouiller votre Mac affiche aussitôt la fenêtre de Zigzag telle qu’elle était. En plein écran, l’écran ne reste plus noir un instant d’abord, et dans une fenêtre, celle de derrière ne transparaît plus un instant.
 - Appuyez et maintenez pour ouvrir un menu, glissez sur un élément et relâchez pour le choisir, comme dans les autres apps Mac : maintenez un clic droit ou un clic à deux doigts sur un onglet, un favori, un dossier, un espace ou la barre latérale, ou appuyez sur un bouton de menu comme le + de la barre latérale, un bouton … ou un menu déroulant, qui s’ouvre désormais dès l’appui. Un clic droit sur Précédent ou Suivant de la barre latérale, dans la barre de titre, ouvre de nouveau sa liste.

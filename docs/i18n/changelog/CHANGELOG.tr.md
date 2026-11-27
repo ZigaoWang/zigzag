@@ -4,6 +4,9 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 
 ## [Unreleased]
 
+### Yeni Özellikler
+- Vim tuşları, Ayarlar › Sekmeler’de varsayılan olarak kapalı yeni bir ayar: ⌃J ve ⌃K kenar çubuğunda aşağı ve yukarı, ⌃H ve ⌃L önceki ve sonraki Space’e gider; ⌥⌘ ve ok tuşları da çalışmaya devam eder. Komut Çubuğu açıkken ⌃J ve ⌃K onun listesinde gezinir. Teşekkürler: [Laughing0900](https://github.com/Laughing0900). ([#567](https://github.com/ZigaoWang/zigzag/issues/567))
+
 ### Düzeltmeler
 - Mac’inizin kilidini açtığınızda Zigzag’in penceresi hemen olduğu gibi görünür. Tam ekranda ekran artık önce bir an siyah kalmaz, pencerede de arkadaki pencere bir an görünmez.
 - Diğer Mac uygulamalarındaki gibi, bir menüyü açmak için basılı tutun, bir öğenin üzerine kaydırın ve seçmek için bırakın: bir sekmede, favoride, klasörde, Space’te veya kenar çubuğunda sağ tuşa ya da iki parmakla tıklamaya basılı tutun veya kenar çubuğunun + düğmesi, bir … düğmesi ya da açılır menü gibi bir menü düğmesine basın; menü artık basar basmaz açılır. Başlık çubuğundaki kenar çubuğu Geri ve İleri düğmelerine sağ tıklamak yine listelerini açar.

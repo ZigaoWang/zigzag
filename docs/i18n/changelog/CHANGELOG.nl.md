@@ -4,6 +4,9 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
+### Nieuw
+- Vim-toetsen, een nieuwe instelling in Instellingen › Tabbladen, standaard uit: met ⌃J en ⌃K ga je omlaag en omhoog in de navigatiekolom, en met ⌃H en ⌃L naar de vorige en volgende space, naast ⌥⌘ met de pijltoetsen. Als de opdrachtbalk open is, ga je met ⌃J en ⌃K door de lijst. Met dank aan [Laughing0900](https://github.com/Laughing0900). ([#567](https://github.com/ZigaoWang/zigzag/issues/567))
+
 ### Opgelost
 - Als je je Mac ontgrendelt, toont Zigzag zijn venster meteen zoals het was. In schermvullende weergave blijft het scherm niet meer even zwart, en in een venster schijnt het venster erachter niet meer even door.
 - Houd ingedrukt om een menu te openen, schuif naar een onderdeel en laat los om het te kiezen, zoals in andere Mac-apps: houd de rechtermuisknop of een klik met twee vingers ingedrukt op een tabblad, favoriet, map, space of de navigatiekolom, of druk op een menuknop zoals de + van de navigatiekolom, een …-knop of een venstermenu, dat nu opent zodra je drukt. Met een klik met de rechtermuisknop op Terug of Vooruit van de navigatiekolom in de titelbalk open je de lijst weer.

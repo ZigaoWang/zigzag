@@ -4,6 +4,9 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
+### Nowe
+- „Klawisze Vim”, nowe ustawienie w „Ustawienia” › „Karty”, domyślnie wyłączone: ⌃J i ⌃K przechodzą w dół i w górę paska bocznego, a ⌃H i ⌃L do poprzedniej i następnej przestrzeni, obok ⌥⌘ ze strzałkami. Gdy pasek poleceń jest otwarty, ⌃J i ⌃K przechodzą po jego liście. Podziękowania dla [Laughing0900](https://github.com/Laughing0900). ([#567](https://github.com/ZigaoWang/zigzag/issues/567))
+
 ### Naprawiono
 - Po odblokowaniu Maca okno Zigzag od razu wygląda tak, jak wyglądało. W trybie pełnoekranowym ekran nie jest już przez chwilę czarny, a w oknie nie prześwituje już przez chwilę okno pod spodem.
 - Naciśnij i przytrzymaj, aby otworzyć menu, przesuń na pozycję i puść, aby ją wybrać, tak jak w innych aplikacjach na Macu: przytrzymaj prawy przycisk lub kliknięcie dwoma palcami na karcie, ulubionej, folderze, przestrzeni lub pasku bocznym albo naciśnij przycisk menu, taki jak + na pasku bocznym, przycisk … lub menu rozwijane, które teraz otwiera się już w chwili naciśnięcia. Kliknięcie prawym przyciskiem przycisków Wstecz i Dalej paska bocznego na pasku tytułu znów otwiera ich listę.
