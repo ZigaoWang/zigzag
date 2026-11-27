@@ -986,14 +986,22 @@ struct BackHoldEventTests {
         let tab = Tab(url: urls[0], title: "0", spaceID: space)
         manager.adopt([tab], in: space)
         manager.select(tab)
-        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        // Off screen, out of the pointer's way, and in front of this process's other windows only.
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 1000, height: 700))
         defer { controller.window?.close() }
-        controller.window?.orderBack(nil)
+        let window = try #require(controller.window)
+        if let top = NSApp.orderedWindows.first(where: { $0 !== window }) {
+            window.order(.above, relativeTo: top.windowNumber)
+        } else {
+            window.orderBack(nil)
+        }
+        window.setFrameOrigin(NSPoint(x: -6000, y: 200))
+        #expect(MenuPanel.current == nil, "a menu left open by an earlier test")
         for url in urls {
             if url != urls[0] { tab.load(url) }
             #expect(await until { tab.webView?.url == url && tab.webView?.isLoading == false })
         }
-        controller.window?.layoutIfNeeded()
+        window.layoutIfNeeded()
         try await body(controller, tab)
     }
 
@@ -1003,7 +1011,7 @@ struct BackHoldEventTests {
         var leftDown = false
     }
 
-    /// Through the app's event queue; `delivered` false drops the drags and release, as the window server can.
+    /// Straight to the window, as AppKit hands it a click; `delivered` false drops the drags and release, as the window server can.
     private func send(_ type: NSEvent.EventType, at point: NSPoint, to window: NSWindow, pointer: Pointer, delivered: Bool = true) {
         pointer.location = window.convertPoint(toScreen: point)
         pointer.leftDown = type != .leftMouseUp
@@ -1011,7 +1019,11 @@ struct BackHoldEventTests {
               let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                              windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
         else { return }
-        NSApp.postEvent(event, atStart: false)
+        if type == .leftMouseDown, let frame = window.contentView?.superview {
+            let hit = frame.hitTest(frame.convert(point, from: nil))
+            #expect(hit is InteractiveView, "the press lands on \(hit.map { "\(Swift.type(of: $0))" } ?? "nothing")")
+        }
+        window.sendEvent(event)
     }
 
     private func middle(of view: NSView) -> NSPoint { view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil) }
