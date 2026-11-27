@@ -52,7 +52,7 @@ body:
     attributes:
       label: Zigzag version
       description: The version and build from Zigzag › About Zigzag.
-      placeholder: 0.7.6 (70)
+      placeholder: 0.10.0 (172)
     validations:
       required: true
   - type: input
