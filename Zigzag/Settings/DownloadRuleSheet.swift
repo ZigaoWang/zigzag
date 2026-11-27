@@ -197,6 +197,7 @@ enum DownloadRuleSheet {
             actionRows.append(FormSheet.Row(label: String(localized: "Username", comment: "Label of the username field in a JSON-RPC download rule's sheet."), view: user))
             let password = FilledField(placeholder: String(localized: "Password, if the service asks", comment: "Placeholder of the password field in a JSON-RPC download rule's sheet. It's kept in the Keychain."), secure: true)
             password.stringValue = savedUser?.password ?? ""
+            password.toolTip = String(localized: "Kept in the Keychain", comment: "Tooltip on the token field of a JSON-RPC download rule's sheet.")
             passwordField = password
             actionRows.append(FormSheet.Row(label: String(localized: "Password", comment: "Label of the password field in a JSON-RPC download rule's sheet."), view: password))
             let method = FilledField(placeholder: "aria2.addUri")
@@ -413,10 +414,10 @@ enum DownloadRuleSheet {
             // Sign-in goes to the Keychain, never the rules file: from the fields, or from an address typed with
             // `user:pass@`, which older rules and habit both produce.
             var credentials = (user: userField?.stringValue ?? "", password: passwordField?.stringValue ?? "")
-            if credentials.user.isEmpty, credentials.password.isEmpty,
-               let (clean, user, password) = HandoffSecrets.endpointWithoutCredentials(rule.action.rpcEndpoint) {
+            if let (clean, user, password) = HandoffSecrets.endpointWithoutCredentials(rule.action.rpcEndpoint) {
                 rule.action.rpcEndpoint = clean
-                credentials = (user, password)
+                // The fields win when both are filled in.
+                if credentials.user.isEmpty, credentials.password.isEmpty { credentials = (user, password) }
             }
             if rule.action.kind == .jsonRPC {
                 HandoffSecrets.setEndpointCredentials(credentials, for: rule.id, endpoint: rule.action.rpcEndpoint)

@@ -916,8 +916,10 @@ final class DownloadRulesStore {
         for index in rules.indices where rules[index].action.kind == .jsonRPC {
             let endpoint = rules[index].action.rpcEndpoint
             guard let (clean, user, password) = HandoffSecrets.endpointWithoutCredentials(endpoint),
-                  clean != endpoint else { continue }
-            HandoffSecrets.setEndpointCredentials((user, password), for: rules[index].id, endpoint: clean)
+                  clean != endpoint,
+                  // Left in the address when the Keychain can't take them, so they aren't lost.
+                  HandoffSecrets.setEndpointCredentials((user, password), for: rules[index].id, endpoint: clean)
+            else { continue }
             rules[index].action.rpcEndpoint = clean
             moved = true
         }
@@ -1023,6 +1025,7 @@ final class DownloadRulesStore {
     func remove(id: UUID) {
         rules.removeAll { $0.id == id }
         HandoffSecrets.removeSecret(for: id)
+        HandoffSecrets.removeEndpointCredentials(for: id)
         // Only this rule could read its answers.
         Self.forgetHandoffAnswers(for: id)
         save()
@@ -1098,21 +1101,22 @@ nonisolated enum HandoffSecrets {
         return String(data: data, encoding: .utf8)
     }
 
-    /// Keeps a value, or removes it when there is none.
-    private static func set(_ value: String?, account: String) {
-        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            SecItemDelete(query(account: account) as CFDictionary)
-            return
+    /// Keeps a value as given, or removes it when there is none. False when the Keychain refused it.
+    @discardableResult
+    private static func set(_ value: String?, account: String) -> Bool {
+        guard let value, !value.isEmpty else {
+            let status = SecItemDelete(query(account: account) as CFDictionary)
+            return status == errSecSuccess || status == errSecItemNotFound
         }
-        let data = Data(trimmed.utf8)
+        let data = Data(value.utf8)
         var query = query(account: account)
-        let status = SecItemUpdate(query as CFDictionary, [kSecValueData: data] as CFDictionary)
+        var status = SecItemUpdate(query as CFDictionary, [kSecValueData: data] as CFDictionary)
         if status == errSecItemNotFound {
             query[kSecValueData] = data
             query[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlock
-            SecItemAdd(query as CFDictionary, nil)
+            status = SecItemAdd(query as CFDictionary, nil)
         }
+        return status == errSecSuccess
     }
 
     /// An endpoint with any `user:pass@` taken out of it, and the credentials it carried. An address can hold them
@@ -1129,19 +1133,27 @@ nonisolated enum HandoffSecrets {
 
     /// The username and password a rule's endpoint signs in with, kept apart from the rules file.
     static func endpointCredentials(for rule: UUID, endpoint: String) -> (user: String, password: String)? {
-        guard let stored = value(forAccount: endpointAccount(for: rule)) else { return nil }
-        // Kept with the address it belongs to, so pointing a rule somewhere else can't send the old credentials there.
-        let parts = stored.components(separatedBy: "\n")
-        guard parts.count == 3, parts[0] == endpoint else { return nil }
-        return (parts[1], parts[2])
+        value(forAccount: endpointAccount(for: rule)).flatMap { credentials(from: $0, endpoint: endpoint) }
     }
 
+    @discardableResult
     static func setEndpointCredentials(_ credentials: (user: String, password: String)?, for rule: UUID,
-                                       endpoint: String) {
-        let stored = credentials.flatMap { pair in
-            pair.user.isEmpty && pair.password.isEmpty ? nil : "\(endpoint)\n\(pair.user)\n\(pair.password)"
-        }
-        set(stored, account: endpointAccount(for: rule))
+                                       endpoint: String) -> Bool {
+        set(credentials.flatMap { stored($0, endpoint: endpoint) }, account: endpointAccount(for: rule))
+    }
+
+    /// Kept with the address it belongs to, so pointing a rule somewhere else can't send the old credentials there.
+    /// JSON, so a password may hold any character, a line break or a trailing space included.
+    static func stored(_ credentials: (user: String, password: String), endpoint: String) -> String? {
+        guard !credentials.user.isEmpty || !credentials.password.isEmpty,
+              let data = try? JSONEncoder().encode([endpoint, credentials.user, credentials.password]) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func credentials(from stored: String, endpoint: String) -> (user: String, password: String)? {
+        guard let parts = try? JSONDecoder().decode([String].self, from: Data(stored.utf8)),
+              parts.count == 3, parts[0] == endpoint else { return nil }
+        return (parts[1], parts[2])
     }
 
     /// What the request proves who it is with: `Basic` and the credentials, never the address itself.
@@ -1178,5 +1190,9 @@ nonisolated enum HandoffSecrets {
 
     static func removeSecret(for rule: UUID) {
         SecItemDelete(query(for: rule) as CFDictionary)
+    }
+
+    static func removeEndpointCredentials(for rule: UUID) {
+        set(nil, account: endpointAccount(for: rule))
     }
 }
