@@ -342,6 +342,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
         }
         fadeTimer?.tolerance = 10
+        // Half a minute apart from the tab sleep check, also once a minute, so the two never add up in one turn.
+        fadeTimer?.fireDate = Date().addingTimeInterval(90)
 
         if tabManager.isPrivate {
             // Private windows are always dark and say so, so you never wonder which one you're in.
