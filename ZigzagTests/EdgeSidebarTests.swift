@@ -552,6 +552,24 @@ struct EdgeSidebarTests {
         #expect(controller.window?.isKeyWindow != true)
     }
 
+    /// The panel's Downloads button opens the list in the panel, over the sidebar's lane; the panel stays out.
+    @Test func downloadsOpenOverThePanel() throws {
+        let (controller, _, _, done) = panelWithTabs(["https://example.test/a"])
+        defer { done(); DownloadsPanel.closeCurrent() }
+        let (panel, host) = try panelParts()
+        let sidebar = try #require(controller.edgeSidebar)
+        // The panel places its card's parts in its own layout pass.
+        host.layoutSubtreeIfNeeded()
+        controller.sidebarShowDownloads(from: sidebar.downloadsButton)
+        #expect(EdgeSidebar.shared.isShowing)
+        #expect(DownloadsPanel.isOpen(in: panel))
+        let list = try #require(Self.find(DownloadsPanelView.self, in: host))
+        #expect(host.cardFrame.contains(list.frame), "list \(list.frame) card \(host.cardFrame)")
+        // Its edges are the rows' edges, as in the window, against the side the sidebar is on.
+        let lane = host.cardFrame.insetBy(dx: Tokens.Sidebar.edge, dy: 0)
+        #expect(controller.edgeSidebarOnRight ? list.frame.maxX == lane.maxX : list.frame.minX == lane.minX)
+    }
+
     private static func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
         if let found = view as? T { return found }
         for sub in view.subviews { if let found = find(type, in: sub) { return found } }

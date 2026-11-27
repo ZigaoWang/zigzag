@@ -562,8 +562,11 @@ final class DownloadsPanelView: FloatingPanelView {
         // In the edge panel: the mirror's lane, above the button that opened it.
         if let host, let hostLane {
             let button = anchor.convert(anchor.bounds, to: host)
-            let width = width(lane: hostLane.width, room: host.bounds.width)
-            frame = NSRect(x: hostLane.minX, y: button.minY - Tokens.Space.x2 - height, width: width, height: height)
+            // Wider than the lane: inwards, away from the screen's edge.
+            let onRight = controller.edgeSidebarOnRight, margin = Tokens.Metric.cardInset
+            let width = width(lane: hostLane.width, room: onRight ? hostLane.maxX - margin : host.bounds.width - margin - hostLane.minX)
+            let x = onRight ? hostLane.maxX - width : hostLane.minX
+            frame = NSRect(x: x, y: button.minY - Tokens.Space.x2 - height, width: width, height: height)
             return
         }
         // Sidebar hidden: above the stand-in Downloads button in the same corner, at the sidebar's usual width.

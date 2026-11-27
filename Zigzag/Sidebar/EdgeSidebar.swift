@@ -693,7 +693,8 @@ final class EdgeSidebar {
     /// Downloads from the panel: the list in the panel's window, over the mirror's lane, not in the window behind.
     func showDownloads(from anchor: NSView, in controller: BrowserWindowController) {
         guard isShowing, let host, let target else { return }
-        DownloadsPanel.show(from: anchor, in: controller, host: host, lane: host.cardFrame,
+        // The rows' edges in the card, as in the window.
+        DownloadsPanel.show(from: anchor, in: controller, host: host, lane: host.cardFrame.insetBy(dx: Tokens.Sidebar.edge, dy: 0),
                             receding: target.edgeSidebar.map { [$0.list] } ?? [])
     }
 
