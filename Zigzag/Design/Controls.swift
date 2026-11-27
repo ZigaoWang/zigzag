@@ -2673,7 +2673,9 @@ final class MenuPanel: FloatingPanelView {
     }
 
     /// The pointer on screen and the buttons held, as the system has them now.
-    static var pressPointer: () -> (location: NSPoint, buttons: Int) = { (NSEvent.mouseLocation, NSEvent.pressedMouseButtons) }
+    /// In the test host it reads no buttons, so the real mouse never steers a test's menu.
+    static var pressPointer: () -> (location: NSPoint, buttons: Int) = AppDelegate.isHostingTests
+        ? { (NSEvent.mouseLocation, 0) } : { (NSEvent.mouseLocation, NSEvent.pressedMouseButtons) }
 
     private func beginPress(_ event: NSEvent) {
         let pointer = Self.pressPointer()
