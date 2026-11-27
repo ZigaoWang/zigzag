@@ -56,6 +56,9 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: InPageMiniHostTests.reopeningDuringTheFoldOutEndsTheOldBorrowFirst
 - Click into the page → Zigzag comes forward, and the sidebar and the page stay out until the pointer leaves them.
   No test yet.
+- The page clicked into, then Esc or the pointer back on the sidebar → the page folds back and the panel keeps the keyboard; the browser window stays where it was.
+  Test: EdgeSidebarTests.aPageFoldingBackGivesTheKeyboardToThePanel
+  Test: EdgeSidebarTests.aPageFoldingBackUnclickedLeavesTheKeyboard
 - Open in Zigzag in the page's strip → the browser window comes forward on that tab. Expand → the page leaves the list for a Zigzag Mini of its own, and the panel goes.
   Test: InPageMiniHostTests.openInZigzagGivesTheBorrowedPageBackToItsTab
   Test: EdgeSidebarTests.expandingTheEdgePreviewLeavesAnIndependentMini

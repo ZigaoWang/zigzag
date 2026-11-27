@@ -419,6 +419,35 @@ struct EdgeSidebarTests {
         #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
     }
 
+    /// A page clicked into has the keyboard: when it folds back and the panel stays out, the panel takes the keyboard,
+    /// not the browser window behind it.
+    @Test func aPageFoldingBackGivesTheKeyboardToThePanel() async throws {
+        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        let (panel, _) = try panelParts()
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        EdgeSidebar.debugPageHasKeyboard = true
+        defer { EdgeSidebar.debugPageHasKeyboard = nil }
+        #expect(EdgeSidebar.shared.dismissPreview())
+        #expect(await until(3) { mini.window?.isVisible != true && tabs[1].host === controller })
+        #expect(EdgeSidebar.shared.isShowing)
+        #expect(panel.isKeyWindow)
+        #expect(controller.window?.isKeyWindow == false)
+    }
+
+    /// A page that never had the keyboard leaves it where it is when it folds back.
+    @Test func aPageFoldingBackUnclickedLeavesTheKeyboard() async throws {
+        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        let (panel, _) = try panelParts()
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        #expect(EdgeSidebar.shared.pagePreview?.window?.isKeyWindow == false)
+        #expect(EdgeSidebar.shared.dismissPreview())
+        #expect(await until(3) { tabs[1].host === controller })
+        #expect(!panel.isKeyWindow)
+    }
+
     /// Extensions hear nothing of the preview: its Mini is no window of theirs, as a Zigzag Mini of its own is.
     @Test func thePreviewIsNoWindowForExtensions() throws {
         let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a"])

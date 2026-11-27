@@ -104,7 +104,17 @@ final class EdgeSidebar {
     /// Where tests put the pointer, on screen. While set, rows' own hover reports, which follow the real mouse, are
     /// left out.
     static var debugPointer: NSPoint?
+    /// Whether tests count the page as having the keyboard, which a test host behind other apps can't give it.
+    static var debugPageHasKeyboard: Bool?
     #endif
+
+    /// Whether the page beside the panel has the keyboard.
+    private func pageHasKeyboard(_ mini: MiniWindowController) -> Bool {
+        #if DEBUG
+        if let has = Self.debugPageHasKeyboard { return has }
+        #endif
+        return mini.window?.isKeyWindow == true
+    }
 
     /// The pointer on screen: every read of it here comes through this.
     private var pointer: NSPoint {
@@ -323,7 +333,7 @@ final class EdgeSidebar {
         previewWork?.cancel()
         previewWork = nil
         guard isShowing, target === controller else {
-            closePreview(animated: false)
+            closePreview(animated: false, panelStays: false)
             return
         }
         closeWork?.cancel()
@@ -428,12 +438,12 @@ final class EdgeSidebar {
         preview = mini
         previewTab = tab
         mini.layoutInDock(force: true)
-        mini.revealDockedPage(fromRight: shownOnRight) { [weak previous] in
+        mini.revealDockedPage(fromRight: shownOnRight) { [weak self, weak previous] in
             // The page before stays under the fold until it is covered.
             guard let previous else { return }
             previous.onInPageMiniClosed = nil
             previous.onInPageMiniDetached = nil
-            previous.closeInPage(focusBack: false, animated: false)
+            previous.closeInPage(focusBack: self?.pageHasKeyboard(previous) == true, animated: false)
         }
     }
 
@@ -508,7 +518,8 @@ final class EdgeSidebar {
     }
 
     /// Puts the page away; the panel narrows to the sidebar and stays out. `animated`: the page folds back first.
-    private func closePreview(animated: Bool = true) {
+    /// `panelStays`: a page with the keyboard hands it to the panel, not to the browser window behind.
+    private func closePreview(animated: Bool = true, panelStays: Bool = true) {
         previewWork?.cancel()
         previewWork = nil
         closeWork?.cancel()
@@ -516,12 +527,13 @@ final class EdgeSidebar {
         guard let mini = preview, !mini.isLeavingDock else { return }
         preview = nil
         previewTab = nil
+        let focusBack = panelStays && pageHasKeyboard(mini)
         if animated {
-            mini.closeInPage(focusBack: false, animated: true)
+            mini.closeInPage(focusBack: focusBack, animated: true)
         } else {
             mini.onInPageMiniClosed = nil
             mini.onInPageMiniDetached = nil
-            mini.closeInPage(focusBack: false, animated: false)
+            mini.closeInPage(focusBack: focusBack, animated: false)
             narrowPanel()
         }
     }
@@ -574,7 +586,7 @@ final class EdgeSidebar {
         let onRight = target.edgeSidebarOnRight
         let panel = panel ?? makePanel()
         guard let host else { return }
-        closePreview(animated: false)
+        closePreview(animated: false, panelStays: false)
         host.pageShowing = false
         managerToken = target.tabManager.changed.observe { [weak self] change in
             MainActor.assumeIsolated { self?.managerChanged(change) }
@@ -611,7 +623,7 @@ final class EdgeSidebar {
         activationWork = nil
         managerToken?.cancel()
         managerToken = nil
-        closePreview(animated: false)
+        closePreview(animated: false, panelStays: false)
         guard isShowing, let panel else { return }
         isShowing = false
         generation += 1
@@ -775,7 +787,11 @@ extension EdgeSidebar: MiniDockHosting {
     /// No page behind it to dim.
     func dockShowDim(owner: AnyObject, onClick: @escaping () -> Void) -> MiniPeekDimView? { nil }
     func dockHideDim(owner: AnyObject) {}
-    func dockFocusPage() {}
+    /// The panel keeps the keyboard while it stays out.
+    func dockFocusPage() {
+        guard isShowing, let panel else { return }
+        panel.makeKey()
+    }
 }
 
 /// Over the preview's room while the row's page isn't running: its name and why, on the card's own ground.
