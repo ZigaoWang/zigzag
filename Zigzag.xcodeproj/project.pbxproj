@@ -401,6 +401,8 @@
 		93F7D9887CC5E8E2800B8E67 /* orion-extensions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9B8A46E0AC7442B76186A940 /* orion-extensions.plist */; };
 		94ADB66CC737D1DA231E3D74 /* ads.html in Resources */ = {isa = PBXBuildFile; fileRef = 016FF1BFB8B47B23AE450117 /* ads.html */; };
 		94C5042A59BC193306EBC468 /* LocalReceiverShim.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92C53B2FC177406F3C94CA9D /* LocalReceiverShim.swift */; };
+		31E2C8A1C6A3FC7F362CC3F2 /* MarkdownPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBDF111653B60321097365F /* MarkdownPage.swift */; };
+		00F0A11C1AC8E6480399033A /* MarkdownHTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29EB136CC2DD7B4A2A73EDFD /* MarkdownHTML.swift */; };
 		95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */; };
 		956552C8E76005BC1AA5A4AA /* SitePanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77968851D276EBBC819F52B /* SitePanelTests.swift */; };
 		4340FCB28BBE98AC680D11D1 /* PseudoLocalizedLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 616B4AA1047A54C998799F51 /* PseudoLocalizedLayoutTests.swift */; };
@@ -607,6 +609,7 @@
 		FFA8F1D26A49C62A0F0393E5 /* firefox-polyfill.js in Resources */ = {isa = PBXBuildFile; fileRef = FF60D1CF839F1BC9C3D5D6BF /* firefox-polyfill.js */; };
 		EC8D7C377217B4137CCBFF7F /* ExtensionContextClaimsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88E6222A2F5303A4D264AED /* ExtensionContextClaimsTests.swift */; };
 		ECC981B8EFD81BC0FC98A4EC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55275BFA54A12BED1AC6C615 /* Sparkle */; };
+		4C898CD288B56BEE2B3480A5 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = CEBB8AC692E42B9084B44756 /* Markdown */; };
 		ECE245AE4D9C42EE413E00BE /* EmptyPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 609E4F597C7C837A99357BA8 /* EmptyPage.swift */; };
 		ED065F475E4A4DFF4FCF494D /* HistoryMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A2240AEEFCA90788106863 /* HistoryMenuTests.swift */; };
 		ED5EDC5FE5F5456CBE42A728 /* ExtensionStormTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F587E3B7274596BDE02E2F4F /* ExtensionStormTests.swift */; };
@@ -1093,6 +1096,8 @@
 		9272B1C4212C3BF6B875E0DB /* SiteSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteSearch.swift; sourceTree = "<group>"; };
 		928D7647F31AE3EE93056E2F /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServer.swift; sourceTree = "<group>"; };
 		92C53B2FC177406F3C94CA9D /* LocalReceiverShim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalReceiverShim.swift; sourceTree = "<group>"; };
+		9FBDF111653B60321097365F /* MarkdownPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPage.swift; sourceTree = "<group>"; };
+		29EB136CC2DD7B4A2A73EDFD /* MarkdownHTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownHTML.swift; sourceTree = "<group>"; };
 		92C68F8087C6786CC457EB4B /* TabStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStore.swift; sourceTree = "<group>"; };
 		9318C9D9C45049E8105EA1CE /* HistoryPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPage.swift; sourceTree = "<group>"; };
 		93578FE502EC8C0F2D11346A /* FindMarks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindMarks.swift; sourceTree = "<group>"; };
@@ -1371,6 +1376,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				ECC981B8EFD81BC0FC98A4EC /* Sparkle in Frameworks */,
+				4C898CD288B56BEE2B3480A5 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1787,6 +1793,8 @@
 				F2A3E9AC0FF6000000000002 /* PageLocation.swift */,
 				15EA5560944494B70EC2C454 /* LocalReceivers.swift */,
 				92C53B2FC177406F3C94CA9D /* LocalReceiverShim.swift */,
+				9FBDF111653B60321097365F /* MarkdownPage.swift */,
+				29EB136CC2DD7B4A2A73EDFD /* MarkdownHTML.swift */,
 				0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */,
 				B7998746D98A412DEEA84CFB /* NoticeCard.swift */,
 				E039B73E54A7A40660652F0A /* OpenInZigzag.swift */,
@@ -2377,6 +2385,7 @@
 			name = Zigzag;
 			packageProductDependencies = (
 				55275BFA54A12BED1AC6C615 /* Sparkle */,
+				CEBB8AC692E42B9084B44756 /* Markdown */,
 			);
 			productName = Zigzag;
 			productReference = 98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */;
@@ -2507,6 +2516,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				03464033770BFFE42AB171E3 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				1BDFF4450470FA9EB84543D7 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F72FDC008AFDE2EA8248DCDF /* Products */;
@@ -2752,6 +2762,8 @@
 				4CE83D681448A928D6D537D2 /* SavePath.swift in Sources */,
 				B739E540C2AEA048EEC341DE /* LinkStatus.swift in Sources */,
 				94C5042A59BC193306EBC468 /* LocalReceiverShim.swift in Sources */,
+				31E2C8A1C6A3FC7F362CC3F2 /* MarkdownPage.swift in Sources */,
+				00F0A11C1AC8E6480399033A /* MarkdownHTML.swift in Sources */,
 				6D4DE91F6E418B8BDB401B42 /* LocalReceivers.swift in Sources */,
 				F9A91C05B07D863474CC6DEB /* MCPBrowser.swift in Sources */,
 				5923DDCCED279AFD335C2C83 /* MCPEndpoint.swift in Sources */,
@@ -3625,6 +3637,14 @@
 				version = 2.10.0;
 			};
 		};
+		1BDFF4450470FA9EB84543D7 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swiftlang/swift-markdown";
+			requirement = {
+				kind = exactVersion;
+				version = 0.9.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -3632,6 +3652,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 03464033770BFFE42AB171E3 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		CEBB8AC692E42B9084B44756 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1BDFF4450470FA9EB84543D7 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

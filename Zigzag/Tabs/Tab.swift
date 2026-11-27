@@ -598,6 +598,8 @@ final class Tab: NSObject {
         return url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet.")
     }
     var isBlank: Bool { url == nil }
+    /// The address you see and copy: a Markdown file's own, not its viewer's.
+    var shownURL: URL? { MarkdownPage.source(of: url) ?? url }
 
     // MARK: Web view lifecycle
 
@@ -1056,7 +1058,7 @@ final class Tab: NSObject {
     static func route(forPageLink url: URL, from page: URL?) -> PageLinkRoute {
         let scheme = url.scheme?.lowercased() ?? ""
         if ["http", "https", "about", "blob"].contains(scheme) { return .load }
-        if scheme == "file" { return page?.isFileURL == true ? .load : .refuse }
+        if scheme == "file" { return page?.isFileURL == true || MarkdownPage.source(of: page)?.isFileURL == true ? .load : .refuse }
         if scheme.isEmpty || ["javascript", "data", "webkit-extension", "chrome-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
         return .app
     }
@@ -1613,6 +1615,8 @@ final class Tab: NSObject {
     /// `countsVisit`: false for same-document URL changes; kept in history without raising its rank.
     private func recordHistory(_ url: URL, title: String?, countsVisit: Bool = true) {
         // Zigzag's own pages (History, Settings) aren't visits, and neither is a page that failed to load.
+        // A Markdown file is remembered at its own address.
+        let url = MarkdownPage.source(of: url)?.withoutFragment ?? url
         guard !isPrivate, url != lastRecorded, url != errorShownFor, !HistoryPage.isInternal(url) else { return }
         lastRecorded = url
         // PDFs have no title; use the response name (`pdfName`).
@@ -2025,7 +2029,8 @@ extension Tab: WKNavigationDelegate {
         // sent the tab there: a page could time it so your next click lands on a switch.
         if url.scheme?.lowercased() == HistoryPage.scheme,
            !Self.mayGoToInternalPage(ownLoad: ownLoad, ownHistory: ownHistory, isBackForward: navigationAction.navigationType == .backForward,
-                                     fromInternalPage: navigationAction.sourceFrame.securityOrigin.protocol == HistoryPage.scheme) {
+                                     fromInternalPage: navigationAction.sourceFrame.securityOrigin.protocol == HistoryPage.scheme
+                                        && MarkdownPage.mayLink(fromHost: navigationAction.sourceFrame.securityOrigin.host, current: webView.url, to: url)) {
             return (.cancel, preferences)
         }
         // Chrome's address for an extension's page: opened from Zigzag or that extension's own pages, refused from others.
@@ -2106,6 +2111,11 @@ extension Tab: WKNavigationDelegate {
                 host?.tab(self, openURL: url, disposition: .foregroundTab)
                 return (.cancel, preferences)
             }
+        }
+        // A local Markdown file's link to another file opens it as a file page's link would; WebKit won't from here.
+        if isMainFrame, isLinkClick, url.isFileURL, MarkdownPage.source(of: webView.url)?.isFileURL == true {
+            DispatchQueue.main.async { [weak self] in self?.load(url, by: .page) }
+            return (.cancel, preferences)
         }
         if isMainFrame {
             pdfFreshLoad = navigationAction.navigationType != .backForward
@@ -2252,6 +2262,14 @@ extension Tab: WKNavigationDelegate {
             DispatchQueue.main.async { [weak self, weak webView] in
                 guard let self, let webView, self.webView === webView else { return }
                 self.handle(failure, in: webView)
+            }
+            return .cancel
+        }
+        // A Markdown file: shown formatted by Zigzag's viewer instead, at its own address (#566).
+        if navigationResponse.isForMainFrame, MarkdownPage.shows(response, isGet: pageIsGet), let source = response.url {
+            DispatchQueue.main.async { [weak self, weak webView] in
+                guard let self, let webView, self.webView === webView else { return }
+                self.load(MarkdownPage.address(for: source), by: .zigzag)
             }
             return .cancel
         }

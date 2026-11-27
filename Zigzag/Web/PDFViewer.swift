@@ -509,6 +509,12 @@ final class PDFViewerView: NSView {
         case .tooLarge: return nil
         case .unavailable: break
         }
+        return await fetch(url, from: webView, userAgent: userAgent, limit: limit)
+    }
+
+    /// A file on the web fetched again with the page's cookies and user agent, up to `limit` bytes.
+    static func fetch(_ url: URL, from webView: WKWebView, userAgent: String?, limit: Int) async -> Data? {
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
         // Only the cookies a link from another site would carry too: a "Strict" one, held back from the page's own
         // load when another site sent you there, isn't sent behind its back now.
         let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()

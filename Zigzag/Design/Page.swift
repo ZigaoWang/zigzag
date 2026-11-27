@@ -270,7 +270,8 @@ enum PageStyle {
 
     private static func px(_ value: CGFloat) -> String { "\(Int(value))px" }
 
-    private static func variables(theme: Brand.Theme) -> String {
+    /// The tokens alone, for a page with its own look that borrows a control or two.
+    static func variables(theme: Brand.Theme) -> String {
         typealias C = Tokens.Color
         let colors: [(String, NSColor)] = [
             ("accent", theme.accent), ("on-accent", theme.onAccent), ("mark", theme.mark),

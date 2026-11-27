@@ -9,6 +9,10 @@ packages:
     url: https://github.com/sparkle-project/Sparkle
     # The version releases are tested with, never a newer one picked up by surprise.
     exactVersion: 2.10.0
+  # Reads Markdown for the file viewer (MarkdownPage.swift): Apple's parser over cmark-gfm.
+  swift-markdown:
+    url: https://github.com/swiftlang/swift-markdown
+    exactVersion: 0.9.0
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -80,6 +84,8 @@ targets:
       - path: ZigzagPDFRenderer/PDFService.swift
     dependencies:
       - package: Sparkle
+      - package: swift-markdown
+        product: Markdown
       # Reads the pictures websites send (site icons and the like) in a sandbox of its own: Contents/XPCServices.
       - target: ZigzagImageDecoder
         embed: true
@@ -160,6 +166,11 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [com.adobe.pdf]
+          # Shown formatted in a tab (MarkdownPage.swift), from Finder's Open With.
+          - CFBundleTypeName: Markdown document
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [net.daringfireball.markdown]
           # Opened from Finder: the Import window asks before restoring it.
           - CFBundleTypeName: Zigzag Backup
             CFBundleTypeRole: Viewer

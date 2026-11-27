@@ -45,6 +45,9 @@ enum HistoryPage {
                 task.didFailWithError(URLError(.noPermissionsToReadFile))
                 return
             }
+            // A Markdown file, and the pictures beside it: read and set off the main thread, answered when ready.
+            if url.host() == MarkdownPage.host { MarkdownPage.serve(task, in: webView); return }
+            if url.host() == MarkdownPage.pictureHost { MarkdownPage.servePicture(task); return }
             let data: Data
             let type: String
             if url.host() == "icon", let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value.flatMap(URL.init(string:)),
@@ -69,7 +72,7 @@ enum HistoryPage {
             task.didFinish()
         }
 
-        func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {}
+        func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) { MarkdownPage.stop(task) }
     }
 
     /// A site icon for the page. PNGs are cached while the store returns the same icon, so a new or cleared icon is
@@ -130,6 +133,7 @@ enum HistoryPage {
                                    replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
             // Only History itself may ask: never a website's page or frame.
             guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.protocol == HistoryPage.scheme,
+                  message.frameInfo.securityOrigin.host == "history",
                   let body = message.body as? [String: Any], let action = body["action"] as? String else {
                 replyHandler(nil, "Not allowed")
                 return

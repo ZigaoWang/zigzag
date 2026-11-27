@@ -476,6 +476,9 @@ final class AddressView: InteractiveView {
         if #available(macOS 15.4, *), let ext = ExtensionCenter.webExtension(ofPage: url) {
             // An extension's own page (its settings) is named after the extension, not its random address.
             return ext.displayName ?? String(localized: "Extension", comment: "The address bar's name for an extension's own page, when the extension has no name.")
+        } else if let source = MarkdownPage.source(of: url) {
+            // A Markdown file is named as the file itself would be.
+            return name(of: source)
         } else if HistoryPage.isHistory(url) {
             return String(localized: "History", comment: "The address bar's name for Zigzag's History page.")
         } else if ArchivePage.isArchive(url) {

@@ -352,7 +352,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let placeholder = mode == .history ? String(localized: "Search history", comment: "Placeholder of the command bar's field while it searches history.") : String(localized: "Search or enter address", comment: "Placeholder of the command bar's field.")
         field.placeholderAttributedString = NSAttributedString(string: placeholder,
                                                                attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
-        if mode == .editCurrent, let url = host.commandBarTab?.url {
+        if mode == .editCurrent, let url = host.commandBarTab?.shownURL {
             field.stringValue = url.absoluteString
         } else if mode == .newTab, let unsent, Date().timeIntervalSince(unsent.at) < Self.unsentMemory {
             // Closed by a stray click or Esc a moment ago: what you'd typed is still here, selected, so typing replaces it.
@@ -703,7 +703,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private func currentResults() -> [CommandResult]? {
         guard let host else { return nil }
         if let keyword { return Array(keywordResults(keyword).prefix(rowsThatFit)) }
-        let editing = mode == .editCurrent && typed == host.commandBarTab?.url?.absoluteString
+        let editing = mode == .editCurrent && typed == host.commandBarTab?.shownURL?.absoluteString
         let query = editing || scope != nil ? "" : typed
         let pages = query.isEmpty ? [] : history.pages(for: query, limit: CommandRanker.historyLimit(historyOnly: mode == .history))
         var results = CommandRanker.results(for: query, manager: host.commandBarTabs, profile: host.commandBarProfile, suggestions: suggestions, history: pages,
@@ -1198,7 +1198,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             activate(results[selectedIndex], modifiers: modifiers)
         } else if let destination = CommandRanker.destination(from: field.stringValue) {
             activate(CommandResult(kind: .open(destination.url, httpFallback: destination.httpFallback), title: "", detail: ""), modifiers: modifiers)
-        } else if mode == .editCurrent, let tab = host?.commandBarTab, field.stringValue == tab.url?.absoluteString {
+        } else if mode == .editCurrent, let tab = host?.commandBarTab, field.stringValue == tab.shownURL?.absoluteString {
             tab.reload()
             dismiss()
         }

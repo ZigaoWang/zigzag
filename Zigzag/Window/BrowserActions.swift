@@ -48,7 +48,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     /// Copies a link without tracking parameters, with its title as rich text, and shows a toast.
     func copyLink(_ url: URL, title: String?) {
-        CleanLink.write(url, title: title)
+        CleanLink.write(MarkdownPage.source(of: url) ?? url, title: title)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
     }
 
@@ -196,7 +196,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func copyPageURLAsMarkdown(_ sender: Any?) {
-        guard let tab = selectedTab, let url = tab.url else { return }
+        guard let tab = selectedTab, let url = tab.shownURL else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(CleanLink.markdown(url, title: tab.displayTitle), forType: .string)
         Toast.show(String(localized: "Markdown link copied", comment: "Toast after the page's title and address are copied as a Markdown link."), symbol: "link", in: self)

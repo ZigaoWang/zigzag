@@ -151,6 +151,24 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 ```
 
+### swift-markdown and swift-cmark
+
+Reading Markdown files for the viewer. Linked as Swift packages: Apple's swift-markdown
+([github.com/swiftlang/swift-markdown](https://github.com/swiftlang/swift-markdown), version 0.9.0) and the
+cmark-gfm parser it builds on, swift-cmark
+([github.com/swiftlang/swift-cmark](https://github.com/swiftlang/swift-cmark), version 0.9.0; see
+`Package.resolved`).
+
+```
+Copyright (c) 2021-2023 Apple Inc. and the Swift project authors
+Copyright (c) 2014, John MacFarlane
+```
+
+License: swift-markdown is under the Apache License, Version 2.0 with Runtime Library Exception
+([LICENSE.txt](https://github.com/swiftlang/swift-markdown/blob/0.9.0/LICENSE.txt)). swift-cmark is under the
+BSD 2-Clause license, with the MIT and other licenses of the code it includes, all in its
+[COPYING](https://github.com/swiftlang/swift-cmark/blob/0.9.0/COPYING).
+
 ### Readability
 
 Reader view. `Zigzag/Resources/Reader/Readability.js` and `Zigzag/Resources/Reader/Readability-readerable.js`

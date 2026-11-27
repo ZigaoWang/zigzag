@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - The mini player shows Previous and Next when the site offers them, as YouTube does in a playlist, so you can move on without going back to the page. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
+- Markdown files open formatted in a tab, like a page: a .md file on your Mac, or one a site sends as Markdown or as plain text at a .md address. Tables, task lists and code show as on GitHub, links and pictures next to the file work, and Source at the top shows the plain text. It works in split view, with find, zoom, printing and Reader, and nothing in the file can run. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
 
 ### Fixed
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
