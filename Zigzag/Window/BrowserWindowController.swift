@@ -3953,6 +3953,7 @@ extension BrowserWindowController: SidebarDelegate {
     func revealNewFolder(_ id: UUID) {
         if SidebarListView.isCollapsed(tabManager.currentSpaceID) { SidebarListView.setCollapsed(tabManager.currentSpaceID, false) }
         if EdgeSidebar.shared.isShowing, let mirror = edgeSidebar {
+            sidebar.list.reload(animated: false)
             mirror.list.reload(animated: true)
             DispatchQueue.main.async { [weak mirror] in mirror?.list.renameFolder(id) }
             return

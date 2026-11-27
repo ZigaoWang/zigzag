@@ -711,7 +711,7 @@ enum SidebarMenus {
         entries.map { entry in
             guard entry != .separator else { return .separator }
             let shortcut = action(of: entry).map(Shortcuts.keys(for:)) ?? ""
-            return .item(MenuPanel.Item(title: title(of: entry), symbol: symbol(of: entry), shortcut: shortcut) { [weak controller, weak button, weak header] in
+            var item = MenuPanel.Item(title: title(of: entry), symbol: symbol(of: entry), shortcut: shortcut) { [weak controller, weak button, weak header] in
                 guard let controller else { return }
                 switch entry {
                 case .newTab: controller.listNewTab()
@@ -722,7 +722,10 @@ enum SidebarMenus {
                 case .newSpace: controller.newSpace(button)
                 case .separator: break
                 }
-            })
+            }
+            // In the edge panel everything but New Tab is done where the list is; New Tab's bar is the window's.
+            item.staysInEdgePanel = entry != .newTab
+            return .item(item)
         }
     }
 

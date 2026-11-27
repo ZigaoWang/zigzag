@@ -326,6 +326,7 @@ final class EdgeSidebar {
         // A pressed button, a menu from the panel or a sheet keeps it out.
         var held = NSEvent.pressedMouseButtons != 0 || MenuPanel.current != nil
             || RunLoop.current.currentMode == .eventTracking || NSApp.modalWindow != nil
+            || host?.overlay.subviews.isEmpty == false
         #if DEBUG
         if Self.debugHoldsOpen { held = true }
         #endif
@@ -661,6 +662,10 @@ final class EdgeSidebar {
         isShowing = false
         generation += 1
         if MenuPanel.current?.window === panel { MenuPanel.current?.close(animated: false) }
+        // A sheet, editor or the downloads list open in the panel goes with it, never left for its next time out.
+        host?.overlay.subviews.forEach { ($0 as? FormSheet)?.close(); ($0 as? SpaceEditorPanel)?.close() }
+        host?.overlay.subviews.forEach { $0.removeFromSuperview() }
+        if DownloadsPanel.isOpen(in: panel) { DownloadsPanel.closeCurrent() }
         guard animated, let host, let container = host.container else { panel.orderOut(nil); return }
         let card = host.cardFrame
         let out = card.offsetBy(dx: (shownOnRight ? 1 : -1) * (card.width + host.inset), dy: 0)

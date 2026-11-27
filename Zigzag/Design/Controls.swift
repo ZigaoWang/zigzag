@@ -2043,6 +2043,8 @@ final class MenuPanel: FloatingPanelView {
         var shortcut: String
         /// Items opened beside this one, as a submenu; an item with them has no action of its own.
         var submenu: [Entry]?
+        /// Done in the screen edge's sidebar itself, rather than in the browser window brought forward.
+        var staysInEdgePanel = false
         var action: () -> Void
 
         init(title: String, image: NSImage? = nil, symbol: String? = nil, isChecked: Bool = false, isDestructive: Bool = false,
@@ -2518,8 +2520,8 @@ final class MenuPanel: FloatingPanelView {
             return
         }
         let action = rows[index].item.action
-        // From the screen edge's sidebar, the browser window comes forward to do it.
-        let fromEdge = EdgeSidebar.shared.isPanel(window)
+        // From the screen edge's sidebar, the browser window comes forward to do it, unless it is done in the panel.
+        let fromEdge = EdgeSidebar.shared.isPanel(window) && !rows[index].item.staysInEdgePanel
         close()
         if fromEdge { EdgeSidebar.shared.chose() }
         action()

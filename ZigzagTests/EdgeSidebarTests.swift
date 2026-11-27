@@ -513,6 +513,60 @@ struct EdgeSidebarTests {
         #expect(EdgeSidebar.shared.isShowing)
     }
 
+    /// The + menu's New Folder, New Live Folder and New Space are done in the panel, where the list is: the panel
+    /// stays out and the browser window stays where it was.
+    @Test func thePlusMenuIsDoneInThePanel() async throws {
+        let (controller, _, _, done) = panelWithTabs(["https://example.test/a"])
+        defer { done() }
+        let (panel, _) = try panelParts()
+        let sidebar = try #require(controller.edgeSidebar)
+        func choose(_ title: String) throws {
+            let entries = SidebarMenus.addPanel(controller: controller)
+            try #require(MenuPanel.show(entries, from: sidebar.newSpaceButton) != nil)
+            let menu = try #require(MenuPanel.current)
+            let index = try #require(menu.itemTitles.firstIndex(of: title))
+            for _ in 0...index { menu.debugKey(125) }
+            menu.debugKey(36)
+        }
+        let space = controller.tabManager.currentSpaceID
+        let folders = Library.shared.folders(in: space).count
+        try choose(SidebarMenus.title(of: .newFolder))
+        #expect(EdgeSidebar.shared.isShowing)
+        #expect(Library.shared.folders(in: space).count == folders + 1)
+        // Its name is ready to type in the panel's list.
+        #expect(await until(3) { (panel.firstResponder as? NSView)?.isDescendant(of: sidebar) == true })
+
+        try choose(SidebarMenus.title(of: .newLiveFolder))
+        #expect(EdgeSidebar.shared.isShowing)
+        let sheet = try #require(await waitFor { panel.contentView.flatMap { Self.find(FormSheet.self, in: $0) } })
+        #expect(sheet.window === panel)
+        sheet.removeFromSuperview()
+
+        let spaces = Library.shared.spaces.count
+        try choose(SidebarMenus.title(of: .newSpace))
+        #expect(EdgeSidebar.shared.isShowing)
+        #expect(Library.shared.spaces.count == spaces + 1)
+        let editor = try #require(SpaceEditorPanel.current)
+        #expect(editor.window === panel)
+        editor.close()
+        #expect(controller.window?.isKeyWindow != true)
+    }
+
+    private static func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
+        if let found = view as? T { return found }
+        for sub in view.subviews { if let found = find(type, in: sub) { return found } }
+        return nil
+    }
+
+    private func waitFor<T>(_ seconds: Double = 3, _ value: () -> T?) async -> T? {
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if let found = value() { return found }
+            try? await Task.sleep(for: .milliseconds(30))
+        }
+        return value()
+    }
+
     /// A page clicked into has the keyboard: when it folds back and the panel stays out, the panel takes the keyboard,
     /// not the browser window behind it.
     @Test func aPageFoldingBackGivesTheKeyboardToThePanel() async throws {
