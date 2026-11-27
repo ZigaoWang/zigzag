@@ -20,6 +20,7 @@
 - 視窗靜止不動時，不會再讓 Mac 的圖形處理器一陣一陣地忙碌：之前有不改變目前空間的變化（例如網站的新圖示）或電池回報電量時，整個視窗都會從它的顏色漸變到同樣的顏色。
 - 關閉剛用 ⌘T 開啟的分頁，會像 Safari 和 Chrome 一樣回到你之前所在的分頁，而不是下面的那個。
 - 空間的已固定分頁收合時，或在闔上的資料夾下顯示時，用 ⌘W 關閉已固定分頁不會再讓它的列從側邊欄消失：它會以未載入的狀態留在那裡，直到你切換空間，或再次展開或收合已固定分頁或那個資料夾。
+- 要求顯示通知的網站（例如 Zoom 的網頁版）在要求時不會再因為指令碼出錯而無法使用。感謝 [Lakeland97](https://github.com/Lakeland97)。([#551](https://github.com/ZigaoWang/zigzag/issues/551))
 - 在 Mac 記憶體不足時休眠了好幾個小時的分頁，醒來後不再登出 Azure DevOps、Microsoft 365 等網站：如果 WebKit 中儲存登入 Cookie 的部分停止了（記憶體吃緊時 macOS 可能會讓它停止），Zigzag 會在頁面載入前把它們放回去。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 - Bitwarden 的「使用生物辨識解鎖」現在能連上 Bitwarden App 了。之前 Zigzag 告訴 Bitwarden 它已經能和 App 溝通，所以 Bitwarden 從不申請，Zigzag 卻又不讓它連上 App。現在 Bitwarden 會申請，Zigzag 會詢問你是否允許。如果之前開啟過生物辨識，請在 Bitwarden 的設定裡把「使用生物辨識解鎖」關閉再開啟。感謝 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - 核准一個要求更多權限的延伸功能更新後，不會再事後收回你已允許的內容，例如 Bitwarden 為「生物辨識解鎖」與其 App 的連線。感謝 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
