@@ -22,6 +22,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 地址栏放在页面上方、空间设为透明时，播放视频不再让 Mac 的图形处理比关掉地址栏时忙得多。窗口的玻璃现在只留在边栏后面，而不是整个窗口。
 - 窗口静止不动时，不会再让 Mac 的图形处理器一阵阵忙碌：之前有不改变当前空间的变化（比如网站的新图标）或电池报告电量时，整个窗口都会从它的颜色渐变到同样的颜色。
 - 关闭刚用 ⌘T 打开的标签页，会像 Safari 和 Chrome 一样回到你之前所在的标签页，而不是下面的那个。
+- 空间的固定标签页折叠时，或者在合上的文件夹下显示时，用 ⌘W 关闭固定标签页不会再让它的行从边栏里消失：它会以未载入的状态留在那里，直到你切换空间，或者再次展开或折叠固定标签页或那个文件夹。
 - 在 Mac 内存不足时休眠了几个小时的标签页，醒来后不再退出 Azure DevOps、Microsoft 365 等网站的登录：如果 WebKit 中保存登录 Cookie 的部分停止了（内存紧张时 macOS 可能会让它停止），Zigzag 会在页面加载前把它们放回去。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 - Bitwarden 的“使用生物识别解锁”现在能连上 Bitwarden App 了。之前 Zigzag 告诉 Bitwarden 它已经能和 App 通信，所以 Bitwarden 从不申请，Zigzag 却又不让它连 App。现在 Bitwarden 会申请，Zigzag 会问你是否允许。如果之前打开过生物识别，请在 Bitwarden 的设置里把“使用生物识别解锁”关掉再打开。感谢 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - 批准一个要求更多权限的扩展更新后，不会再事后收回你已允许的内容，比如 Bitwarden 为“生物识别解锁”与其 App 的连接。感谢 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
