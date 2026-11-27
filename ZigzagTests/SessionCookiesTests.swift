@@ -49,8 +49,25 @@ struct SessionCookiesTests {
         let back = try #require(jar.cookies.first)
         #expect(back.name == "wide" && back.value == "v-wide" && back.domain == ".youtube.com" && back.path == "/")
         #expect(back.isSessionOnly && back.isSecure && back.isHTTPOnly && back.sameSitePolicy == .sameSiteLax)
-        // The file goes once they're back; the next save writes it again.
-        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+
+    /// Put back at launch, the file stays until a save writes over it: a run that never gets to save them (#502)
+    /// still has them at the next launch.
+    @Test func theFileStaysUntilASaveReplacesIt() async {
+        defer { cleanUp() }
+        save([cookie("ESTSAUTH", domain: ".login.microsoftonline.com", secure: true, httpOnly: true)])
+        await SessionCookies.restore(from: url, into: FakeJar())
+        let jar = FakeJar()
+        #expect(await SessionCookies.restore(from: url, into: jar) == 1)
+        #expect(jar.cookies.map(\.name) == ["ESTSAUTH"])
+    }
+
+    /// A read with no network process known before it (none was running, or WebKit doesn't say which) is saved: it
+    /// came from the one running now (#502).
+    @Test func aReadWithNoKnownNetworkProcessIsSaved() {
+        let store = WKWebsiteDataStore.default()
+        defer { NetworkProcessCookies.forget(store) }
+        #expect(NetworkProcessCookies.noted(store, cookies: [], process: 0))
     }
 
     @Test func aHostOnlyCookieStaysOnItsHost() async throws {
