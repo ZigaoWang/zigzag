@@ -8,11 +8,14 @@ protocol SyncHost: AnyObject {
     var libraryStamp: Date? { get }
     /// When each carried preference last changed while sync wasn't reading them (off), by key.
     var settingTimes: [String: Date] { get }
+    /// True while it writes what came from iCloud, so the change that causes isn't read as one made here.
+    var isWriting: Bool { get }
 }
 
 extension SyncHost {
     var libraryStamp: Date? { nil }
     var settingTimes: [String: Date] { [:] }
+    var isWriting: Bool { false }
 }
 
 /// The server's side: CKSyncEngine, or a test's stand-in for iCloud.
@@ -36,7 +39,7 @@ enum SyncFetchScope {
 }
 
 /// A record as the server has it.
-struct SyncRemote: Codable {
+nonisolated struct SyncRemote: Codable, Sendable {
     var name: String
     var type: String
     /// Its fields as the server holds them, a newer Zigzag's included.
@@ -57,6 +60,18 @@ struct SyncUpload {
     var systemFields: Data?
 }
 
+/// What isn't sent because its record is too big for iCloud: it stays as it is on this Mac, nothing is sent as unset
+/// or removed because of it, and the line under the switch says so.
+struct SyncTooBig: Equatable {
+    /// The preferences' record.
+    var settings = false
+    /// Records of pinned tabs, folders, spaces or favorites, how many of each kind.
+    var kinds: [SyncKind: Int] = [:]
+    /// Another record that isn't one item (the site rules, the removals).
+    var other = false
+    var isEmpty: Bool { !settings && kinds.isEmpty && !other }
+}
+
 /// Why the server didn't take a save.
 enum SyncSaveFailure {
     /// Another Mac changed it first: here's its version.
@@ -71,7 +86,7 @@ enum SyncSaveFailure {
 
 /// A favorite or a preference of a profile removed on another Mac, or a space moved off it, read just before the
 /// profile's own removal: kept for that fetch and the next only, so one removed on purpose never comes back later.
-struct SyncLeftover: Codable {
+nonisolated struct SyncLeftover: Codable, Sendable {
     /// The fetch it came in (`SyncState.fetches`).
     var fetch: Int
     var favorite: SyncItem?
@@ -89,7 +104,7 @@ enum SyncDeleteFailure {
 }
 
 /// What sync keeps between launches, beside the server's own state.
-struct SyncState: Codable {
+nonisolated struct SyncState: Codable, Sendable {
     /// The records as this Mac and iCloud last agreed on them, with what this Mac changed since on top.
     var base: [String: SyncItem] = [:]
     /// Each record's fields as the server last had them, a newer Zigzag's included.
@@ -145,10 +160,15 @@ struct SyncState: Codable {
     var goneRead: Set<String> = []
     /// How far Zigzag's own fetch of the zone has read, beside CKSyncEngine's.
     var zoneToken: Data?
+    /// How far this Mac's clock ran ahead of iCloud's at its last save, when that was more than a minute.
+    var clockAhead: TimeInterval?
+    /// The newest save iCloud's clock dated, of this Mac's or another's: it's never later than now.
+    var lastServerSave: Date?
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
         case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, wroteLibrary, resumeAccount, resumed, device, claimed, claimSeen, goneAsked, savedSeen, fetches
+        case clockAhead, lastServerSave
     }
 
     init() {}
@@ -183,6 +203,8 @@ struct SyncState: Codable {
         goneAsked = try c.decodeIfPresent(Set<String>.self, forKey: .goneAsked) ?? []
         savedSeen = try c.decodeIfPresent([String: Date].self, forKey: .savedSeen) ?? [:]
         fetches = try c.decodeIfPresent(Int.self, forKey: .fetches) ?? 0
+        clockAhead = try c.decodeIfPresent(TimeInterval.self, forKey: .clockAhead)
+        lastServerSave = try c.decodeIfPresent(Date.self, forKey: .lastServerSave)
         leftovers = leftovers.filter { $0.value.fetch >= fetches - 1 }
     }
 }
@@ -200,14 +222,25 @@ final class SyncSession {
     var onHeld: (() -> Void)?
     /// Called when a Library.json older than what was last synced was laid out from iCloud again, and that changed it.
     var onTookICloud: (() -> Void)?
-    /// Called when a save finds the zone gone after the first sync: removed from iCloud on another Mac.
-    var onRemovedElsewhere: (() -> Void)?
+    /// Called just before iCloud's version is laid out over what's here, when that changes something: a backup first.
+    var onTakingICloud: (() -> Void)?
+    /// Called when a save or a removal finds the zone gone after the first sync: removed from iCloud on another Mac,
+    /// or iCloud's copy reset. Never made again from here meanwhile.
+    var onZoneGone: (() -> Void)?
     /// Called when the server's version of something is needed before it can be sent again.
     var onNeedsFetch: (() -> Void)?
     /// Called while the first sync waits for another Mac's to finish going up: read again on the retry schedule.
     var onWaiting: (() -> Void)?
     /// Called when sync starts over here as a first sync (this Mac's claim was taken over).
     var onStartedOver: (() -> Void)?
+    /// What stays on this Mac because it's too big for iCloud.
+    var tooBig: SyncTooBig {
+        SyncTooBig(settings: tooBigNames.contains(SyncName.settings), kinds: SyncKind.count(tooBigNames),
+                   other: tooBigNames.contains { $0 != SyncName.settings && SyncKind(rawValue: String($0.prefix { $0 != "." })) == nil })
+    }
+    private var tooBigNames: Set<String> = [] { didSet { if tooBigNames != oldValue { onTooBig?() } } }
+    /// Called when what's too big for iCloud changed.
+    var onTooBig: (() -> Void)?
     /// True while it writes into the library, so the change that causes isn't read as one made here.
     private(set) var isApplying = false
     /// Sync turned off or started again: a fetch still on its way changes nothing.
@@ -250,6 +283,48 @@ final class SyncSession {
         onChange?()
     }
 
+    // MARK: Whose clock
+
+    /// The later edit wins, by when each was made. A Mac's clock can be set wrong, so an edit is never dated after
+    /// iCloud saved it (`clamped`), and this Mac's own edits count from iCloud's clock when its own runs more than
+    /// `clockSlack` ahead of it, as its last save showed (`state.clockAhead`).
+    static let clockSlack: TimeInterval = 60
+
+    /// Further ahead than this is no clock set wrong but a measure gone wrong: no guide.
+    static let clockAheadMost: TimeInterval = 30 * 24 * 3600
+
+    /// When something done here at `date`, by this Mac's clock, was done by iCloud's.
+    func edited(_ date: Date) -> Date {
+        guard let ahead = state.clockAhead, ahead <= Self.clockAheadMost else { return date }
+        return date.addingTimeInterval(-ahead)
+    }
+
+    /// Now, by iCloud's clock: corrected, never before iCloud's newest save known here.
+    func editedNow() -> Date {
+        let now = now(), corrected = edited(now)
+        guard corrected != now, let floor = state.lastServerSave else { return corrected }
+        return min(now, max(corrected, floor))
+    }
+
+    /// A record as another Mac dated it, its date (and its preferences' and removal notes') never after iCloud saved
+    /// it: an edit can't be made after it went up, so a later one is a clock running ahead.
+    static func clamped(_ item: SyncItem, savedAt server: Date?) -> SyncItem {
+        guard let server else { return item }
+        var item = item
+        item.modified = min(item.modified, server)
+        switch item.body {
+        case .settings(var settings) where settings.values.values.contains(where: { $0.modified > server }):
+            settings.values = settings.values.mapValues { entry in var entry = entry; entry.modified = min(entry.modified, server); return entry }
+            item = SyncItem(.settings(settings), modified: item.modified)
+        case .removals(var removals) where removals.names.values.contains(where: { $0 > server }):
+            removals.names = removals.names.mapValues { min($0, server) }
+            item = SyncItem(.removals(removals), modified: item.modified)
+        default:
+            break
+        }
+        return item
+    }
+
     // MARK: Changes here
 
     /// Reads the library and queues what changed since. What's changed here by hand is always sent: only the first
@@ -259,8 +334,8 @@ final class SyncSession {
         guard !isClosed, state.merged, !isApplying else { return }
         let library = host.read()
         let export = SyncMapping.export(library, previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now(),
-                                        settingsChanged: host.settingTimes, settingsNow: now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: (stamp.map(edited) ?? editedNow()),
+                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow())
         state.emptyFolders = export.emptyFolders
         queue(diff(export.items, deletes: true, stamp: stamp))
         // The file's own date as it is now; one ahead of the clock (a clock set wrong) is no guide.
@@ -287,8 +362,8 @@ final class SyncSession {
             return
         }
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, unsent: state.unsent, now: changedAt ?? now(),
-                                        settingsChanged: host.settingTimes, settingsNow: now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: (changedAt.map(edited) ?? editedNow()),
+                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow())
         if let gone = Self.manyRemovals(from: state.base, to: export.items, unsent: state.unsent) {
             state.heldNames.formUnion(gone)
             // Turned on after tidying up while off, the rest is this Mac's own: sent. At a launch, it may be an old
@@ -306,8 +381,8 @@ final class SyncSession {
     @discardableResult
     private func takeICloudKeepingNew(stamp: Date?) -> Bool {
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now(),
-                                        settingsChanged: host.settingTimes, settingsNow: now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: (stamp.map(edited) ?? editedNow()),
+                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow())
         // Removed since, unless Library.json was saved after the removal (an unpin undone), so it's back on purpose.
         let saved = host.libraryStamp
         let new = export.items.filter { name, _ in
@@ -318,6 +393,7 @@ final class SyncSession {
         let shown = state.base.filter { !state.heldNames.contains($0.key) && SyncName.id($0.key) != nil }
         let differs = export.items.contains { name, item in new[name] == nil && SyncName.id(name) != nil && shown[name].map { !$0.sameContent(as: item) } ?? true }
             || shown.keys.contains { export.items[$0] == nil }
+        if differs { onTakingICloud?() }
         queue(diff(new, deletes: false, stamp: stamp))
         layOut()
         return differs
@@ -356,7 +432,7 @@ final class SyncSession {
             state.unsent.remove(name)
             state.removed[name] = now()
         }
-        let noted = noteRemovals(Array(names), at: now())
+        let noted = noteRemovals(Array(names), at: editedNow())
         queue((noted.map { [$0] } ?? [], Array(names)))
         layOut()
         onHeld?()
@@ -378,12 +454,13 @@ final class SyncSession {
     private func diff(_ exported: [String: SyncItem], deletes allowDeletes: Bool, stamp: Date? = nil) -> (saves: [String], deletes: [String]) {
         var items = exported
         var saves: [String] = [], deletes: [String] = []
+        let dated = stamp.map(edited) ?? editedNow()
         let stamp = stamp ?? now()
         // The removals record isn't the library's: kept as it is, and added to below.
         if let removals = state.base[SyncName.removals] { items[SyncName.removals] = removals }
         for (name, var item) in items {
             if let old = state.base[name], old.sameContent(as: item) { continue }
-            if item.type != SyncBody.settingsType { item.modified = stamp }
+            if item.type != SyncBody.settingsType { item.modified = dated }
             // Back here (an unpin undone): no longer removed.
             state.removed[name] = nil
             state.base[name] = item
@@ -399,7 +476,7 @@ final class SyncSession {
                 deletes.append(name)
                 state.removed[name] = stamp
             }
-            if !deletes.isEmpty, let name = noteRemovals(deletes, at: stamp) { saves.append(name) }
+            if !deletes.isEmpty, let name = noteRemovals(deletes, at: dated) { saves.append(name) }
         }
         return (saves, deletes)
     }
@@ -408,8 +485,8 @@ final class SyncSession {
     private func noteRemovals(_ names: [String], at date: Date) -> String? {
         var removals: [String: Date] = if case .removals(let r)? = state.base[SyncName.removals]?.body { r.names } else { [:] }
         for name in names where SyncName.id(name) != nil { removals[name] = max(removals[name] ?? date, date) }
-        removals = removals.filter { now().timeIntervalSince($0.value) < SyncRemovals.kept }
-        state.base[SyncName.removals] = SyncItem(.removals(SyncRemovals(names: removals)), modified: now())
+        removals = removals.filter { editedNow().timeIntervalSince($0.value) < SyncRemovals.kept }
+        state.base[SyncName.removals] = SyncItem(.removals(SyncRemovals(names: removals)), modified: editedNow())
         state.unsent.insert(SyncName.removals)
         return SyncName.removals
     }
@@ -417,7 +494,7 @@ final class SyncSession {
     /// When `name` was removed on some Mac, as the removals record has it.
     private func removedAt(_ name: String) -> Date? {
         // One dated ahead of this Mac's clock came from a Mac whose clock runs fast: no guide.
-        if case .removals(let r)? = state.base[SyncName.removals]?.body, let at = r.names[name], at <= now().addingTimeInterval(60) { return at }
+        if case .removals(let r)? = state.base[SyncName.removals]?.body, let at = r.names[name], at <= editedNow().addingTimeInterval(Self.clockSlack) { return at }
         return nil
     }
 
@@ -454,11 +531,18 @@ final class SyncSession {
         if !records.isEmpty || !deleted.isEmpty { onChange?() }
     }
 
-    /// A read of the whole zone is done: what iCloud had and doesn't any more was removed there.
-    func readAll(_ names: Set<String>) {
+    /// A read of the whole zone is done: what iCloud had and doesn't any more was removed there. What this Mac saved
+    /// after the read started (`startedAt`) may be missing from pages read before it went up, so it isn't.
+    func readAll(_ names: Set<String>, startedAt: Date) {
         guard !isClosed, state.merged else { return }
-        for name in state.serverPayloads.keys where !names.contains(name) && state.incoming[name] == nil { arrive(name, nil) }
+        for name in state.serverPayloads.keys where !names.contains(name) && state.incoming[name] == nil {
+            if let saved = ownSaves[name], saved >= startedAt { continue }
+            arrive(name, nil)
+        }
     }
+
+    /// When this Mac's own saves went through, by record name, this launch.
+    private var ownSaves: [String: Date] = [:]
 
     /// A fetch is done: the first sync merges, later ones settle what came.
     func fetchFinished() {
@@ -581,12 +665,15 @@ final class SyncSession {
     private func take(_ record: SyncRemote) -> (changed: Bool, resend: Bool) {
         // An older copy than the one here (two fetches crossing): nothing to do.
         if let date = record.serverModified, let known = state.serverDates[record.name], date < known { return (false, false) }
-        if let date = record.serverModified { state.serverDates[record.name] = date }
+        if let date = record.serverModified {
+            state.serverDates[record.name] = date
+            state.lastServerSave = max(state.lastServerSave ?? date, date)
+        }
         // What both Macs started from, for merging the rules and splits entry by entry.
         let ancestor = state.serverPayloads[record.name].map { SyncItem(type: record.type, payload: $0, modified: .distantPast) }
         state.systemFields[record.name] = record.systemFields
         state.serverPayloads[record.name] = record.payload
-        let theirs = SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified)
+        let theirs = Self.clamped(SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified), savedAt: record.serverModified)
         guard let mine = state.base[record.name] else {
             state.base[record.name] = theirs
             return (true, false)
@@ -758,10 +845,10 @@ final class SyncSession {
             if let date = record.serverModified { state.serverDates[name] = date }
             state.systemFields[name] = record.systemFields
             state.serverPayloads[name] = record.payload
-            server[name] = SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified)
+            server[name] = Self.clamped(SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified), savedAt: record.serverModified)
         }
         clearIncoming()
-        let merge = SyncMerge.merge(local: host.read(), server: server, previous: state.aliases, now: now())
+        let merge = SyncMerge.merge(local: host.read(), server: server, previous: state.aliases, now: editedNow())
         state.aliases = merge.aliases
         state.base = server
         if server[SyncName.claim] == nil, let claim { state.base[SyncName.claim] = claim }
@@ -773,7 +860,7 @@ final class SyncSession {
         state.claimSeen = nil
         state.merged = true
         write(SyncMapping.apply(merge.items, onto: host.read(), aliases: state.aliases).library)
-        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, now: now())
+        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, now: editedNow())
         state.emptyFolders = export.emptyFolders
         // Nothing in iCloud is removed because this Mac lacks it.
         queue(diff(export.items, deletes: false))
@@ -785,18 +872,28 @@ final class SyncSession {
     static let largestPayload = 900_000
 
     /// The record to send for `name`, or nil when there's nothing to send (it was removed here since), or it's too big
-    /// for iCloud and stays on this Mac until it's smaller.
+    /// for iCloud: it isn't sent, never trimmed, stays as it is on this Mac, and goes up with the first change once it
+    /// fits again; what else changed keeps syncing.
     func upload(_ name: String) -> SyncUpload? {
-        guard let item = state.base[name] else { return nil }
+        guard let item = state.base[name] else { tooBigNames.remove(name); return nil }
         if case .unknown = item.body, item.type != Self.claimType { return nil }
         let payload = SyncBody.overlay(item.payload, on: state.serverPayloads[name], type: item.type)
-        guard payload.count <= Self.largestPayload else { return nil }
+        guard payload.count <= Self.largestPayload else { tooBigNames.insert(name); return nil }
+        tooBigNames.remove(name)
         return SyncUpload(name: name, type: item.type, payload: payload, modified: item.modified, systemFields: state.systemFields[name])
     }
 
-    func saved(_ records: [SyncRemote]) {
+    func saved(_ records: [SyncRemote], sentAt: Date? = nil) {
         guard !isClosed else { return }
+        // How far this Mac's clock runs ahead of iCloud's, at least: the send started (`sentAt`, by this clock) before
+        // iCloud saved it, so a slow answer or a Mac asleep before it heard back can only make it look less ahead.
+        if let sentAt, let first = records.compactMap(\.serverModified).min() {
+            let ahead = sentAt.timeIntervalSince(first)
+            if ahead <= Self.clockAheadMost { state.clockAhead = ahead > Self.clockSlack ? ahead : nil }
+        }
+        if let newest = records.compactMap(\.serverModified).max() { state.lastServerSave = max(state.lastServerSave ?? newest, newest) }
         for record in records {
+            ownSaves[record.name] = now()
             state.systemFields[record.name] = record.systemFields
             state.serverPayloads[record.name] = record.payload
             if let date = record.serverModified { state.serverDates[record.name] = date }
@@ -823,7 +920,7 @@ final class SyncSession {
         case .gone:
             deleted([name])
         case .zoneMissing:
-            if state.merged { onRemovedElsewhere?() } else { deleted([name]) }
+            if state.merged { onZoneGone?() } else { deleted([name]) }
         }
     }
 
@@ -885,8 +982,8 @@ final class SyncSession {
             }
             decideGone(name)
         case .zoneMissing:
-            // After the first sync it was removed, never made again from here.
-            if state.merged { onRemovedElsewhere?(); return }
+            // After the first sync it was removed or reset, never made again from here.
+            if state.merged { onZoneGone?(); return }
             state.systemFields = [:]
             state.unsent.formUnion(state.base.keys)
             queue((Array(state.base.keys), []))

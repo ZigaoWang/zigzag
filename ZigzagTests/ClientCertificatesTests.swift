@@ -94,7 +94,7 @@ struct ClientCertificatesTests {
         let before = ClientCertificates.defaults
         ClientCertificates.defaults = UserDefaults(suiteName: suite)!
         defer {
-            ClientCertificates.defaults.removePersistentDomain(forName: suite)
+            ClientCertificates.defaults.removeScratchSuite(suite)
             ClientCertificates.defaults = before
         }
         try body()

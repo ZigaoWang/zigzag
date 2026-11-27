@@ -15387,12 +15387,6 @@
         "value": "Esta acción no se puede deshacer."
       }
     },
-    "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "La biblioteca de este Mac era más antigua que la última que sincronizó, así que se restauró la versión de iCloud."
-      }
-    },
     "%lld folders": {
       "variations": {
         "plural": {
@@ -15463,6 +15457,60 @@
             }
           }
         }
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Lo que no cabe en iCloud se queda solo en este Mac: %@ y algunos ajustes. Todo lo demás se sincroniza."
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Lo que no cabe en iCloud se queda solo en este Mac: %@. Todo lo demás se sincroniza."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "La biblioteca de este Mac era una copia antigua, así que Zigzag la actualizó desde iCloud."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "La biblioteca de este Mac era una copia antigua, así que Zigzag la actualizó desde iCloud. La copia antigua está guardada en la carpeta “Backups” de Zigzag."
+      }
+    },
+    "Settings are too big to sync from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Los ajustes son demasiado grandes para sincronizarse desde este Mac. Las pestañas fijadas y los espacios se siguen sincronizando."
+      }
+    },
+    "Some of what syncs is too big to send from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Parte de lo que se sincroniza es demasiado grande para enviarse desde este Mac. Las pestañas fijadas y los espacios se siguen sincronizando."
+      }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Teclas de Vim"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "⌃J y ⌃K bajan y suben por la barra lateral, y por la lista de la barra de comandos mientras está abierta. ⌃H y ⌃L van al espacio anterior y al siguiente. Las páginas y los campos de texto dejan de recibir estas teclas."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl control ctrl j k h l teclado navegación siguiente anterior pestaña espacio arc"
       }
     }
   },

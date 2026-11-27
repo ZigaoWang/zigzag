@@ -761,6 +761,25 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func selectNextTab(_ sender: Any?) { selectAdjacentRow(by: 1) }
+
+    /// A Vim key (`VimKeys`). With the command bar open, ⌃J and ⌃K step its list, and ⌃H and ⌃L stay its field's.
+    func handleVimKey(_ move: VimKeys.Move) -> Bool {
+        if commandBar.isVisible {
+            switch move {
+            case .nextTab: commandBar.step(1)
+            case .previousTab: commandBar.step(-1)
+            case .previousSpace, .nextSpace: return false
+            }
+            return true
+        }
+        switch move {
+        case .nextTab: selectNextTab(nil)
+        case .previousTab: selectPreviousTab(nil)
+        case .previousSpace: previousSpace(nil)
+        case .nextSpace: nextSpace(nil)
+        }
+        return true
+    }
     @objc func selectPreviousTab(_ sender: Any?) { selectAdjacentRow(by: -1) }
 
     /// The stops ⌥⌘↑/↓ and ⇧⌘[/] walk, top to bottom: open favorites, then the sidebar's rows as shown.
@@ -1110,12 +1129,28 @@ enum ZoomLevels {
         set {
             let old = defaultZoom
             if abs(newValue - 1) < 0.001 { UserDefaults.standard.removeObject(forKey: defaultKey) } else { UserDefaults.standard.set(Double(newValue), forKey: defaultKey) }
-            // Open pages at the old default switch now. Manually zoomed pages keep their zoom.
-            for tab in WindowManager.shared.everyOpenTab {
-                guard let webView = tab.webView, let url = tab.url, !hasOwnZoom(url),
-                      abs(webView.pageZoom - old) < 0.001 else { continue }
-                webView.pageZoom = newValue
-            }
+            defaultZoomChanged(from: old)
+        }
+    }
+
+    /// The default zoom as `value` holds it (a synced preference before it changed).
+    static func defaultZoom(_ value: SettingValue?) -> CGFloat {
+        let zoom: Double = switch value {
+        case .double(let v)?: v
+        case .int(let v)?: Double(v)
+        default: 1
+        }
+        return steps.contains { abs($0 - zoom) < 0.001 } ? CGFloat(zoom) : 1
+    }
+
+    /// Open pages at the old default switch now to the new one. Manually zoomed pages keep their zoom.
+    static func defaultZoomChanged(from old: CGFloat) {
+        let new = defaultZoom
+        guard abs(new - old) >= 0.001 else { return }
+        for tab in WindowManager.shared.everyOpenTab {
+            guard let webView = tab.webView, let url = tab.url, !hasOwnZoom(url),
+                  abs(webView.pageZoom - old) < 0.001 else { continue }
+            webView.pageZoom = new
         }
     }
     private static let defaultKey = "DefaultZoom"

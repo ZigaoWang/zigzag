@@ -17,6 +17,10 @@
   Test: TabNavigationTests.goesDownTheSidebarAndWraps
 - ⌥⌘→ / ⌥⌘← → next or previous space, stopping at the ends.
   Test: MenuShortcutsTests.optionCommandArrowsGoThroughTheSpacesAndStopAtTheEnds
+- With Settings › Tabs › Vim keys on, ⌃J / ⌃K → next or previous row, ⌃H / ⌃L → previous or next space, beside the keys above; with the command bar open, ⌃J / ⌃K step its list instead. Off by default, and then the keys are the page's.
+  Test: TabNavigationTests.vimKeysGoThroughTabsAndSpacesWhenOn
+- A Vim key you gave a menu item in Settings › Shortcuts stays that item's.
+  Test: TabNavigationTests.vimKeysLeaveAKeyYouGaveAMenuItem
 - ⌃Tab / ⌃⇧Tab → recent-tabs switcher by default; sidebar order when Settings › Tabs says so.
   Test: TabNavigationTests.controlTabFollowsTheSetting
 - ⌘1–⌘8 → that row of the sidebar; ⌘9, or a number past the end → the last row.

@@ -37,7 +37,7 @@ struct KeptCookiesTests {
         let saved = KeptCookies.defaults
         KeptCookies.defaults = UserDefaults(suiteName: name)!
         defer {
-            KeptCookies.defaults.removePersistentDomain(forName: name)
+            KeptCookies.defaults.removeScratchSuite(name)
             KeptCookies.defaults = saved
         }
         try await body()

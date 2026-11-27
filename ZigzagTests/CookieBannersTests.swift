@@ -15,7 +15,7 @@ struct CookieBannersTests {
         let saved = CookieBanners.defaults
         CookieBanners.defaults = UserDefaults(suiteName: name)!
         defer {
-            CookieBanners.defaults.removePersistentDomain(forName: name)
+            CookieBanners.defaults.removeScratchSuite(name)
             CookieBanners.defaults = saved
         }
         return try await body()

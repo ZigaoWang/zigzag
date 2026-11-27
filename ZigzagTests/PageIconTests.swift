@@ -183,7 +183,7 @@ struct SiteIconTests {
         SiteIcons.defaults = defaults
         defer {
             SiteIcons.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try body()
     }

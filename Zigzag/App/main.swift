@@ -1,6 +1,8 @@
 import AppKit
 
 #if DEBUG
+// Tests only: a bare client of a helper, never the app (HelperProbe.swift).
+HelperProbe.runIfAsked()
 DevDefaults.isolate()
 // -ZigzagPseudoLocalize YES: every string accented, bracketed and longer (docs/i18n/README.md).
 PseudoLocale.startIfAsked()

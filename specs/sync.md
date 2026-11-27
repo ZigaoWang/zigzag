@@ -4,15 +4,20 @@
 - A new Zigzag, or one updated → Settings › General › Sync with iCloud is off, with nothing under it, and nothing touches iCloud.
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
 - Turn on Sync with iCloud → a sheet says what syncs, what stays on this Mac, and that it merges; Continue turns it on, Cancel leaves it off.
-  No test yet.
+  Test: SyncTests.turningSyncOnAsksFirstThenBacksUpAndMerges
 - Continue → a Zigzag backup of this Mac's library, with every preference sync carries, is saved in Backups first, then the first sync merges this Mac with iCloud. Restoring it adds back whatever is missing; it doesn't undo renames or remove what the merge added.
   Test: SyncTests.aBackupIsSavedBeforeTheFirstSync
+  Test: SyncTests.turningSyncOnAsksFirstThenBacksUpAndMerges
 - The backup can't be saved (a full disk) → sync stays off and says so; nothing goes to iCloud.
   Test: SyncTests.withoutABackupSyncStaysOff
+- Zigzag's unit tests → never reach a real iCloud account: the test host's own sync is never entitled, and tests sync through a stand-in for iCloud.
+  Test: SyncTests.turningSyncOnAsksFirstThenBacksUpAndMerges
+- A debug build's test copy (its own data folder, ZIGZAG_DATA_DIR) → sync is off, never carried over from the dev build with its account. The copy reaches iCloud only during a launch with --sync-with-icloud; launched without it, it can't use iCloud whatever its switch says, and the switch is kept as it is for the next launch that asks. Only then can its syncremove command remove the dev build's iCloud copy. Release builds have no test copies.
+  Test: DevDefaultsTests.aTestCopyNeverSyncsWithICloudUnlessAsked
 - Turn it off → everything stays on this Mac as it is, and iCloud keeps its copy.
-  No test yet.
+  Test: SyncTests.turningSyncOffKeepsEverythingHereAndICloudsCopy
 - Remove from iCloud…, then Remove → iCloud's copy is removed for every Mac and sync turns off; this Mac keeps everything. Another Mac syncing with it turns sync off too and keeps its own.
-  No test yet.
+  Test: SyncTests.removeFromICloudRemovesItForEveryMacAndBothKeepTheirOwn
 
 ## What syncs
 - Spaces → their name, color, glass, icon, order and profile.
@@ -29,6 +34,8 @@
   Test: SyncTests.aLiveFolderSyncsItsSourceNotItsPages
 - Settings → preferences about how Zigzag behaves, sites in spaces, and per-site choices like zaps, compatibility mode, zoom and dark pages; never ones about this Mac (window sizes, the download folder, the update channel, debug switches) or what lets other apps in.
   Test: SyncTests.onlyPreferencesTravelNeverWhatIsAboutThisMac
+- A preference changed on another Mac → takes effect here at once, as the same change made here does, without a relaunch: compatibility mode tells extensions and the content blocker and redoes the site's zaps and style on its open pages, ad blocking and its sites re-apply to open tabs, dark pages and full screen choices reach open pages, the sidebar, address bar, page edges, favorites per row, space names and pinned tabs as tiles redraw, page zoom moves open pages at the old default, the screen edge sidebar starts or stops, windows share tabs or stop, shortcuts change in the menus, translation choices, site icons and developer tools update, and a profile's sites without extensions apply to its extensions. The rest are read each time they're used. One that arrives as it already is here does nothing.
+  Test: SyncTests.aSyncedPreferenceTakesEffectAsAChangeHereDoes
 - Site permissions (camera, microphone, location, notifications, pop-ups, downloads), scripts allowed on a site where they're off, password filling and clearing cookies on quit → stay on each Mac. A grant is made on the Mac it's for, as in Safari; password filling follows the password app each Mac has; clearing cookies on quit turned on elsewhere would sign you out here. Blocking scripts on a site does travel.
   Test: SyncTests.permissionsPasswordFillingAndCookieClearingStayOnEachMac
 - Open tabs, history, cookies and website data, passwords, extensions, downloads, picture icons and space pictures → stay on this Mac. Passwords sync through iCloud Keychain as before.
@@ -69,6 +76,7 @@
   Test: SyncTests.turningSyncOffRenamingAndOnAgainAddsNoCopy
   Test: SyncTests.turningSyncOnAgainKeepsWhatChangedOnEachSideWhileOff
   Test: SyncTests.turningSyncOnAgainAfterRemoveFromICloudMergesAfresh
+- Something this Mac sends while it reads all of iCloud again (sync turned on again, a pin made meanwhile) → stays here and in iCloud the whole time; what the read's earlier pages didn't list isn't taken as removed when it's this Mac's own save made after the read began.
   Test: SyncTests.aPinSentDuringTheFullReadAfterTurningOnIsntTakenAsRemoved
 - This Mac's library couldn't be read and Zigzag started afresh → merged again as on a first sync, so iCloud fills it in; nothing is removed from iCloud.
   Test: SyncTests.aLibraryThatCouldntBeReadIsFilledFromICloudNotEmptiedInto
@@ -80,6 +88,9 @@
   Test: SyncTests.editsToDifferentThingsBothArrive
 - The same thing edited on two Macs → the later edit wins on both.
   Test: SyncTests.theLastEditToOnePageWins
+- Which edit is later → each is dated by the Mac that made it, and that date is never later than when iCloud saved it, so a Mac whose clock runs ahead can't date its edits into the future. A Mac whose clock ran more than a minute ahead of iCloud's at its last save dates its own edits by iCloud's clock, so its edit made offline doesn't beat a later one from another Mac either. How far ahead is measured from when the send started, so a slow answer or a Mac asleep before it heard back never reads as a fast clock; more than 30 days ahead is no guide, and a corrected time is never before iCloud's newest save known here. The same goes for each preference and each removal note.
+  Test: SyncTests.aMacWhoseClockRunsAheadDoesntWinALaterEdit
+  Test: SyncTests.aStallAfterASaveIsntTakenForAFastClock
 - A page moved on one Mac while another pins a new one → both keep their places.
   Test: SyncTests.aMoveAndAnInsertAtOnceBothKeepTheirPlaces
 - Preferences changed on two Macs → each keeps the later value of each preference.
@@ -109,12 +120,20 @@
   Test: SyncTests.aFavoriteRemovedOnPurposeDoesntComeBackWithItsProfileLater
 - A preference too big for iCloud (long styles for many sites) → stays on this Mac and isn't replaced by another Mac's; the rest still sync.
   Test: SyncTests.aPreferenceTooBigForICloudStaysOnThisMac
-- A pinned page too big for iCloud (a long data: address) → stays on this Mac and isn't sent, without asking iCloud again and again.
+- Preferences too big together for iCloud's one record (each under 200 KB, styles, dark pages and icons for thousands of sites) → the preferences' record isn't sent from this Mac; nothing is trimmed, sent as unset or removed because of it, and every Mac keeps its values. Pinned tabs, spaces, folders and favorites keep syncing, and other Macs' preference changes still arrive here, a smaller value included. Under Last synced, Settings says: Settings are too big to sync from this Mac. Pins and spaces still sync. Once they fit again, the next change goes up as usual, and what other Macs changed meanwhile isn't undone by older values from here.
+  Test: SyncTests.settingsOverTheLimitArentSentAndPinsStillSync
+  Test: SyncTests.twoMacsOverTheLimitTogetherLoseNothing
+  Test: SyncTests.aSmallerValueFromAnotherMacIsTakenWhileOverTheLimit
+- A pinned page too big for iCloud (a long data: address) → stays on this Mac and isn't sent, without asking iCloud again and again; under Last synced, Settings says how many of what stay on this Mac.
   Test: SyncTests.aRecordTooBigForICloudIsntSentAndStaysHere
+- Thousands removed within 30 days, more removal notes than one record holds (or site rules bigger than a record) → that record isn't sent from this Mac, and Settings says some of what syncs is too big to send; the removals themselves, pins and spaces still sync.
+  Test: SyncTests.aRemovalsRecordTooBigIsntSentAndRemovalsStillArrive
 - Nothing changed → nothing is sent.
   Test: SyncTests.onceSettledNothingMoreIsSent
 - A thousand pinned pages → sync without a wait, and one edit sends one record.
   Test: SyncTests.aThousandPinnedPagesSyncQuickly
+- Sync's own state (Sync/State.json, megabytes with a big library) → encoded and written off the main thread, so typing and scrolling never wait for it: one write at a time, in the order asked, none lost; before quitting and when sync turns off it's on disk before Zigzag goes on.
+  Test: SyncTests.theStateIsWrittenOffTheMainThreadInOrder
 - Records a newer Zigzag wrote → read, and their new fields and kinds are kept when this Mac edits or removes around them.
   Test: SyncTests.olderAndNewerRecordsStillRead
   Test: SyncTests.aNewerZigzagsFieldsSurviveAnEditHere
@@ -156,6 +175,10 @@
   Test: SyncTests.aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing
   Test: SyncTests.aZoneRemovedAfterTheFirstSyncIsRemovedElsewhereNotTriedAgain
   Test: SyncTests.aSaveFindingTheZoneGoneNeverMakesItAgain
+- The library found gone by a save, a removal or a fetch's error, before iCloud's own note of why → deleted in System Settings, sync turns off at once; otherwise Zigzag reads the database's changes first: iCloud's copy reset (its keys) merges again as a first sync, as when a fetch finds the reset, and a removal, or no note at all, turns sync off. Nothing on this Mac changes meanwhile, and the zone isn't made again until that's known. Reading the database's changes failing (offline) is no answer: sync stays on with its state, says it can't reach iCloud and asks again with the usual waits. While it asks, a deletion those changes bring is its answer, not acted on twice.
+  Test: SyncTests.aResetASaveFindsFirstIsMergedAgainNotTurnedOff
+  Test: SyncTests.aFailedCheckOfWhyTheZoneIsGoneLeavesSyncOn
+  Test: SyncTests.whyTheZoneIsGoneIsTheDeletionTheDatabaseBrings
 - Something changed on another Mac while Zigzag is open here → iCloud's push fetches it within seconds; pushes for other apps are ignored.
   Test: SyncTests.onlyZigzagsOwnPushesFromICloudFetch
 - Zigzag quits in the middle of a fetch → what the fetch brought is saved with how far it read, and arrives at the next launch; nothing is skipped.
@@ -188,6 +211,8 @@
 - Zigzag opened with a Library.json older than the one sync last read (put back from a copy) → iCloud's version of everything, and nothing is sent.
   Test: SyncTests.aLibraryOlderThanTheOneLastSyncedSendsNothing
   Test: SyncTests.aClockOnceAheadDoesntMakeLaterLaunchesRollbacks
+- iCloud's version laid out over what's here at launch (an older Library.json, or removals held) → a Zigzag backup of the library as it was, with its preferences, is saved in Backups first, only when that changes something. The toast says the library was an older copy and Zigzag brought it up to date from iCloud, that the older copy is in Zigzag's Backups folder, with Show in Finder; without a backup it says only the first.
+  Test: SyncTests.anOlderLibraryIsBackedUpBeforeICloudsVersionIsLaidOut
 - Removing things by hand, however many (a space with all its pins) → sent at once; only a library found changed at launch or when sync is turned on is checked.
   Test: SyncTests.removingASpaceAndItsPinsByHandIsSentAtOnce
 - Profiles.json gone while iCloud has this Mac's other profiles → read as a file that couldn't be read, and merged again as on a first sync; no profile is removed from iCloud.

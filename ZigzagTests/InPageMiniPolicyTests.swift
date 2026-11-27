@@ -4,15 +4,10 @@ import Testing
 
 @MainActor
 struct InPageMiniPolicyTests {
-    private func defaults() -> UserDefaults {
+    @Test func theSettingIsOffUntilTurnedOn() {
         let name = "InPageMiniPolicyTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
-        defaults.removePersistentDomain(forName: name)
-        return defaults
-    }
-
-    @Test func theSettingIsOffUntilTurnedOn() {
-        let defaults = defaults()
+        defer { defaults.removeScratchSuite(name) }
         #expect(InPageMiniSettings.isEnabled(in: defaults) == false)
         InPageMiniSettings.setEnabled(true, in: defaults)
         #expect(InPageMiniSettings.isEnabled(in: defaults))

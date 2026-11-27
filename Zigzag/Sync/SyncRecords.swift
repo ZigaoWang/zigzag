@@ -1,13 +1,13 @@
 import Foundation
 
 /// One synced thing as its iCloud record holds it: its kind, its fields as JSON, and when it last changed.
-struct SyncItem: Codable, Equatable {
+nonisolated struct SyncItem: Codable, Equatable, Sendable {
     var type: String
     /// The fields, as canonical JSON (sorted keys), so equal items have equal bytes.
     var payload: Data
     var modified: Date
 
-    init(_ body: SyncBody, modified: Date) {
+    @MainActor init(_ body: SyncBody, modified: Date) {
         type = body.recordType
         payload = body.encoded()
         self.modified = modified
@@ -19,7 +19,7 @@ struct SyncItem: Codable, Equatable {
         self.modified = modified
     }
 
-    var body: SyncBody { SyncBody.decode(type: type, payload: payload) }
+    @MainActor var body: SyncBody { SyncBody.decode(type: type, payload: payload) }
 
     /// Same fields, whenever each was written.
     func sameContent(as other: SyncItem) -> Bool { type == other.type && payload == other.payload }

@@ -45,6 +45,81 @@ import Testing
         }
     }
 
+    /// Settings › Tabs › Vim keys: ⌃J and ⌃K go down and up the sidebar, ⌃H and ⌃L through the spaces; off, the keys
+    /// are nobody's. With the command bar open, ⌃J and ⌃K are its list's and the tab stays.
+    @Test func vimKeysGoThroughTabsAndSpacesWhenOn() throws {
+        let defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: VimKeys.key)
+        defer { defaults.set(saved, forKey: VimKeys.key) }
+        try inWindow(["A", "B", "C"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            let window = try #require(controller.window)
+            func control(_ key: String, _ mods: NSEvent.ModifierFlags = .control) throws -> NSEvent {
+                try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: mods, timestamp: 0,
+                                               windowNumber: window.windowNumber, context: nil, characters: key,
+                                               charactersIgnoringModifiers: key, isARepeat: false, keyCode: 0))
+            }
+            controller.sidebar.list.reload(animated: false)
+            VimKeys.isOn = false
+            #expect(VimKeys.move(for: try control("j")) == nil)
+            VimKeys.isOn = true
+            #expect(VimKeys.move(for: try control("j", [.control, .command])) == nil)
+            #expect(VimKeys.move(for: try control("x")) == nil)
+            #expect(window.performKeyEquivalent(with: try control("j")))
+            #expect(manager.selectedTab === tabs[1])
+            #expect(window.performKeyEquivalent(with: try control("k")))
+            #expect(manager.selectedTab === tabs[0])
+            #expect(window.performKeyEquivalent(with: try control("l")))
+            #expect(manager.currentSpaceID != space)
+            #expect(window.performKeyEquivalent(with: try control("h")))
+            #expect(manager.currentSpaceID == space)
+            // Kept from anything else in Settings › Shortcuts while on, like ⌃1–9.
+            let controlJ = Shortcuts.Combo(key: "j", modifiers: NSEvent.ModifierFlags.control.rawValue)
+            #expect(Shortcuts.reserved(controlJ, in: NSMenu()) == VimKeys.title)
+            VimKeys.isOn = false
+            #expect(Shortcuts.reserved(controlJ, in: NSMenu()) == nil)
+            VimKeys.isOn = true
+            controller.commandBar.show(mode: .newTab)
+            controller.commandBar.debugType("nav")
+            let rows = try #require(controller.commandBar.debugState["rows"] as? [[String: Any]])
+            try #require(rows.count > 1)
+            let first = try #require(controller.commandBar.debugState["selected"] as? Int)
+            #expect(window.performKeyEquivalent(with: try control("j")))
+            #expect(controller.commandBar.debugState["selected"] as? Int == (first + 1) % rows.count)
+            #expect(window.performKeyEquivalent(with: try control("k")))
+            #expect(controller.commandBar.debugState["selected"] as? Int == first)
+            #expect(manager.selectedTab === tabs[0])
+            #expect(!controller.handleVimKey(.previousSpace))
+            #expect(manager.currentSpaceID == space)
+            controller.commandBar.dismiss()
+        }
+    }
+
+    /// A Vim key you gave a menu item in Settings › Shortcuts stays that item's; the other three are still Vim's.
+    @Test func vimKeysLeaveAKeyYouGaveAMenuItem() throws {
+        let defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: VimKeys.key)
+        defer { defaults.set(saved, forKey: VimKeys.key) }
+        VimKeys.isOn = true
+        let menu = NSMenu()
+        let sub = NSMenu()
+        let yours = NSMenuItem(title: "Yours", action: #selector(NSText.selectAll(_:)), keyEquivalent: "j")
+        yours.keyEquivalentModifierMask = .control
+        sub.addItem(yours)
+        menu.addItem(withTitle: "Edit", action: nil, keyEquivalent: "").submenu = sub
+        func control(_ key: String) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: 0, windowNumber: 0,
+                                           context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: 0))
+        }
+        #expect(VimKeys.move(for: try control("j"), menu: menu) == nil)
+        #expect(VimKeys.move(for: try control("k"), menu: menu) == .previousTab)
+        let controlJ = Shortcuts.Combo(key: "j", modifiers: NSEvent.ModifierFlags.control.rawValue)
+        #expect(Shortcuts.reserved(controlJ, in: menu) == nil)
+        yours.keyEquivalent = ""
+        #expect(VimKeys.move(for: try control("j"), menu: menu) == .nextTab)
+        #expect(Shortcuts.reserved(controlJ, in: menu) == VimKeys.title)
+    }
+
     /// The order is the sidebar's, not the order the tabs were last used in.
     @Test func ignoresRecentUse() throws {
         try inWindow(["A", "B", "C", "D"]) { controller, tabs, _ in

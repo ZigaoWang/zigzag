@@ -1395,7 +1395,7 @@ extension DownloadRuleTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         let rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -1444,7 +1444,7 @@ extension DownloadRuleTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -1517,7 +1517,7 @@ extension DownloadRuleTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try body(defaults)
     }

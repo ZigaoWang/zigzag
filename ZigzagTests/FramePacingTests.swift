@@ -109,7 +109,7 @@ struct FramePacingTests {
         FramePacing.throttled = { false }
         FramePacing.held = FramePacing.HeldSites()
         defer {
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
             (FeatureFlags.defaults, FeatureFlags.engine, DeveloperTools.defaults) = saved
             FramePacing.throttled = throttled
             FramePacing.held = held

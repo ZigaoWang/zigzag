@@ -20,7 +20,7 @@ struct SiteControlsPermissionTests {
         defer {
             SitePermissions.defaults = before
             SitePermissions.forgetAsked()
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try body()
     }

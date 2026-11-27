@@ -19,7 +19,7 @@ struct SiteBoostsTests {
         SiteBoosts.defaults = defaults
         defer {
             SiteBoosts.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try await body()
     }
@@ -496,7 +496,7 @@ struct SiteCompatibilityTests {
             ContentBlocker.isEnabled = blocking
             ContentBlocker.allowedSites = allowed
             ExtensionStore.setExtensionsOffSites(off, in: profile)
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try await body()
     }

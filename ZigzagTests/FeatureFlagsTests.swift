@@ -31,7 +31,7 @@ struct FeatureFlagsTests {
         DeveloperTools.defaults = defaults
         FeatureFlags.engine = engine
         defer {
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
             (FeatureFlags.defaults, FeatureFlags.engine, DeveloperTools.defaults) = saved
         }
         try body(engine)

@@ -112,9 +112,12 @@ final class Flag: @unchecked Sendable {
 }
 
 final class Listener: NSObject, NSXPCListenerDelegate {
+    let lifetime = HelperLifetime()
+
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         connection.exportedInterface = PictureService.interface()
         connection.exportedObject = Decoder()
+        lifetime.opened(connection)
         connection.resume()
         return true
     }

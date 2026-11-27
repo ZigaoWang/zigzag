@@ -93,9 +93,7 @@ import WebKit
     private let stateKeys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "siteAccess", "accessSites"]
 
     private func file() throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-cache-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appendingPathComponent("state.json")
+        try FileManager.default.scratchFolder("zigzag-cache").appendingPathComponent("state.json")
     }
 
     @Test func askingAgainReadsNothing() throws {
@@ -225,9 +223,7 @@ import WebKit
 /// The session is written off the main thread, and only when it says something new (#89).
 struct SessionSaveTests {
     private func file() throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-session-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appendingPathComponent("Session.json")
+        try FileManager.default.scratchFolder("zigzag-session").appendingPathComponent("Session.json")
     }
 
     private func state(_ url: String, title: String = "Page") -> SessionState {

@@ -14,7 +14,7 @@ struct SiteUserAgentsTests {
         SiteUserAgents.defaults = defaults
         defer {
             SiteUserAgents.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try body()
     }

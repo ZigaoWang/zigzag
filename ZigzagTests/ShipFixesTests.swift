@@ -915,7 +915,7 @@ struct UpdateBackupTests {
         let root = try makeRoot()
         let suite = "zigzag-backup-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { try? FileManager.default.removeItem(at: root); defaults.removePersistentDomain(forName: suite) }
+        defer { try? FileManager.default.removeItem(at: root); defaults.removeScratchSuite(suite) }
         // A first run, with no profile yet: nothing to back up, only the build noted.
         UpdateBackup.backUpIfUpdated(build: "18", version: "0.4.0", defaults: defaults, root: root)
         #expect(UpdateBackup.all(in: root).isEmpty)
@@ -938,7 +938,7 @@ struct UpdateBackupTests {
         let root = try makeRoot()
         let suite = "zigzag-backup-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { try? FileManager.default.removeItem(at: root); defaults.removePersistentDomain(forName: suite) }
+        defer { try? FileManager.default.removeItem(at: root); defaults.removeScratchSuite(suite) }
         defaults.set("104", forKey: "LastRunBuild")
         defaults.set("0.9.1", forKey: "LastRunVersion")
         UpdateBackup.backUpIfUpdated(build: "105", version: "0.9.1", defaults: defaults, root: root)
@@ -1271,7 +1271,7 @@ struct PageTextCheckingTests {
         let registered = UserDefaults.standard.volatileDomain(forName: UserDefaults.registrationDomain)
         #expect(registered[PageTextChecking.spellingCorrectionKey] as? Bool == mac)
         let (defaults, name) = scratchDefaults()
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { defaults.removeScratchSuite(name) }
         let checking = PageTextChecking(defaults: defaults, center: NotificationCenter(), systemCorrects: { mac })
         checking.start()
         #expect(defaults.bool(forKey: PageTextChecking.spellingCorrectionKey) == mac)
@@ -1283,7 +1283,7 @@ struct PageTextCheckingTests {
 
     @Test func aChangedChoiceIsSentToThePagesOnce() async throws {
         let (defaults, name) = scratchDefaults()
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { defaults.removeScratchSuite(name) }
         // The notification UserDefaults posts on change.
         let center = NotificationCenter.default
         var posted = 0
@@ -1388,7 +1388,7 @@ struct ZigzagCardTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-card-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer {
-            CardStart.defaults.removePersistentDomain(forName: name)
+            CardStart.defaults.removeScratchSuite(name)
             CardStart.defaults = saved
             try? FileManager.default.removeItem(at: root)
         }
@@ -1481,7 +1481,7 @@ struct ZigzagCardTests {
         let saved = CardFinish.defaults
         CardFinish.defaults = try #require(UserDefaults(suiteName: name))
         defer {
-            CardFinish.defaults.removePersistentDomain(forName: name)
+            CardFinish.defaults.removeScratchSuite(name)
             CardFinish.defaults = saved
         }
         #expect(CardFinish.chosen == .space)

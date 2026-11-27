@@ -16,7 +16,7 @@ struct DarkReaderTests {
         let saved = DarkPages.defaults
         DarkPages.defaults = UserDefaults(suiteName: name)!
         defer {
-            DarkPages.defaults.removePersistentDomain(forName: name)
+            DarkPages.defaults.removeScratchSuite(name)
             DarkPages.defaults = saved
             DarkPages.refreshAll()
         }

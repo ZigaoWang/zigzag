@@ -116,7 +116,7 @@ struct WhatsNewTests {
     @Test func offerIsOwedUntilShown() throws {
         let suite = "zigzag-whatsnew-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         // A fresh install: quiet.
         WhatsNew.noteLaunch(defaults: defaults, version: "0.7.7")
         #expect(!WhatsNew.isPending(defaults: defaults, version: "0.7.7"))

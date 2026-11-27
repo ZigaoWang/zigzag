@@ -518,7 +518,7 @@ extension MCPServerTests {
         defer { try? FileManager.default.removeItem(at: file) }
         let suite = "mcp-key-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         let old = try #require(MCPKeyFile.token(at: file, creating: true))
         let endpoint = endpoint()
         #expect(MCPService.replaceKeyForBusyPort(endpoint, keyFile: file, defaults: defaults))

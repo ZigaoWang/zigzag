@@ -32,9 +32,7 @@ private final class PageLoad: NSObject, WKNavigationDelegate {
 @MainActor
 struct ExtensionSecurityTests {
     private static func temporaryFolder() throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("ExtensionSecurityTests-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder
+        try FileManager.default.scratchFolder("ExtensionSecurityTests")
     }
 
     /// Zips a folder's contents as a package would be, with ditto, which keeps symbolic links as links.

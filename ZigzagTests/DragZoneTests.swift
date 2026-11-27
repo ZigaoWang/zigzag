@@ -375,7 +375,7 @@ struct DragZoneTests {
         BrowserRootView.defaults = defaults
         defer {
             BrowserRootView.defaults = shared
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
             manager.invalidate()
             Library.shared.restore(before)
         }

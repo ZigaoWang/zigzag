@@ -15075,12 +15075,6 @@
         "value": "Bu işlem geri alınamaz."
       }
     },
-    "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Bu Mac’in kitaplığı son eşzamanlanandan daha eskiydi, bu yüzden iCloud’daki sürüm geri getirildi."
-      }
-    },
     "%lld folders": {
       "variations": {
         "plural": {
@@ -15133,6 +15127,60 @@
             }
           }
         }
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud için çok büyük olduğundan yalnızca bu Mac’te kalanlar: %@ ve bazı ayarlar. Geri kalan her şey eşzamanlanır."
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud için çok büyük olduğundan yalnızca bu Mac’te kalanlar: %@. Geri kalan her şey eşzamanlanır."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi. Eski kopya, Zigzag’in “Backups” klasöründe saklanıyor."
+      }
+    },
+    "Settings are too big to sync from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ayarlar bu Mac’ten eşzamanlanamayacak kadar büyük. Sabitlenmiş sekmeler ve Space’ler eşzamanlanmaya devam ediyor."
+      }
+    },
+    "Some of what syncs is too big to send from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Eşzamanlananların bir kısmı bu Mac’ten gönderilemeyecek kadar büyük. Sabitlenmiş sekmeler ve Space’ler eşzamanlanmaya devam ediyor."
+      }
+    },
+    "Vim keys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Vim tuşları"
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "⌃J ve ⌃K kenar çubuğunda, Komut Çubuğu açıkken de onun listesinde aşağı ve yukarı gider. ⌃H ve ⌃L önceki ve sonraki Space’e gider. Sayfalar ve metin alanları artık bu tuşları almaz."
+      }
+    },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "vim hjkl control ctrl j k h l klavye gezinme sonraki önceki sekme space arc"
       }
     }
   },

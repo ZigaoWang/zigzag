@@ -59,7 +59,7 @@ struct DarkPagesTests {
         let saved = DarkPages.defaults
         DarkPages.defaults = UserDefaults(suiteName: name)!
         defer {
-            DarkPages.defaults.removePersistentDomain(forName: name)
+            DarkPages.defaults.removeScratchSuite(name)
             DarkPages.defaults = saved
         }
         try body()
@@ -160,7 +160,7 @@ struct DarkPagesTests {
         let saved = DarkPages.defaults
         DarkPages.defaults = UserDefaults(suiteName: name)!
         defer {
-            DarkPages.defaults.removePersistentDomain(forName: name)
+            DarkPages.defaults.removeScratchSuite(name)
             DarkPages.defaults = saved
             DarkPages.refreshAll()
         }
@@ -233,7 +233,7 @@ struct DarkPagesTests {
         let saved = DarkPages.defaults
         DarkPages.defaults = UserDefaults(suiteName: name)!
         defer {
-            DarkPages.defaults.removePersistentDomain(forName: name)
+            DarkPages.defaults.removeScratchSuite(name)
             DarkPages.defaults = saved
         }
         DarkPages.mode = .always
@@ -373,7 +373,7 @@ struct DarkPagesTests {
         let saved = DarkPages.defaults
         DarkPages.defaults = UserDefaults(suiteName: name)!
         defer {
-            DarkPages.defaults.removePersistentDomain(forName: name)
+            DarkPages.defaults.removeScratchSuite(name)
             DarkPages.defaults = saved
             DarkPages.refreshAll()
         }

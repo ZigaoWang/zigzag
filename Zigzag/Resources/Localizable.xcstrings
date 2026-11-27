@@ -3298,6 +3298,172 @@
         }
       }
     },
+    "Settings are too big to sync from this Mac. Pins and spaces still sync." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud, when this Mac's preferences together are more than an iCloud record holds (styles or icons for thousands of sites, say), so they aren't sent; pinned tabs, spaces, folders and favorites still sync, and other Macs' settings still arrive.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Einstellungen sind zu groß, um von diesem Mac synchronisiert zu werden. Fixierte Tabs und Spaces werden weiter synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los ajustes son demasiado grandes para sincronizarse desde este Mac. Las pestañas fijadas y los espacios se siguen sincronizando."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les réglages sont trop volumineux pour être synchronisés depuis ce Mac. Les onglets épinglés et les espaces restent synchronisés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le impostazioni sono troppo grandi per essere sincronizzate da questo Mac. I pannelli fissati e gli spazi continuano a sincronizzarsi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定が大きすぎるため、このMacからは同期できません。固定タブとスペースは引き続き同期されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정이 너무 커서 이 Mac에서 동기화할 수 없습니다. 고정된 탭과 스페이스는 계속 동기화됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De instellingen zijn te groot om vanaf deze Mac te synchroniseren. Vastgezette tabbladen en spaces worden nog steeds gesynchroniseerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ustawienia są za duże, by synchronizować je z tego Maca. Przypięte karty i przestrzenie nadal się synchronizują."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os ajustes são grandes demais para sincronizar a partir deste Mac. As abas fixadas e os espaços continuam sincronizando."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройки слишком велики для синхронизации с этого Mac. Закреплённые вкладки и пространства по-прежнему синхронизируются."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayarlar bu Mac’ten eşzamanlanamayacak kadar büyük. Sabitlenmiş sekmeler ve Space’ler eşzamanlanmaya devam ediyor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置太大，无法从这台 Mac 同步。已固定标签页和空间仍会同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定太大，無法從這台 Mac 同步。已固定分頁和空間仍會同步。"
+          }
+        }
+      }
+    },
+    "Some of what syncs is too big to send from this Mac. Pins and spaces still sync." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud, when a record that isn't one pinned tab or space (the site rules, or the list of what was removed lately) is more than iCloud takes, so it isn't sent; pinned tabs, spaces, folders and favorites still sync.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Teil dessen, was synchronisiert wird, ist zu groß, um von diesem Mac gesendet zu werden. Fixierte Tabs und Spaces werden weiter synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte de lo que se sincroniza es demasiado grande para enviarse desde este Mac. Las pestañas fijadas y los espacios se siguen sincronizando."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une partie de ce qui est synchronisé est trop volumineuse pour être envoyée depuis ce Mac. Les onglets épinglés et les espaces restent synchronisés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte di ciò che viene sincronizzato è troppo grande per essere inviata da questo Mac. I pannelli fissati e gli spazi continuano a sincronizzarsi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期する内容の一部が大きすぎるため、このMacからは送信できません。固定タブとスペースは引き続き同期されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화할 항목 중 일부가 너무 커서 이 Mac에서 보낼 수 없습니다. 고정된 탭과 스페이스는 계속 동기화됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een deel van wat er wordt gesynchroniseerd is te groot om vanaf deze Mac te versturen. Vastgezette tabbladen en spaces worden nog steeds gesynchroniseerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Część synchronizowanych danych jest za duża, by wysłać ją z tego Maca. Przypięte karty i przestrzenie nadal się synchronizują."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte do que é sincronizado é grande demais para ser enviada deste Mac. As abas fixadas e os espaços continuam sincronizando."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Часть синхронизируемых данных слишком велика для отправки с этого Mac. Закреплённые вкладки и пространства по-прежнему синхронизируются."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eşzamanlananların bir kısmı bu Mac’ten gönderilemeyecek kadar büyük. Sabitlenmiş sekmeler ve Space’ler eşzamanlanmaya devam ediyor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分同步内容太大，无法从这台 Mac 发送。已固定标签页和空间仍会同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分同步內容太大，無法從這台 Mac 傳送。已固定分頁和空間仍會同步。"
+          }
+        }
+      }
+    },
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too." : {
       "comment" : "Explanation under “Removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it. The rest keeps syncing.",
       "localizations" : {
@@ -3796,85 +3962,334 @@
         }
       }
     },
-    "This Mac’s library was older than what it last synced, so iCloud’s version was put back." : {
-      "comment" : "Toast at launch when Library.json was put back from an older copy (Time Machine, say), so Sync with iCloud laid out iCloud's version instead.",
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud." : {
+      "comment" : "Toast at launch when Library.json was an older copy (put back from Time Machine, say), so Sync with iCloud brought its spaces, pinned tabs and settings up to date from iCloud; what was only on this Mac stays.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Bibliothek dieses Macs war älter als beim letzten Synchronisieren, daher wurde die Version aus iCloud wiederhergestellt."
+            "value" : "Die Bibliothek dieses Macs war eine ältere Kopie, daher hat Zigzag sie aus iCloud auf den neuesten Stand gebracht."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La biblioteca de este Mac era más antigua que la última que sincronizó, así que se restauró la versión de iCloud."
+            "value" : "La biblioteca de este Mac era una copia antigua, así que Zigzag la actualizó desde iCloud."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La bibliothèque de ce Mac était plus ancienne que lors de sa dernière synchronisation : la version d’iCloud a été restaurée."
+            "value" : "La bibliothèque de ce Mac était une copie plus ancienne, alors Zigzag l’a mise à jour depuis iCloud."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La libreria di questo Mac era più vecchia di quella sincronizzata l’ultima volta, quindi è stata ripristinata la versione di iCloud."
+            "value" : "La libreria di questo Mac era una copia meno recente, quindi Zigzag l’ha aggiornata da iCloud."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacのライブラリが最後に同期した時点より古かったため、iCloudの内容に戻しました。"
+            "value" : "このMacのライブラリが古いコピーだったため、ZigzagがiCloudから最新の状態にしました。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 Mac의 라이브러리가 마지막으로 동기화한 것보다 오래되어 iCloud의 버전으로 되돌렸습니다."
+            "value" : "이 Mac의 라이브러리가 이전 사본이어서 Zigzag가 iCloud에서 최신 상태로 업데이트했습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "De bibliotheek van deze Mac was ouder dan bij de laatste synchronisatie, dus de versie uit iCloud is teruggezet."
+            "value" : "De bibliotheek van deze Mac was een oudere kopie, dus Zigzag heeft hem bijgewerkt vanuit iCloud."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Biblioteka tego Maca była starsza niż przy ostatniej synchronizacji, więc przywrócono wersję z iCloud."
+            "value" : "Biblioteka tego Maca była starszą kopią, więc Zigzag zaktualizował ją z iCloud."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A biblioteca deste Mac era mais antiga do que a última sincronizada, então a versão do iCloud foi restaurada."
+            "value" : "A biblioteca deste Mac era uma cópia mais antiga, então o Zigzag a atualizou a partir do iCloud."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Библиотека этого Mac оказалась старше, чем при последней синхронизации, поэтому восстановлена версия из iCloud."
+            "value" : "Библиотека этого Mac оказалась старой копией, поэтому Zigzag обновил её из iCloud."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu Mac’in kitaplığı son eşzamanlanandan daha eskiydi, bu yüzden iCloud’daki sürüm geri getirildi."
+            "value" : "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 上的资料库比上次同步时的旧，因此已恢复为 iCloud 中的版本。"
+            "value" : "这台 Mac 上的资料库是较旧的副本，因此 Zigzag 已从 iCloud 将其更新。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台 Mac 上的資料庫比上次同步時的舊，因此已還原為 iCloud 中的版本。"
+            "value" : "這台 Mac 上的資料庫是較舊的副本，因此 Zigzag 已從 iCloud 將其更新。"
+          }
+        }
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder." : {
+      "comment" : "Toast at launch when Library.json was an older copy (put back from Time Machine, say), so Sync with iCloud brought its spaces, pinned tabs and settings up to date from iCloud; what was only on this Mac stays. The older copy was saved first as a Zigzag backup; Backups is a folder's name on disk.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Bibliothek dieses Macs war eine ältere Kopie, daher hat Zigzag sie aus iCloud auf den neuesten Stand gebracht. Die ältere Kopie ist in Zigzags Ordner „Backups“ gesichert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La biblioteca de este Mac era una copia antigua, así que Zigzag la actualizó desde iCloud. La copia antigua está guardada en la carpeta “Backups” de Zigzag."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La bibliothèque de ce Mac était une copie plus ancienne, alors Zigzag l’a mise à jour depuis iCloud. La copie plus ancienne est enregistrée dans le dossier « Backups » de Zigzag."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La libreria di questo Mac era una copia meno recente, quindi Zigzag l’ha aggiornata da iCloud. La copia meno recente è salvata nella cartella “Backups” di Zigzag."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacのライブラリが古いコピーだったため、ZigzagがiCloudから最新の状態にしました。古いコピーはZigzagの「Backups」フォルダに保存されています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Mac의 라이브러리가 이전 사본이어서 Zigzag가 iCloud에서 최신 상태로 업데이트했습니다. 이전 사본은 Zigzag의 ‘Backups’ 폴더에 저장되어 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De bibliotheek van deze Mac was een oudere kopie, dus Zigzag heeft hem bijgewerkt vanuit iCloud. De oudere kopie staat in de map “Backups” van Zigzag."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biblioteka tego Maca była starszą kopią, więc Zigzag zaktualizował ją z iCloud. Starsza kopia jest zapisana w folderze „Backups” Zigzaga."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A biblioteca deste Mac era uma cópia mais antiga, então o Zigzag a atualizou a partir do iCloud. A cópia mais antiga está salva na pasta “Backups” do Zigzag."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Библиотека этого Mac оказалась старой копией, поэтому Zigzag обновил её из iCloud. Старая копия сохранена в папке «Backups» Zigzag."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi. Eski kopya, Zigzag’in “Backups” klasöründe saklanıyor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上的资料库是较旧的副本，因此 Zigzag 已从 iCloud 将其更新。较旧的副本已保存在 Zigzag 的“Backups”文件夹中。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台 Mac 上的資料庫是較舊的副本，因此 Zigzag 已從 iCloud 將其更新。較舊的副本已儲存在 Zigzag 的「Backups」資料夾中。"
+          }
+        }
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud. The placeholder lists pinned tabs or favorites too big for an iCloud record (a very long data: address, say), like “1 pinned tab”; preferences are too big as well.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zu groß für iCloud, daher nur auf diesem Mac: %@ und einige Einstellungen. Alles andere wird synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que no cabe en iCloud se queda solo en este Mac: %@ y algunos ajustes. Todo lo demás se sincroniza."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui ne tient pas dans iCloud reste seulement sur ce Mac : %@ et certains réglages. Tout le reste est synchronisé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciò che non entra in iCloud resta solo su questo Mac: %@ e alcune impostazioni. Tutto il resto viene sincronizzato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudには大きすぎるため、このMacにだけ残る項目：%@と一部の設定。それ以外はすべて同期されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 비해 너무 커서 이 Mac에만 남는 항목: %@ 및 일부 설정. 나머지는 모두 동기화됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat niet in iCloud past, blijft alleen op deze Mac: %@ en sommige instellingen. Al het andere wordt gesynchroniseerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To, co nie mieści się w iCloud, zostaje tylko na tym Macu: %@ oraz niektóre ustawienia. Cała reszta jest synchronizowana."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que não cabe no iCloud fica só neste Mac: %@ e alguns ajustes. Todo o resto é sincronizado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хранится только на этом Mac, так как слишком велико для iCloud: %@ и некоторые настройки. Всё остальное синхронизируется."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud için çok büyük olduğundan yalnızca bu Mac’te kalanlar: %@ ve bazı ayarlar. Geri kalan her şey eşzamanlanır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "因为对 iCloud 来说太大，只保留在这台 Mac 上：%@和部分设置。其他内容都会同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "因為對 iCloud 來說太大，只保留在這台 Mac 上：%@和部分設定。其他內容都會同步。"
+          }
+        }
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@. Everything else syncs." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud. The placeholder lists pinned tabs or favorites too big for an iCloud record (a very long data: address, say), like “1 pinned tab”.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zu groß für iCloud, daher nur auf diesem Mac: %@. Alles andere wird synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que no cabe en iCloud se queda solo en este Mac: %@. Todo lo demás se sincroniza."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui ne tient pas dans iCloud reste seulement sur ce Mac : %@. Tout le reste est synchronisé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciò che non entra in iCloud resta solo su questo Mac: %@. Tutto il resto viene sincronizzato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudには大きすぎるため、このMacにだけ残る項目：%@。それ以外はすべて同期されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 비해 너무 커서 이 Mac에만 남는 항목: %@. 나머지는 모두 동기화됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat niet in iCloud past, blijft alleen op deze Mac: %@. Al het andere wordt gesynchroniseerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To, co nie mieści się w iCloud, zostaje tylko na tym Macu: %@. Cała reszta jest synchronizowana."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que não cabe no iCloud fica só neste Mac: %@. Todo o resto é sincronizado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хранится только на этом Mac, так как слишком велико для iCloud: %@. Всё остальное синхронизируется."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud için çok büyük olduğundan yalnızca bu Mac’te kalanlar: %@. Geri kalan her şey eşzamanlanır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "因为对 iCloud 来说太大，只保留在这台 Mac 上：%@。其他内容都会同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "因為對 iCloud 來說太大，只保留在這台 Mac 上：%@。其他內容都會同步。"
           }
         }
       }
@@ -4207,6 +4622,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在更新…"
+          }
+        }
+      }
+    },
+    "Vim keys" : {
+      "comment" : "A setting in Settings › Tabs: Control with H, J, K and L move between tabs and spaces, as in the Vim editor. Also named in Settings › Shortcuts when these keys are tried for something else.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim-Tasten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teclas de Vim"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touches Vim"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tasti Vim"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vimキー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim 키"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim-toetsen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klawisze Vim"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teclas do Vim"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиши Vim"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim tuşları"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim 键位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vim 按鍵"
           }
         }
       }
@@ -150908,7 +151406,7 @@
       }
     },
     "Show in Finder" : {
-      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Export Your Data: shows the saved files in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
+      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Export Your Data: shows the saved files in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton in the toast after Sync with iCloud brought an older library up to date: shows the backup of the older copy in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -198921,6 +199419,89 @@
         }
       }
     },
+    "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc" : {
+      "comment" : "Words that find the Vim keys setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl steuerung j k h l tastatur navigation nächster vorheriger tab space arc"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l teclado navegación siguiente anterior pestaña espacio arc"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl contrôle control ctrl j k h l clavier navigation suivant précédent onglet espace arc"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l tastiera navigazione successivo precedente pannello spazio arc"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc キーボード 移動 次 前 タブ スペース"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc 컨트롤 키보드 탐색 다음 이전 탭 스페이스"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l toetsenbord navigatie volgende vorige tabblad space arc"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l klawiatura nawigacja następna poprzednia karta przestrzeń arc"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l teclado navegação próxima anterior aba espaço arc"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l клавиатура навигация следующая предыдущая вкладка пространство arc"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l klavye gezinme sonraki önceki sekme space arc"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l 键盘 导航 下一个 上一个 标签页 空间 arc"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vim hjkl control ctrl j k h l 鍵盤 導覽 下一個 上一個 分頁 空間 arc"
+          }
+        }
+      }
+    },
     "web app dock install application" : {
       "comment" : "Words that find Installed Apps with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -201925,6 +202506,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按住 ⇧ 點一下可輸入縮放比例"
+          }
+        }
+      }
+    },
+    "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys." : {
+      "comment" : "Explanation under “Vim keys” in Settings › Tabs. ⌃ is the Control key.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J und ⌃K gehen in der Seitenleiste nach unten und oben, und in der Liste der Befehlsleiste, solange sie offen ist. ⌃H und ⌃L gehen zum vorherigen und nächsten Space. Seiten und Textfelder erhalten diese Tasten nicht mehr."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J y ⌃K bajan y suben por la barra lateral, y por la lista de la barra de comandos mientras está abierta. ⌃H y ⌃L van al espacio anterior y al siguiente. Las páginas y los campos de texto dejan de recibir estas teclas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J et ⌃K parcourent la barre latérale vers le bas et vers le haut, ainsi que la liste de la barre de commandes lorsqu’elle est ouverte. ⌃H et ⌃L passent à l’espace précédent et suivant. Les pages et les champs de texte ne reçoivent plus ces touches."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J e ⌃K scorrono la barra laterale verso il basso e verso l’alto, e l’elenco della barra dei comandi quando è aperta. ⌃H e ⌃L passano allo spazio precedente e successivo. Le pagine e i campi di testo non ricevono più questi tasti."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃Jと⌃Kではサイドバーを、コマンドバーが開いているときはそのリストを上下に移動します。⌃Hと⌃Lでは前と次のスペースに移動します。ページやテキストフィールドではこれらのキーが使えなくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J 및 ⌃K는 사이드바에서, 명령 막대가 열려 있으면 그 목록에서 아래와 위로 이동합니다. ⌃H 및 ⌃L은 이전 및 다음 스페이스로 이동합니다. 페이지와 텍스트 필드는 더 이상 이 키를 받지 않습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Met ⌃J en ⌃K ga je omlaag en omhoog in de navigatiekolom, en in de lijst van de opdrachtbalk als die open is. Met ⌃H en ⌃L ga je naar de vorige en volgende space. Pagina’s en tekstvelden krijgen deze toetsen niet meer."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J i ⌃K przechodzą w dół i w górę paska bocznego, a gdy pasek poleceń jest otwarty — po jego liście. ⌃H i ⌃L przechodzą do poprzedniej i następnej przestrzeni. Strony i pola tekstowe nie otrzymują już tych klawiszy."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J e ⌃K descem e sobem pela barra lateral e pela lista da barra de comandos enquanto ela estiver aberta. ⌃H e ⌃L vão para o espaço anterior e o próximo. Páginas e campos de texto deixam de receber essas teclas."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J и ⌃K перемещают вниз и вверх по боковому меню, а пока открыта командная панель — по её списку. ⌃H и ⌃L переходят к предыдущему и следующему пространству. Страницы и текстовые поля больше не получают эти клавиши."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J ve ⌃K kenar çubuğunda, Komut Çubuğu açıkken de onun listesinde aşağı ve yukarı gider. ⌃H ve ⌃L önceki ve sonraki Space’e gider. Sayfalar ve metin alanları artık bu tuşları almaz."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J 和 ⌃K 在边栏里上下移动，命令栏打开时则在它的列表里移动。⌃H 和 ⌃L 前往上一个和下一个空间。网页和文本框不再收到这些按键。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃J 和 ⌃K 在側邊欄裡上下移動，指令列開啟時則在它的清單裡移動。⌃H 和 ⌃L 前往上一個和下一個空間。網頁和文字欄位不再收到這些按鍵。"
           }
         }
       }

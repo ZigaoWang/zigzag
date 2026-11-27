@@ -9,14 +9,16 @@ import Testing
 /// The private database's zone as CloudKit keeps it: each record with a change tag, saves that name a stale tag
 /// refused, and a change log each Mac reads from where it left off.
 @MainActor final class FakeCloud {
-    struct Stored { var type: String; var payload: Data; var modified: Date; var tag: Int }
+    struct Stored { var type: String; var payload: Data; var modified: Date; var tag: Int; var server: Date }
     private(set) var records: [String: Stored] = [:]
     private var log: [String] = []
     private var tags = 0
+    /// iCloud's own clock: when it last saved something. It only goes forward.
+    private var lastSave = Date(timeIntervalSince1970: 1_800_000_000)
 
     func remote(_ name: String) -> SyncRemote? {
         records[name].map { SyncRemote(name: name, type: $0.type, payload: $0.payload, modified: $0.modified, systemFields: Data(String($0.tag).utf8),
-                                       serverModified: Date(timeIntervalSince1970: 1_800_000_000 + Double($0.tag) / 1000)) }
+                                       serverModified: $0.server) }
     }
 
     enum Saved { case saved(SyncRemote), failed(SyncSaveFailure) }
@@ -24,15 +26,25 @@ import Testing
     /// iCloud's copy reset (its encryption keys): the zone is there, empty.
     func reset() { records = [:] }
 
-    /// The zone was removed (Remove from iCloud on another Mac).
-    func removeZone() {
+    /// The zone was removed: Remove from iCloud on another Mac (`.deleted`), or its keys reset (`.encryptedDataReset`).
+    func removeZone(reason: CKDatabase.DatabaseChange.Deletion.Reason = .deleted) {
         records = [:]
         zoneRemoved = true
+        deletion = reason
     }
+    /// Why the zone went, as the database's changes say.
+    private(set) var deletion: CKDatabase.DatabaseChange.Deletion.Reason?
     private(set) var zoneRemoved = false
 
+    /// The zone made again, by the first sync after a reset.
+    func makeZoneAgain() {
+        zoneRemoved = false
+        deletion = nil
+    }
+
+    /// `at`: the time it really is, as iCloud's clock has it; without one, the record's own date.
     @discardableResult
-    func save(_ upload: SyncUpload) -> Saved {
+    func save(_ upload: SyncUpload, at: Date? = nil) -> Saved {
         if zoneRemoved { return .failed(.zoneMissing) }
         let tag = upload.systemFields.flatMap { Int(String(decoding: $0, as: UTF8.self)) }
         if let current = records[upload.name] {
@@ -41,7 +53,8 @@ import Testing
             return .failed(.gone)
         }
         tags += 1
-        records[upload.name] = Stored(type: upload.type, payload: upload.payload, modified: upload.modified, tag: tags)
+        lastSave = max(lastSave.addingTimeInterval(0.001), at ?? upload.modified)
+        records[upload.name] = Stored(type: upload.type, payload: upload.payload, modified: upload.modified, tag: tags, server: lastSave)
         log.append(upload.name)
         return .saved(remote(upload.name)!)
     }
@@ -102,6 +115,8 @@ import Testing
     private(set) var deletes: [String] = []
     private(set) var sent = 0
     var clock = Date(timeIntervalSince1970: 1_800_000_000)
+    /// How far ahead of the real time this Mac's clock runs.
+    var skew: TimeInterval = 0
 
     init(_ cloud: FakeCloud, _ library: SyncLibrary, clock: Date = Date(timeIntervalSince1970: 1_800_000_000), state: SyncState = SyncState()) {
         self.cloud = cloud
@@ -111,6 +126,17 @@ import Testing
         session.server = self
         session.now = { [unowned self] in self.clock }
     }
+
+    /// The engine an `ICloudSync` under test connects with, for its own session, on the real clock.
+    init(_ cloud: FakeCloud, engineFor session: SyncSession, host: MemoryHost) {
+        self.cloud = cloud
+        self.host = host
+        self.session = session
+        realTime = true
+    }
+    private var realTime = false
+    /// Asking the database why the zone is gone fails this many times, as offline.
+    var whyFails = 0
 
     var library: SyncLibrary {
         get { host.library }
@@ -159,7 +185,7 @@ import Testing
         }
         guard scope == .zone || pushed else { return }
         pushed = false
-        if zoneMissing { throw CKError(.zoneNotFound) }
+        if zoneMissing || cloud.zoneRemoved { throw CKError(.zoneNotFound) }
         read()
         if session.state.merged { session.fetchFinished() }
     }
@@ -180,29 +206,80 @@ import Testing
         let all = token == 0
         token = changes.token
         session.fetched(changes.records, deleted: all ? [] : changes.deleted)
-        if all { session.readAll(Set(changes.records.map(\.name))) }
+        if all { session.readAll(Set(changes.records.map(\.name)), startedAt: clock) }
     }
 
     func send() {
         let names = saves, gone = deletes
+        let sentAt = realTime ? Date() : clock
         saves = []
         deletes = []
         var saved: [SyncRemote] = []
         for name in names {
             guard let upload = session.upload(name) else { continue }
             sent += 1
-            switch cloud.save(upload) {
+            switch cloud.save(upload, at: realTime ? Date() : clock - skew) {
             case .saved(let record): saved.append(record)
             case .failed(let failure): session.saveFailed(name, failure)
             }
         }
-        session.saved(saved)
+        session.saved(saved, sentAt: sentAt)
         var removed: [String] = []
         for name in gone {
             if cloud.delete(name) { removed.append(name) } else { session.deleteFailed(name, .gone) }
         }
         session.deleted(removed)
     }
+}
+
+/// As CKSyncEngine for an `ICloudSync` under test: a first sync makes the zone, as its saveZone does.
+extension FakeMac: SyncEngine {
+    var serialization: Data? { nil }
+    func start() { if !session.state.merged { cloud.makeZoneAgain() } }
+    func stop() {}
+    func zoneDeletion() async throws -> CKDatabase.DatabaseChange.Deletion.Reason? {
+        if whyFails > 0 {
+            whyFails -= 1
+            throw CKError(.networkUnavailable)
+        }
+        return cloud.deletion
+    }
+}
+
+/// iCloud for an `ICloudSync` under test: an account signed in, its private database, and the engines it made.
+@MainActor final class FakeICloud: SyncCloud {
+    /// Each account's private database.
+    var clouds: [String: FakeCloud]
+    var account: String
+    var status: CKAccountStatus = .available
+    let host: MemoryHost
+    private(set) var engines: [FakeMac] = []
+
+    init(_ cloud: FakeCloud, account: String = "_abc", library: SyncLibrary) {
+        clouds = [account: cloud]
+        self.account = account
+        host = MemoryHost(library)
+    }
+
+    var cloud: FakeCloud {
+        if let cloud = clouds[account] { return cloud }
+        let cloud = FakeCloud()
+        clouds[account] = cloud
+        return cloud
+    }
+
+    var isEntitled: Bool { true }
+    func accountStatus() async throws -> CKAccountStatus { status }
+    func userRecordName() async throws -> String { account }
+
+    func engine(for session: SyncSession, owner: ICloudSync) -> SyncEngine {
+        let engine = FakeMac(cloud, engineFor: session, host: host)
+        engines.append(engine)
+        return engine
+    }
+
+    func removeZone() async throws { cloud.removeZone(reason: .deleted) }
+    func receivePushes(_ on: Bool) {}
 }
 
 // MARK: - Libraries to sync
@@ -597,6 +674,74 @@ extension SyncLibrary {
         #expect(b.library.titles(in: "Personal") == ["Newer"])
     }
 
+    @Test func aMacWhoseClockRunsAheadDoesntWinALaterEdit() {
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        // B's clock runs an hour fast. B renames the page, then A renames it a minute later.
+        b.skew = 3600
+        b.clock = a.clock + 3600
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "From B" } }
+        b.sync()
+        a.clock = b.clock - 3600 + 60
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "From A, later" } }
+        a.sync(); b.sync(); a.sync()
+        #expect(a.library.titles(in: "Personal") == ["From A, later"])
+        #expect(b.library.titles(in: "Personal") == ["From A, later"])
+        // B edits offline; A edits a minute later and sends first. B's own clock doesn't make its earlier edit win.
+        b.online = false
+        b.clock += 120
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "B, offline" } }
+        a.clock = b.clock - 3600 + 60
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "A, a minute after" } }
+        a.sync()
+        b.online = true
+        b.sync(); a.sync()
+        #expect(a.library.titles(in: "Personal") == ["A, a minute after"])
+        #expect(b.library.titles(in: "Personal") == ["A, a minute after"])
+        // A later edit on B still wins.
+        b.clock = a.clock + 3600 + 60
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "B, later still" } }
+        b.sync(); a.sync()
+        #expect(a.library.titles(in: "Personal") == ["B, later still"])
+        // Preferences the same way, key by key.
+        b.clock += 60
+        b.edit { $0.settings["ReaderSize"] = .int(14) }
+        b.sync()
+        a.clock = b.clock - 3600 + 60
+        a.edit { $0.settings["ReaderSize"] = .int(22) }
+        a.sync(); b.sync(); a.sync()
+        #expect(a.library.settings["ReaderSize"] == .int(22))
+        #expect(b.library.settings["ReaderSize"] == .int(22))
+    }
+
+    @Test func aStallAfterASaveIsntTakenForAFastClock() throws {
+        let (cloud, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        // A's send goes up, then the Mac sleeps 8 hours before it hears back.
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "before the lid closed" } }
+        let sentAt = a.clock
+        let page = try #require(pageName(a, "a"))
+        guard let upload = a.session.upload(page), case .saved(let record) = cloud.save(upload, at: sentAt) else { Issue.record("not saved"); return }
+        a.clock += 8 * 3600
+        a.session.saved([record], sentAt: sentAt)
+        #expect(a.session.state.clockAhead == nil)
+        // Its next edit is dated as it was made.
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "after waking" } }
+        #expect(a.session.state.base[page]?.modified == a.clock)
+        // A clock that really runs an hour ahead is still found, from when the send started.
+        a.clock += 60
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "an hour ahead" } }
+        let ahead = a.clock
+        guard let again = a.session.upload(page), case .saved(let fast) = cloud.save(again, at: ahead - 3600) else { Issue.record("not saved"); return }
+        a.session.saved([fast], sentAt: ahead)
+        #expect(a.session.state.clockAhead.map { abs($0 - 3600) < 1 } == true)
+        // One that would be months ahead is no guide, and a correction never dates an edit before iCloud's last save.
+        a.session.updateState { $0.clockAhead = 90 * 86400 }
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "months ahead" } }
+        #expect(a.session.state.base[page]?.modified == a.clock)
+        a.session.updateState { $0.clockAhead = 10 * 3600 }
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "corrected too far" } }
+        #expect(a.session.state.base[page]?.modified == fast.serverModified)
+    }
+
     @Test func aMoveAndAnInsertAtOnceBothKeepTheirPlaces() {
         let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", ["1", "2", "3", "4", "5"].map { Sample.page($0) })]))
         // A drags 5 to the top; B pins a new page between 2 and 3.
@@ -876,8 +1021,9 @@ extension SyncLibrary {
     }
 
     @Test func onlyPreferencesTravelNeverWhatIsAboutThisMac() {
-        let defaults = UserDefaults(suiteName: "SyncTests-\(UUID().uuidString)")!
-        defer { defaults.removePersistentDomain(forName: defaults.description) }
+        let suite = "SyncTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removeScratchSuite(suite) }
         for (key, value) in ["ReaderSize": 18, "DownloadFolder": "/Users/me/Downloads", "BetaUpdates": true, "SUAutomaticallyUpdate": false,
                              "MiniWindowSize": "{300, 200}", "SidebarWidth": 260, "LaunchCount": 9, "DebugNoAutoplay": true, "MCPPort": 8000,
                              "AllowsAIApps": true, "TrustedCertificates": ["a": "b"], "SyncWithICloud": true, "AppleLanguages": ["de"]] as [String: Any] {
@@ -893,6 +1039,42 @@ extension SyncLibrary {
         let work = UUID()
         #expect(SyncPreferences.owner("ExtensionsOffSites.\(work.uuidString)") == (true, work))
         #expect(SyncPreferences.owner("PasswordsManager").carried == false)
+    }
+
+    @Test func aSyncedPreferenceTakesEffectAsAChangeHereDoes() throws {
+        // Every carried preference is either read where it's used or has its setter's effect done on a synced write.
+        let carried = SyncPreferences.keys.union(SyncPreferences.profileKeys.map(\.rawValue))
+        let listed = SyncedPreferenceEffects.readWhenUsed.union(SyncedPreferenceEffects.keysWithEffects)
+        #expect(listed == carried, "\(carried.symmetricDifference(listed).sorted())")
+        #expect(SyncedPreferenceEffects.readWhenUsed.isDisjoint(with: SyncedPreferenceEffects.keysWithEffects))
+        // Through the write sync uses, as another Mac's change arrives.
+        let keys = ["SiteBoosts", "borderlessPage", "DarkPagesOnSites", "FullScreenFills", "TranslateNeverSites", "DevelopmentSites", "BlockAdsAndTrackers"]
+        let saved = keys.map { ($0, UserDefaults.standard.object(forKey: $0)) }
+        defer { for (key, value) in saved { if let value { UserDefaults.standard.set(value, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } } }
+        var seen: [String: Int] = [:]
+        let tokens = [SiteCompatibility.changed.observe { seen["compatibility", default: 0] += 1 },
+                      ContentBlocker.changed.observe { seen["blocker", default: 0] += 1 },
+                      DarkPages.changed.observe { seen["dark", default: 0] += 1 },
+                      PageFullScreen.changed.observe { seen["full screen", default: 0] += 1 },
+                      PageTranslator.choicesChanged.observe { seen["translate", default: 0] += 1 },
+                      DeveloperTools.changed.observe { seen["developer", default: 0] += 1 }]
+        let observer = NotificationCenter.default.addObserver(forName: BrowserRootView.borderlessChanged, object: nil, queue: nil) { _ in
+            MainActor.assumeIsolated { seen["borderless", default: 0] += 1 }
+        }
+        defer { NotificationCenter.default.removeObserver(observer); _ = tokens }
+        let site = "sync-effects.example"
+        let boosts = SettingValue.data(try JSONEncoder().encode([site: SiteBoost(compatible: true)]))
+        let changes: [String: SettingValue?] = ["SiteBoosts": boosts, "borderlessPage": .bool(false), "DarkPagesOnSites": .array([.string(site)]),
+                                                "FullScreenFills": .string("window"), "TranslateNeverSites": .array([.string(site)]),
+                                                "DevelopmentSites": .array([.string(site)]), "BlockAdsAndTrackers": .bool(false)]
+        AppSyncHost.writePreferences(changes)
+        #expect(SiteCompatibility.isOn(site: site))
+        for effect in ["compatibility", "blocker", "dark", "full screen", "translate", "developer", "borderless"] {
+            #expect(seen[effect] == 1, "\(effect): \(seen[effect] ?? 0)")
+        }
+        // The same values again change nothing, and do nothing.
+        AppSyncHost.writePreferences(changes)
+        #expect(seen.values.allSatisfy { $0 == 1 }, "\(seen)")
     }
 
     @Test func permissionsPasswordFillingAndCookieClearingStayOnEachMac() {
@@ -912,7 +1094,65 @@ extension SyncLibrary {
 
     // MARK: Account and settling
 
-    @Test func anotherAccountIsNeverSyncedWithoutAsking() {
+    @Test func aFailedCheckOfWhyTheZoneIsGoneLeavesSyncOn() async throws {
+        let cloud = FakeCloud()
+        let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        // The zone is gone, and asking the database why fails (offline): no answer, so nothing is decided.
+        cloud.removeZone(reason: .deleted)
+        try #require(fake.engines.last).whyFails = 1
+        await sync.catchUp()
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(sync.isOn && sync.hasCopy && sync.status == .offline, "\(sync.status)")
+        #expect(sync.retry.isWaiting)
+        #expect(fake.host.library.urls(in: "Personal") == ["a"])
+        // Asked again, it gets its answer: removed, so sync turns off here.
+        await sync.catchUp()
+        #expect(await settled { !sync.isOn }, "\(sync.status)")
+        #expect(sync.status == .removedElsewhere)
+    }
+
+    /// CloudEngine's own question: the deletion the database's changes bring while it asks is the answer, not acted on.
+    @Test func whyTheZoneIsGoneIsTheDeletionTheDatabaseBrings() async throws {
+        let watch = SyncZoneDeletionWatch()
+        // Not asking: acted on at once.
+        #expect(!watch.noted(.deleted))
+        var noted: Bool?
+        #expect(try await watch.ask { noted = watch.noted(.encryptedDataReset) } == .encryptedDataReset)
+        #expect(noted == true && !watch.isAsking)
+        // Nothing brought: removed, as a definite answer.
+        #expect(try await watch.ask {} == nil)
+        // The fetch failed: no answer, unless the deletion came first.
+        await #expect(throws: CKError.self) { try await watch.ask { throw CKError(.networkUnavailable) } }
+        #expect(try await watch.ask { _ = watch.noted(.purged); throw CKError(.networkUnavailable) } == .purged)
+        #expect(!watch.isAsking && !watch.noted(.deleted))
+    }
+
+    @Test func anotherAccountIsNeverSyncedWithoutAsking() async {
+        let cloud = FakeCloud()
+        let fake = FakeICloud(cloud, account: "_abc", library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        // Signed in to another account: sync stops and says so, and nothing goes to that account.
+        fake.account = "_xyz"
+        sync.accountChanged()
+        #expect(await settled { sync.status == .otherAccount }, "\(sync.status)")
+        fake.host.library.editSpace("Personal") { $0.bookmarks.append(Sample.page("after")) }
+        await sync.catchUp()
+        try? await Task.sleep(for: .milliseconds(1200))
+        #expect(fake.cloud.records.isEmpty && sync.isOn && sync.status == .otherAccount)
+        #expect(pages(cloud) == ["a"])
+        // Only once turned off and on again, as asked, it merges with that account.
+        sync.turnOff()
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        #expect(pages(fake.cloud) == ["a", "after"])
+        #expect(pages(cloud) == ["a"])
         #expect(ICloudSync.mayUse(account: "_abc", saved: nil))
         #expect(ICloudSync.mayUse(account: "_abc", saved: "_abc"))
         #expect(!ICloudSync.mayUse(account: "_xyz", saved: "_abc"))
@@ -1046,7 +1286,7 @@ extension SyncLibrary {
     @Test func anUnrelatedDefaultsChangeSendsNothing() throws {
         let (_, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
         let defaults = try #require(UserDefaults(suiteName: "SyncTests.unrelated"))
-        defer { defaults.removePersistentDomain(forName: "SyncTests.unrelated") }
+        defer { defaults.removeScratchSuite("SyncTests.unrelated") }
         var carried = SyncPreferences.read(from: defaults, profiles: [])
         defaults.set("{{0, 0}, {800, 600}}", forKey: "NSWindow Frame main")
         #expect(!ICloudSync.carriedPreferencesChanged(&carried, now: SyncPreferences.read(from: defaults, profiles: [])))
@@ -1094,8 +1334,9 @@ extension SyncLibrary {
             let settings = SettingsView(pane: .general)
             settings.frame = NSRect(x: 0, y: 0, width: 900, height: 700)
             window.contentView?.addSubview(settings)
-            for (name, status, isOn, hasCopy) in SyncSettingsRows.everyStatus {
-                settings.syncRows.show(status, isOn: isOn, hasCopy: hasCopy)
+            let tooBig = SyncSettingsRows.everyTooBig.map { ($0.name, ICloudSync.Status.synced(Date()), true, true, $0.tooBig) }
+            for (name, status, isOn, hasCopy, big) in SyncSettingsRows.everyStatus.map({ ($0.name, $0.status, $0.isOn, $0.hasCopy, SyncTooBig()) }) + tooBig {
+                settings.syncRows.show(status, isOn: isOn, hasCopy: hasCopy, tooBig: big)
                 settings.needsLayout = true
                 settings.layoutSubtreeIfNeeded()
                 let rows = settings.syncRows
@@ -1138,6 +1379,121 @@ extension SyncLibrary {
         #expect(a.sent == sentA && b.sent == sentB)
     }
 
+    /// Preferences of about this many bytes in the record, named by `tag`.
+    private func sized(_ bytes: Int, _ tag: String) -> SettingValue {
+        let one = "\(tag)-0000-with-a-long-name.example.com".utf8.count + 3
+        return .array((0..<(bytes / one)).map { .string("\(tag)-\(String(format: "%04d", $0))-with-a-long-name.example.com") })
+    }
+
+    /// Settled: syncing again and again sends nothing more from either Mac.
+    private func settledSettings(_ a: FakeMac, _ b: FakeMac) -> Bool {
+        let sentA = a.sent, sentB = b.sent
+        for _ in 0..<3 { a.sync(); b.sync() }
+        return a.sent == sentA && b.sent == sentB
+    }
+
+    private func settingsRecord(_ cloud: FakeCloud) -> SyncSettings? {
+        guard case .settings(let settings)? = cloud.remote(SyncName.settings).map({ SyncBody.decode(type: $0.type, payload: $0.payload) }) else { return nil }
+        return settings
+    }
+
+    /// Five site lists of about 190 KB each: each under what a value may be, together over what a record holds.
+    private func overTheLimit(_ tag: String, _ keys: [String] = ["DarkPagesOnSites", "DarkPagesOffSites", "CookieBannersHandledSites", "TranslateNeverSites", "UserAgentSites"]) -> [String: SettingValue] {
+        Dictionary(uniqueKeysWithValues: keys.map { ($0, sized(190_000, tag + $0)) })
+    }
+
+    @Test func settingsOverTheLimitArentSentAndPinsStillSync() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])],
+                                                   settings: ["ReaderSize": .int(16), "ReaderTheme": .string("sepia")]))
+        let big = overTheLimit("a-")
+        for value in big.values { #expect(!SyncPreferences.isTooBig(value)) }
+        let before = try #require(cloud.records[SyncName.settings]).tag
+        // A's preferences go over what one record holds: the record isn't sent, and Settings says so.
+        a.edit { $0.settings.merge(big) { $1 } }
+        a.sync(); b.sync()
+        #expect(cloud.records[SyncName.settings]?.tag == before)
+        #expect(a.session.tooBig.settings && b.session.tooBig.isEmpty)
+        let line = SyncSettingsRows.describe(.synced(a.clock), hasCopy: true, tooBig: a.session.tooBig).detail
+        #expect(line == String(localized: "Settings are too big to sync from this Mac. Pins and spaces still sync.",
+                               comment: "Under “Last synced” in Settings › General › Sync with iCloud, when this Mac's preferences together are more than an iCloud record holds (styles or icons for thousands of sites, say), so they aren't sent; pinned tabs, spaces, folders and favorites still sync, and other Macs' settings still arrive."))
+        // Nothing is unset anywhere, and B keeps its values.
+        #expect(settingsRecord(cloud)?.values.values.allSatisfy { $0.value != nil } == true)
+        #expect(b.library.settings["ReaderSize"] == .int(16) && b.library.settings["ReaderTheme"] == .string("sepia"))
+        // Pins still sync, and B's changes still arrive here: a new value, and one set back to its default.
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("pinned while over")) } }
+        b.edit { $0.settings["ReaderSize"] = .int(20); $0.settings["ReaderTheme"] = nil }
+        a.sync(); b.sync(); a.sync()
+        #expect(b.library.urls(in: "Personal") == ["a", "pinned while over"])
+        #expect(a.library.settings["ReaderSize"] == .int(20) && a.library.settings["ReaderTheme"] == nil)
+        for (key, value) in big { #expect(a.library.settings[key] == value, "\(key)") }
+        #expect(settledSettings(a, b))
+        // Once it fits again, the next change syncs as usual, and nothing older goes over B's newer edits.
+        a.edit { for key in big.keys { $0.settings[key] = nil } }
+        a.edit { $0.settings["ReaderWidth"] = .int(3) }
+        a.sync(); b.sync(); a.sync()
+        #expect(!a.session.tooBig.settings)
+        for mac in [a, b] {
+            #expect(mac.library.settings["ReaderWidth"] == .int(3))
+            #expect(mac.library.settings["ReaderSize"] == .int(20) && mac.library.settings["ReaderTheme"] == nil)
+        }
+        #expect(settledSettings(a, b))
+    }
+
+    /// Two Macs offline, each adding its own, then meeting: together over what one record holds.
+    @Test func twoMacsOverTheLimitTogetherLoseNothing() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal")], settings: ["ReaderSize": .int(16)]))
+        let ofA = overTheLimit("a-", ["DarkPagesOnSites", "DarkPagesOffSites"]).merging(["CookieBannersHandledSites": sized(80_000, "a-banners")]) { $1 }
+        let ofB = overTheLimit("b-", ["AdsAllowedSites", "CookieBannersLeftSites"]).merging(["KeepAwakeSites": sized(80_000, "b-awake")]) { $1 }
+        a.online = false
+        b.online = false
+        a.edit { $0.settings.merge(ofA) { $1 } }
+        b.edit { $0.settings.merge(ofB) { $1 } }
+        a.online = true
+        b.online = true
+        for _ in 0..<3 { a.sync(); b.sync() }
+        // A's went up; B's, together with them, don't fit, and B says so. No Mac loses a value of its own.
+        #expect((cloud.records[SyncName.settings]?.payload.count ?? 0) <= SyncSession.largestPayload)
+        #expect(b.session.tooBig.settings)
+        for (key, value) in ofA { #expect(a.library.settings[key] == value && b.library.settings[key] == value, "\(key)") }
+        for (key, value) in ofB { #expect(b.library.settings[key] == value, "\(key)") }
+        #expect(settingsRecord(cloud)?.values.values.allSatisfy { $0.value != nil } == true)
+        // A's later changes still reach B.
+        a.edit { $0.settings["ReaderSize"] = .int(22) }
+        a.sync(); b.sync()
+        #expect(b.library.settings["ReaderSize"] == .int(22))
+        #expect(settledSettings(a, b))
+    }
+
+    /// A Mac over the limit with its own values still takes another Mac's smaller one.
+    @Test func aSmallerValueFromAnotherMacIsTakenWhileOverTheLimit() {
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal")], settings: ["DarkPagesOnSites": sized(185_000, "dark")]))
+        b.edit { $0.settings.merge(overTheLimit("b-", ["AdsAllowedSites", "CookieBannersLeftSites", "KeepAwakeSites", "JavaScriptOffSites"])) { $1 } }
+        b.sync(); a.sync()
+        #expect(b.session.tooBig.settings)
+        let smaller = sized(67_000, "dark")
+        a.edit { $0.settings["DarkPagesOnSites"] = smaller }
+        a.sync(); b.sync(); a.sync(); b.sync()
+        #expect(b.library.settings["DarkPagesOnSites"] == smaller && a.library.settings["DarkPagesOnSites"] == smaller)
+        #expect(settledSettings(a, b))
+    }
+
+    @Test func aRemovalsRecordTooBigIsntSentAndRemovalsStillArrive() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        // Thousands removed lately, more notes than one record holds.
+        let old = Dictionary(uniqueKeysWithValues: (0..<20_000).map { (SyncName.page(UUID()), a.clock - Double(20_000 - $0)) })
+        a.session.updateState { $0.base[SyncName.removals] = SyncItem(.removals(SyncRemovals(names: old)), modified: a.clock) }
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeAll { $0.url.lastPathComponent == "b" } } }
+        a.sync(); b.sync()
+        #expect((cloud.records[SyncName.removals]?.payload.count ?? 0) <= SyncSession.largestPayload)
+        #expect(a.session.tooBig.other && !a.session.tooBig.settings)
+        #expect(!SyncSettingsRows.describe(.synced(a.clock), hasCopy: true, tooBig: a.session.tooBig).detail.isEmpty)
+        // The removal itself still reaches B, and pins keep syncing.
+        #expect(b.library.urls(in: "Personal") == ["a"])
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("c")) } }
+        a.sync(); b.sync()
+        #expect(b.library.urls(in: "Personal") == ["a", "c"])
+    }
+
     @Test func aRecordTooBigForICloudIsntSentAndStaysHere() {
         let huge = Bookmark(url: URL(string: "data:text/plain," + String(repeating: "a", count: 1_000_000))!, title: "Huge")
         let cloud = FakeCloud()
@@ -1149,6 +1505,37 @@ extension SyncLibrary {
         a.sync(); a.session.localChanged(); a.sync()
         #expect(a.sent == sent)
         #expect(a.library.titles(in: "Personal") == ["a", "Huge"])
+        // Said under the switch.
+        #expect(a.session.tooBig.kinds == [.page: 1])
+        #expect(!SyncSettingsRows.describe(.synced(a.clock), hasCopy: true, tooBig: a.session.tooBig).detail.isEmpty)
+    }
+
+    @Test func theStateIsWrittenOffTheMainThreadInOrder() throws {
+        let pages = (0..<3000).map { Sample.page("p\($0)", "A pinned page with a title about this long \($0)") }
+        let (_, _, b) = twoMacs(Sample.library([Sample.space("Personal", pages)]))
+        // iCloud's own fields for each record, about as big as CloudKit's.
+        b.session.updateState { s in for name in s.systemFields.keys { s.systemFields[name] = Data((0..<550).map { UInt8($0 % 251) }) } }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("SyncTests-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let file = SyncStateFile(url: url)
+        // The main thread only hands a copy over.
+        var slowest: TimeInterval = 0
+        for i in 1...5 {
+            b.session.updateState { $0.fetches = i }
+            let start = Date()
+            file.save(b.session.state)
+            slowest = max(slowest, Date().timeIntervalSince(start))
+        }
+        #expect(slowest < 0.003, "\(Int(slowest * 1000)) ms on the main thread")
+        // In order, none lost: the last asked for is what's there, and one written now lands after those before it.
+        #expect(file.load()?.fetches == 5)
+        b.session.updateState { $0.fetches = 9 }
+        file.save(b.session.state)
+        var off = b.session.state
+        off.fetches = 10
+        #expect(file.saveNow(off))
+        let read = try #require(file.load())
+        #expect(read.fetches == 10 && read.base.count == b.session.state.base.count)
     }
 
     @Test func aThousandPinnedPagesSyncQuickly() {
@@ -1156,14 +1543,19 @@ extension SyncLibrary {
         let start = Date()
         let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", pages)]))
         #expect(b.library.space(named: "Personal")?.bookmarks.count == 1000)
+        let firstSync = Date().timeIntervalSince(start)
         let sent = a.sent
+        let edited = Date()
         a.edit { $0.editSpace("Personal") { $0.bookmarks[500].title = "Changed" } }
         a.sync()
         // One edit sends one record.
         #expect(a.sent == sent + 1)
         b.sync()
         #expect(b.library.space(named: "Personal")?.bookmarks[500].title == "Changed")
-        #expect(Date().timeIntervalSince(start) < 20)
+        // Debug build, both Macs in one process: an edit's round trip in well under a second, both first syncs in a few.
+        let roundTrip = Date().timeIntervalSince(edited)
+        #expect(roundTrip < 0.5, "\(Int(roundTrip * 1000)) ms")
+        #expect(firstSync < 2, "\(Int(firstSync * 1000)) ms")
     }
 
     // MARK: Many removals at once
@@ -1284,6 +1676,31 @@ extension SyncLibrary {
         a.sync(); b.sync()
         #expect(cloud.records.mapValues(\.tag) == records.mapValues(\.tag))
         #expect(a.library.titles(in: "Personal") == ["Since", "b", "c"])
+    }
+
+    @Test func anOlderLibraryIsBackedUpBeforeICloudsVersionIsLaidOut() {
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        let old = a.library
+        a.host.libraryStamp = Date(timeIntervalSince1970: 2_000)
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "Since" } }
+        a.sync(); b.sync()
+        // Library.json put back from an older copy: what it holds is backed up before iCloud's version is laid out.
+        a.host.libraryStamp = Date(timeIntervalSince1970: 1_500)
+        var backedUp: [String]?
+        a.session.onTakingICloud = { backedUp = a.library.titles(in: "Personal") }
+        relaunch(a, with: old)
+        #expect(backedUp == ["a", "b"])
+        #expect(a.library.titles(in: "Personal") == ["Since", "b"])
+        // Nothing to bring up to date: no backup.
+        backedUp = nil
+        relaunch(a, with: a.library)
+        #expect(backedUp == nil)
+        // The toast says it plainly, and where the older copy is when there's one.
+        let backup = URL(fileURLWithPath: "/tmp/Zigzag Backup.zigzag")
+        #expect(ICloudSync.tookICloudToast(backup: backup).action != nil)
+        #expect(ICloudSync.tookICloudToast(backup: nil).action == nil)
+        #expect(ICloudSync.tookICloudToast(backup: backup).text != ICloudSync.tookICloudToast(backup: nil).text)
+        #expect(!ICloudSync.tookICloudToast(backup: nil).text.contains("put back"))
     }
 
     @Test func aMissingProfilesFileIsUnreadableNotEveryProfileRemoved() {
@@ -1470,12 +1887,47 @@ extension SyncLibrary {
     @Test func aSaveFindingTheZoneGoneNeverMakesItAgain() {
         let (cloud, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
         var removed = false
-        a.session.onRemovedElsewhere = { removed = true }
+        a.session.onZoneGone = { removed = true }
         cloud.removeZone()
         a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("b")) } }
         a.sync()
         #expect(removed)
         #expect(a.saves.isEmpty && cloud.records.isEmpty)
+    }
+
+    @Test func aResetASaveFindsFirstIsMergedAgainNotTurnedOff() async throws {
+        // Gone by the user's hand (iCloud's data deleted in System Settings): removed. Gone while off here: merged afresh.
+        // Otherwise a reset and a removal elsewhere both leave the zone not found, and the database's changes say which.
+        #expect(ICloudSync.zoneGone(userDeleted: true, resumed: false) == .removed)
+        #expect(ICloudSync.zoneGone(userDeleted: false, resumed: true) == .reset)
+        #expect(ICloudSync.zoneGone(userDeleted: false, resumed: false) == .askWhy)
+        #expect(ICloudSync.isReset(.encryptedDataReset))
+        #expect(!ICloudSync.isReset(.deleted) && !ICloudSync.isReset(.purged) && !ICloudSync.isReset(nil))
+        for (reason, isReset) in [(CKDatabase.DatabaseChange.Deletion.Reason.encryptedDataReset, true), (.deleted, false)] {
+            let cloud = FakeCloud()
+            let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+            let (sync, done) = makeSync(fake)
+            defer { done() }
+            sync.turnOn()
+            #expect(await settled { isSynced(sync) })
+            // The zone goes, and this Mac's next save finds it gone before any fetch does.
+            cloud.removeZone(reason: reason)
+            let engine = try #require(fake.engines.last)
+            fake.host.library.editSpace("Personal") { $0.bookmarks.append(Sample.page("c")) }
+            engine.session.localChanged()
+            engine.send()
+            if isReset {
+                // A reset: merged again as a first sync, sync still on, nothing twice, nothing lost.
+                #expect(await settled { pages(cloud) == ["a", "b", "c"] }, "\(sync.status) \(pages(cloud))")
+                #expect(sync.isOn && fake.engines.count == 2)
+                #expect(cloud.records.values.filter { $0.type == SyncBody.spaceType }.count == 1)
+            } else {
+                // Removed elsewhere: sync turns off here and says so, keeping everything, and the zone isn't made again.
+                #expect(await settled { !sync.isOn }, "\(sync.status)")
+                #expect(sync.status == .removedElsewhere && cloud.zoneRemoved && cloud.records.isEmpty)
+            }
+            #expect(fake.host.library.urls(in: "Personal") == ["a", "b", "c"])
+        }
     }
 
     @Test func aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing() async throws {
@@ -1488,9 +1940,32 @@ extension SyncLibrary {
     }
 
     @Test func aZoneRemovedAfterTheFirstSyncIsRemovedElsewhereNotTriedAgain() async {
-        let (_, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
-        a.zoneMissing = true
-        await #expect(throws: CKError.self) { try await ICloudSync.catchUp(a.session, through: a) }
+        let cloud = FakeCloud()
+        let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        // Removed from iCloud on another Mac: the next catch-up finds the zone gone, and the database says it was removed.
+        cloud.removeZone(reason: .deleted)
+        await sync.catchUp()
+        #expect(await settled { !sync.isOn }, "\(sync.status)")
+        #expect(sync.status == .removedElsewhere && !sync.hasCopy)
+        // Not tried again, and never made again; everything here stays.
+        #expect(!sync.retry.isWaiting && sync.retry.failures == 0)
+        #expect(cloud.zoneRemoved && cloud.records.isEmpty)
+        #expect(fake.host.library.urls(in: "Personal") == ["a"])
+        // iCloud's copy reset instead, found the same way: merged again as a first sync, and sync stays on.
+        let resetCloud = FakeCloud()
+        let resetFake = FakeICloud(resetCloud, library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let (reset, resetDone) = makeSync(resetFake)
+        defer { resetDone() }
+        reset.turnOn()
+        #expect(await settled { isSynced(reset) })
+        resetCloud.removeZone(reason: .encryptedDataReset)
+        await reset.catchUp()
+        #expect(await settled { !resetCloud.zoneRemoved && pages(resetCloud) == ["a"] }, "\(reset.status)")
+        #expect(reset.isOn && resetFake.host.library.urls(in: "Personal") == ["a"])
         let gone = CKError(.zoneNotFound)
         #expect(ICloudSync.isZoneGone(gone) && ICloudSync.isZoneGone(CKError(.userDeletedZone)))
         #expect(ICloudSync.isZoneGone(CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [ICloudSync.zoneID: gone]])))
@@ -1600,6 +2075,8 @@ extension SyncLibrary {
         let waits = Waits()
         let retry = makeRetry(waits)
         var clock = Date(timeIntervalSince1970: 1_800_000_000)
+    /// How far ahead of the real time this Mac's clock runs.
+    var skew: TimeInterval = 0
         retry.now = { clock }
         var tries = 0
         retry.onRetry = { tries += 1; retry.failed(CKError(.networkUnavailable)) }
@@ -1997,12 +2474,17 @@ extension SyncTests {
         let again = FakeMac(cloud, library, clock: b.clock + 3600, state: ICloudSync.stateTurningOn(saved: off))
         again.session.checkAfterLaunch()
         again.session.requeue()
+        // The full read lists the zone in pages; this Mac's pin goes up between them.
+        let started = again.clock
         let snapshot = cloud.changes(since: 0)
-        again.session.fetched(snapshot.records, deleted: [])
+        again.session.fetched(snapshot.records, deleted: [], startedAt: started)
         again.session.updateState { $0.zoneToken = Data(String(snapshot.token).utf8) }
+        again.clock += 1
         again.send()
-        again.session.readAll(Set(snapshot.records.map(\.name)))
+        again.session.readAll(Set(snapshot.records.map(\.name)), startedAt: started)
         again.session.fetchFinished()
+        // Right after the read, not only once a later fetch brought it back.
+        #expect(again.library.urls(in: "Personal") == ["a", "pinned while off"])
         again.sync(); a.sync()
         #expect(again.library.urls(in: "Personal") == ["a", "pinned while off"])
         #expect(a.library.urls(in: "Personal") == ["a", "pinned while off"])
@@ -2163,6 +2645,7 @@ extension SyncTests {
     @Test func aRemovalFromAMacWhoseClockRunsFastDoesntBeatALaterEdit() throws {
         let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
         b.clock = a.clock + 86400
+        b.skew = 86400
         b.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 1) } }
         a.clock += 60
         a.edit { $0.editSpace("Personal") { $0.bookmarks[1].title = "edited after" } }
@@ -2286,11 +2769,144 @@ extension SyncTests {
         let cloud = FakeCloud()
         let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("y")])]))
         let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("z")])]), clock: Date(timeIntervalSince1970: 1_800_000_000 + SyncSession.claimTimeout + 60))
+        b.skew = SyncSession.claimTimeout + 60
         a.fetch(); b.fetch()
         if let up = a.session.upload(SyncName.claim) { if case .saved(let r) = cloud.save(up) { a.session.saved([r]) } }
         b.send()
         b.sync()
         for _ in 0..<3 { a.sync(); b.sync() }
         #expect(a.library.spaceNames == ["Personal"])
+    }
+}
+
+// MARK: - Zigzag's own sync, on a stand-in for iCloud
+
+extension SyncTests {
+    /// An `ICloudSync` on `fake`, with settings and a State.json of its own; `done` turns it off and clears them.
+    private func makeSync(_ fake: FakeICloud) -> (sync: ICloudSync, done: () -> Void) {
+        let suite = "SyncTests.icloud.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("SyncTests-\(UUID().uuidString).json")
+        let sync = ICloudSync(cloud: fake, host: fake.host, defaults: defaults, stateFile: file)
+        sync.backUpFirst = { file }
+        return (sync, {
+            if sync.isOn { sync.turnOff() }
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: file)
+        })
+    }
+
+    /// Waits, a little at a time, for what `ICloudSync` does in its own tasks.
+    private func settled(_ done: () -> Bool) async -> Bool {
+        for _ in 0..<300 {
+            if done() { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return done()
+    }
+
+    private func isSynced(_ sync: ICloudSync) -> Bool { if case .synced = sync.status { true } else { false } }
+
+    private func pages(_ cloud: FakeCloud) -> [String] {
+        cloud.records.values.filter { $0.type == SyncBody.pageType }.compactMap { record in
+            if case .page(let page) = SyncBody.decode(type: record.type, payload: record.payload) { page.url.lastPathComponent } else { nil }
+        }.sorted()
+    }
+
+    /// A Mac already syncing, and one that turns sync on from Settings.
+    @Test func turningSyncOnAsksFirstThenBacksUpAndMerges() async throws {
+        // The test host's own sync never reaches a real iCloud account.
+        #expect(!CloudKitCloud().isEntitled)
+        let cloud = FakeCloud()
+        let other = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("from iCloud")])]))
+        other.sync()
+        let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("here")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let rows = SyncSettingsRows(sync: sync)
+        window.contentView?.addSubview(rows.row)
+        func sheet() -> ConfirmSheet? { window.contentView?.subviews.compactMap { $0 as? ConfirmSheet }.last }
+        // Turned on, it asks first; Cancel leaves it off, and nothing touches iCloud.
+        rows.toggle.isOn = true
+        rows.toggle.onChange?(true)
+        try #require(sheet()).debugCancel()
+        #expect(!sync.isOn && !rows.toggle.isOn && sync.status == .off)
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(fake.engines.isEmpty && pages(cloud) == ["from iCloud"])
+        // Continue: the backup is saved before anything goes to iCloud, then the first sync merges.
+        var cloudAtBackup: [String]?
+        sync.backUpFirst = { cloudAtBackup = self.pages(cloud); return URL(fileURLWithPath: "/tmp/backup.zigzag") }
+        rows.toggle.isOn = true
+        rows.toggle.onChange?(true)
+        try #require(sheet()).debugConfirm()
+        #expect(sync.isOn && rows.toggle.isOn)
+        #expect(cloudAtBackup == ["from iCloud"])
+        #expect(await settled { isSynced(sync) }, "\(sync.status)")
+        #expect(fake.host.library.urls(in: "Personal").sorted() == ["from iCloud", "here"])
+        #expect(pages(cloud) == ["from iCloud", "here"])
+        #expect(sync.hasCopy)
+        other.sync()
+        #expect(other.library.urls(in: "Personal").sorted() == ["from iCloud", "here"])
+        // Without the backup it stays off, and says so.
+        sync.turnOff()
+        sync.backUpFirst = { nil }
+        sync.turnOn()
+        #expect(!sync.isOn && sync.status == .backupFailed)
+    }
+
+    @Test func turningSyncOffKeepsEverythingHereAndICloudsCopy() async throws {
+        let cloud = FakeCloud()
+        let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        let records = cloud.records.mapValues(\.tag)
+        let library = fake.host.library
+        sync.turnOff()
+        #expect(!sync.isOn && sync.status == .off && sync.hasCopy)
+        // Changes here while off go nowhere.
+        fake.host.library.editSpace("Personal") { $0.bookmarks.append(Sample.page("while off")) }
+        try? await Task.sleep(for: .milliseconds(1200))
+        #expect(cloud.records.mapValues(\.tag) == records)
+        #expect(fake.host.library.urls(in: "Personal") == library.urls(in: "Personal") + ["while off"])
+        // On again, it keeps what changed here and adds nothing twice.
+        sync.turnOn()
+        #expect(sync.isOn)
+        #expect(await settled { pages(cloud).count == 3 })
+        #expect(pages(cloud) == ["a", "b", "while off"])
+    }
+
+    /// Remove from iCloud on one Mac: iCloud's copy goes for every Mac, and the other Mac turns sync off too.
+    @Test func removeFromICloudRemovesItForEveryMacAndBothKeepTheirOwn() async throws {
+        let cloud = FakeCloud()
+        let fakeA = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let fakeB = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("b")])]))
+        let (a, doneA) = makeSync(fakeA), (b, doneB) = makeSync(fakeB)
+        defer { doneA(); doneB() }
+        a.turnOn()
+        #expect(await settled { isSynced(a) })
+        b.turnOn()
+        #expect(await settled { isSynced(b) })
+        await a.catchUp()
+        #expect(fakeA.host.library.urls(in: "Personal").sorted() == ["a", "b"])
+        #expect(await a.removeFromICloud())
+        #expect(cloud.records.isEmpty && cloud.zoneRemoved)
+        #expect(!a.isOn && !a.hasCopy && a.status == .off)
+        #expect(fakeA.host.library.urls(in: "Personal").sorted() == ["a", "b"])
+        // The other Mac finds it gone at its next catch-up: sync turns off there and says so; it keeps everything.
+        await b.catchUp()
+        #expect(await settled { !b.isOn }, "\(b.status)")
+        #expect(b.status == .removedElsewhere && !b.hasCopy)
+        #expect(fakeB.host.library.urls(in: "Personal").sorted() == ["a", "b"])
+        // Nothing made the zone again.
+        #expect(cloud.records.isEmpty && cloud.zoneRemoved)
+        // Turned on again here, it merges afresh as a first sync, nothing twice.
+        a.turnOn()
+        #expect(await settled { isSynced(a) && !cloud.records.isEmpty })
+        #expect(pages(cloud) == ["a", "b"])
     }
 }

@@ -194,7 +194,7 @@ struct KeepAwakeTests {
         let saved = KeepAwake.defaults
         KeepAwake.defaults = UserDefaults(suiteName: name)!
         defer {
-            KeepAwake.defaults.removePersistentDomain(forName: name)
+            KeepAwake.defaults.removeScratchSuite(name)
             KeepAwake.defaults = saved
         }
         try body()

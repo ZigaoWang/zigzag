@@ -326,7 +326,7 @@ struct SiteOriginPermissionTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try body(defaults)
     }
@@ -448,7 +448,7 @@ struct EmbeddedPermissionTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try body()
     }

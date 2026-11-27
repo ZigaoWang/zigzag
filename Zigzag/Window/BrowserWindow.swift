@@ -108,6 +108,11 @@ final class BrowserWindow: NSWindow {
            controller.switcher.handle(event) {
             return true
         }
+        // Vim keys (Settings › Tabs) come before the menu bar and the page.
+        if let move = VimKeys.move(for: event), let controller = windowController as? BrowserWindowController,
+           controller.handleVimKey(move) {
+            return true
+        }
         if event.charactersIgnoringModifiers?.lowercased() == "z", mods == .command || mods == [.command, .shift] {
             // On a page, the page hears it first, as in Safari and Chrome: web apps (Sheets, Docs, Figma) undo their own
             // document on ⌘Z. One that lets it pass gets it back from WebKit, and then it's Zigzag's: the sidebar's

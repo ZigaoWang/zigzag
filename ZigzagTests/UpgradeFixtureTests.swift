@@ -14,8 +14,7 @@ import Testing
 
     /// A copy to read, as JSONStore sets aside a file it can't read and the fixture must stay.
     private func copy(_ name: String) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("UpgradeFixture-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try FileManager.default.scratchFolder("UpgradeFixture")
         let url = folder.appendingPathComponent(name)
         try FileManager.default.copyItem(at: Self.fixtures.appendingPathComponent(name), to: url)
         return url

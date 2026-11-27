@@ -1548,7 +1548,7 @@ struct TopBarTests {
     @Test func theOldSwitchIsAlwaysAndStillWrittenForAnOlderZigzag() throws {
         let name = "TopBarTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { defaults.removeScratchSuite(name) }
         #expect(BrowserRootView.addressBarPlace(in: defaults) == .off)
         defaults.set(true, forKey: "addressAbovePage")
         #expect(BrowserRootView.addressBarPlace(in: defaults) == .always)

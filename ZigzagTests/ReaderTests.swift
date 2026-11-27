@@ -49,7 +49,9 @@ struct ReaderTests {
     }
 
     @Test func choicesAreRememberedAndStepWithinBounds() throws {
-        let defaults = try #require(UserDefaults(suiteName: "ReaderTests-\(UUID().uuidString)"))
+        let suite = "ReaderTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removeScratchSuite(suite) }
         #expect(Reader.Preferences.load(from: defaults) == Reader.Preferences(size: 20, face: .serif, theme: .auto, width: .medium))
         Reader.Preferences(size: 24, face: .sans, theme: .sepia, width: .wide).save(to: defaults)
         #expect(Reader.Preferences.load(from: defaults) == Reader.Preferences(size: 24, face: .sans, theme: .sepia, width: .wide))
@@ -168,7 +170,9 @@ struct ReaderTests {
 
     /// Space is a theme of its own, saved by name: an older Zigzag that doesn't know it reads Auto.
     @Test func spaceIsSavedAndReachesThePage() throws {
-        let defaults = try #require(UserDefaults(suiteName: "ReaderTests-\(UUID().uuidString)"))
+        let suite = "ReaderTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removeScratchSuite(suite) }
         Reader.Preferences(theme: .space).save(to: defaults)
         #expect(defaults.string(forKey: "ReaderTheme") == "space")
         #expect(Reader.Preferences.load(from: defaults).theme == .space)

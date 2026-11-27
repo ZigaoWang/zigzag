@@ -2272,8 +2272,10 @@ enum DebugBridge {
             debugLog("folderstate \(Library.shared.folders(in: controller.tabManager.currentSpaceID).map { "\($0.name)=\($0.isOpen ? "open" : "shut")" }) loaded=\(Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).filter { controller.tabManager.bookmarkTab(for: $0.id) != nil }.map(\.title)) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "")")
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
         case "syncremove":
-            // syncremove: Remove from iCloud…, in a test copy only, so a live test can start from an empty zone.
+            // syncremove: Remove from iCloud…, in a test copy launched with --sync-with-icloud only, so a live test can
+            // start from an empty zone. The zone is the dev build's own: never removed by a copy that wasn't asked to sync.
             guard ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] != nil else { debugLog("syncremove refused: not a test copy"); break }
+            guard CommandLine.arguments.contains(DevDefaults.syncArgument) else { debugLog("syncremove refused: launched without \(DevDefaults.syncArgument)"); break }
             Task {
                 let removed = await ICloudSync.shared.removeFromICloud()
                 debugLog("syncremove \(removed)")

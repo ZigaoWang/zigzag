@@ -64,6 +64,53 @@ EOF
 fi
 
 pids=()
+# Ends what this run left running, however it ends: only processes whose executable is in this worktree's build, and
+# the helpers launchd started for this run's test hosts (WebKit's too), which it doesn't always end with them.
+products="$PWD/$dd/Build/Products/"
+app="${products}Debug/Zigzag.app"
+hosts="$logs/hosts"
+# Processes whose executable path starts with $1.
+running_from() {
+  ps -axo pid=,comm= | awk -v p="$1" '{ pid = $1; sub(/^ *[0-9]+ /, ""); if (index($0, p) == 1) print pid }'
+}
+in_build() { running_from "$products"; }
+cleanup() {
+  trap - EXIT INT TERM
+  [ -n "${sampler:-}" ] && { kill "$sampler"; wait "$sampler"; } 2>/dev/null
+  [ ${#pids[@]} -gt 0 ] && kill "${pids[@]}" 2>/dev/null
+  left=$(in_build)
+  if [ -n "$left" ]; then
+    kill $left 2>/dev/null
+    sleep 2
+  fi
+  # A host's helpers are the services in its launchd domain, which names the app that made it.
+  for host in $(sort -u "$hosts" 2>/dev/null); do
+    kill -0 "$host" 2>/dev/null && continue
+    launchctl print "pid/$host" 2>/dev/null | awk -v app="$app" '
+      $1 == "originator" { mine = ($3 == app) }
+      /^\tservices = \{/ { on = 1; next }
+      on && /^\t\}/ { on = 0 }
+      on && $1 ~ /^[1-9][0-9]*$/ { services = services " " $1 }
+      END { if (mine && services != "") print services }' | xargs kill -9 2>/dev/null
+    # Suites its tests emptied, which the system wrote out again as it ended (DevDefaults.noteEmptiedSuite).
+    list="$(getconf DARWIN_USER_TEMP_DIR)ZigzagTests-Suites-$host"
+    [ -f "$list" ] || continue
+    while read -r suite; do
+      case "$suite" in ""|*/*|wang.zigao.zigzag*) continue ;; esac
+      file="$HOME/Library/Preferences/$suite.plist"
+      [ "$(plutil -convert json -o - "$file" 2>/dev/null)" = "{}" ] && rm -f "$file"
+    done < "$list"
+    rm -f "$list"
+  done
+  left=$(in_build)
+  [ -n "$left" ] && kill -9 $left 2>/dev/null
+  return 0
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+# The test hosts are gone by the end, so their IDs are noted while they run.
+(while :; do running_from "$app/Contents/MacOS/Zigzag" >> "$hosts"; sleep 1; done) &
+sampler=$!
 for shard in $(ls "$logs" | grep -E '^shard-([0-9]+|pseudo)$' | sed "s|^|$logs/|"); do
   # The pseudo shard's test host starts with every string pseudo-localized.
   case "$shard" in *-pseudo) export TEST_RUNNER_ZIGZAG_PSEUDO_LOCALIZE=1 ;; *) unset TEST_RUNNER_ZIGZAG_PSEUDO_LOCALIZE ;; esac
