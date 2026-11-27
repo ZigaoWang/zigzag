@@ -162,7 +162,7 @@ enum Shortcuts {
     /// these keys are one. They can't be given to anything else, or one of the two would silently stop working.
     static func reserved(_ combo: Combo, in menu: NSMenu? = NSApp.mainMenu) -> String? {
         guard !combo.key.isEmpty else { return nil }
-        if VimKeys.isOn, VimKeys.combos.contains(combo) { return VimKeys.title }
+        if VimKeys.isOn, VimKeys.combos.contains(combo), item(for: combo, in: menu) == nil { return VimKeys.title }
         func walk(_ menu: NSMenu) -> String? {
             for item in menu.items {
                 if let sub = item.submenu, let found = walk(sub) { return found }
@@ -171,6 +171,19 @@ enum Shortcuts {
             return nil
         }
         return menu.flatMap(walk)
+    }
+
+    /// The menu item that answers to these keys, if any.
+    static func item(for combo: Combo, in menu: NSMenu?) -> NSMenuItem? {
+        guard !combo.key.isEmpty, let menu else { return nil }
+        for item in menu.items {
+            if let sub = item.submenu {
+                if let found = self.item(for: combo, in: sub) { return found }
+            } else if !item.isHidden || item.allowsKeyEquivalentWhenHidden, Self.combo(of: item) == combo {
+                return item
+            }
+        }
+        return nil
     }
 
     /// The item that already answers to these keys, other than `item`.
@@ -307,7 +320,8 @@ enum Shortcuts {
 }
 
 /// Settings › Tabs › Vim keys: ⌃J and ⌃K go down and up the sidebar, ⌃H and ⌃L to the previous and next space, beside
-/// the shortcuts those have in the menu bar. Off as Zigzag ships, since pages and text fields use these keys too.
+/// the shortcuts those have in the menu bar. Off as Zigzag ships, since pages and text fields use these keys too. A key
+/// you gave a menu item in Settings › Shortcuts stays that item's.
 enum VimKeys {
     enum Move: Equatable { case nextTab, previousTab, previousSpace, nextSpace }
 
@@ -321,10 +335,12 @@ enum VimKeys {
     static let combos = moves.keys.map { Shortcuts.Combo(key: $0, modifiers: NSEvent.ModifierFlags.control.rawValue) }
     static var title: String { String(localized: "Vim keys", comment: "A setting in Settings › Tabs: Control with H, J, K and L move between tabs and spaces, as in the Vim editor. Also named in Settings › Shortcuts when these keys are tried for something else.") }
 
-    /// The move a pressed key asks for: Control alone with H, J, K or L, while the setting is on.
-    static func move(for event: NSEvent) -> Move? {
+    /// The move a pressed key asks for: Control alone with H, J, K or L, while the setting is on and no menu item
+    /// has those keys.
+    static func move(for event: NSEvent, menu: NSMenu? = NSApp.mainMenu) -> Move? {
         guard isOn, event.modifierFlags.intersection([.command, .shift, .option, .control]) == .control,
-              let key = event.charactersIgnoringModifiers?.lowercased() else { return nil }
-        return moves[key]
+              let key = event.charactersIgnoringModifiers?.lowercased(), let move = moves[key] else { return nil }
+        let combo = Shortcuts.Combo(key: key, modifiers: NSEvent.ModifierFlags.control.rawValue)
+        return Shortcuts.item(for: combo, in: menu) == nil ? move : nil
     }
 }

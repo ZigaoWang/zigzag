@@ -95,6 +95,31 @@ import Testing
         }
     }
 
+    /// A Vim key you gave a menu item in Settings › Shortcuts stays that item's; the other three are still Vim's.
+    @Test func vimKeysLeaveAKeyYouGaveAMenuItem() throws {
+        let defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: VimKeys.key)
+        defer { defaults.set(saved, forKey: VimKeys.key) }
+        VimKeys.isOn = true
+        let menu = NSMenu()
+        let sub = NSMenu()
+        let yours = NSMenuItem(title: "Yours", action: #selector(NSText.selectAll(_:)), keyEquivalent: "j")
+        yours.keyEquivalentModifierMask = .control
+        sub.addItem(yours)
+        menu.addItem(withTitle: "Edit", action: nil, keyEquivalent: "").submenu = sub
+        func control(_ key: String) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: 0, windowNumber: 0,
+                                           context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: 0))
+        }
+        #expect(VimKeys.move(for: try control("j"), menu: menu) == nil)
+        #expect(VimKeys.move(for: try control("k"), menu: menu) == .previousTab)
+        let controlJ = Shortcuts.Combo(key: "j", modifiers: NSEvent.ModifierFlags.control.rawValue)
+        #expect(Shortcuts.reserved(controlJ, in: menu) == nil)
+        yours.keyEquivalent = ""
+        #expect(VimKeys.move(for: try control("j"), menu: menu) == .nextTab)
+        #expect(Shortcuts.reserved(controlJ, in: menu) == VimKeys.title)
+    }
+
     /// The order is the sidebar's, not the order the tabs were last used in.
     @Test func ignoresRecentUse() throws {
         try inWindow(["A", "B", "C", "D"]) { controller, tabs, _ in
