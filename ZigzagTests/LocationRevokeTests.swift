@@ -42,4 +42,46 @@ struct LocationRevokeTests {
         }
         #expect(answer == "error:1", "got \(answer)")
     }
+
+    /// The other direction: a site switched to Allow gets its location back on the page that is open, without a
+    /// reload. This is what the guard must undo — a page that was refused on an earlier answer would otherwise stay
+    /// refused until it reloaded, which is the complaint this change answers.
+    @Test func theGuardComesOffAgainForAnAllowedSite() async throws {
+        let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
+        let webView = tab.ensureWebView()
+        let token = UUID().uuidString
+        webView.loadHTMLString("<p id='\(token)'>hi</p>", baseURL: URL(string: site + "/"))
+        for _ in 0..<100 {
+            try await Task.sleep(for: .milliseconds(50))
+            if (try? await webView.evaluateJavaScript("!!document.getElementById('\(token)')")) as? Bool == true { break }
+        }
+
+        PageLocation.shared.revoke(origin: site, in: tab)
+        // The guard is on: the method the guard installed is an own property of `navigator.geolocation`.
+        let guarded = (try? await webView.evaluateJavaScript(
+            "Object.prototype.hasOwnProperty.call(navigator.geolocation, 'getCurrentPosition')")) as? Bool
+        #expect(guarded == true)
+
+        PageLocation.shared.allow(origin: site, in: tab)
+        // The guard is off: the native method is reached through the prototype again, not a copy the guard left.
+        let restored = (try? await webView.evaluateJavaScript(
+            "Object.prototype.hasOwnProperty.call(navigator.geolocation, 'getCurrentPosition')")) as? Bool
+        #expect(restored == false, "an allowed site must get the browser's own geolocation back")
+
+        // And it works: a watch started after the Allow is a real watch, not the guard's immediate refusal. The
+        // position itself may never arrive without Core Location, so this asserts only that no permission error did.
+        _ = try? await webView.evaluateJavaScript("""
+        window.zigzagWatch = 'none';
+        navigator.geolocation.watchPosition(
+          function () { window.zigzagWatch = 'position'; },
+          function (e) { window.zigzagWatch = 'error:' + e.code; });
+        """)
+        var answer = "none"
+        for _ in 0..<20 {
+            try await Task.sleep(for: .milliseconds(50))
+            answer = (try? await webView.evaluateJavaScript("window.zigzagWatch")) as? String ?? "none"
+            if answer != "none" { break }
+        }
+        #expect(answer != "error:1", "a watch after an Allow must not be refused as blocked")
+    }
 }
