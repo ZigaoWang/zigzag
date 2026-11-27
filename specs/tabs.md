@@ -9,6 +9,8 @@
   Test: TabCloseSelectionTests.closingGoesToTheTabBelowNotTheOneYouWereOnBefore
 - ⌘W on a pinned tab or favorite → it unloads and stays; next time it opens fresh at its saved address.
   Test: TabCloseSelectionTests.closingAPinnedPageOrFavoriteUnloadsItAndKeepsIt
+  Test: TabCloseSelectionTests.aClosedPinnedPageOrFavoriteStaysInTheSidebar
+  Test: TabCloseSelectionTests.aClosedPinnedPageInAFolderOrSplitStaysInTheSidebar
 - ⌘W on the last tab of a space → the space's most recent page, else the space shows empty.
   Test: TabCloseSelectionTests.closingTheLastTabGoesToTheSpacesRecentPageElseEmpty
 - Close a tab → its page is let go at once, so WebKit can end its process; ⇧⌘T loads it again with its history.
