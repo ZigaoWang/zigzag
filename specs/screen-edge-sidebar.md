@@ -25,8 +25,15 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.theEdgesSidebarIsAListWithoutTheAddressRow
 - Its rows and buttons light up under the pointer with the other app still in front.
   Test: EdgeSidebarTests.itsControlsAnswerHoverWithAnotherAppInFront
-- Click a tab, a favorite, New Tab or a menu item → the panel goes and the browser window comes forward and does it there.
+- Click a tab, a favorite, New Tab or a menu item other than the +'s below → the panel goes and the browser window comes forward and does it there.
   No test yet.
+- The +'s New Folder, New Live Folder or New Space → done in the panel: the folder's name ready to type in its list, the live folder's sheet or the space's editor over it, and the browser window stays where it was.
+  Test: EdgeSidebarTests.thePlusMenuIsDoneInThePanel
+  Test: EdgeSidebarTests.sheetsAndEditorsFitThePanelsCard
+- Its Downloads button → the list opens in the panel, over the sidebar's lane, and the panel stays out.
+  Test: EdgeSidebarTests.downloadsOpenOverThePanel
+- Clicked into, the menu bar's keys work in it: ⌘W closes the tab whose row is lit and ⌘R reloads it, with the panel still out; a key the window does, like ⌘T or ⌘L, brings the browser window forward to do it there.
+  Test: EdgeSidebarTests.theMenuBarsKeysActOnThePanelsBrowser
 - The pointer moves off it, Esc, another app or another Space → it goes back, and the app in front keeps the keyboard unless the panel was clicked.
   Test: EdgeSidebarTests.thePanelRunsDownTheScreensEdgeAndStaysWhileThePointerIsOnIt
 
@@ -47,15 +54,22 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.clickingAnAsleepCardOpensItsTabInTheWindow
 - A page out beside the sidebar, or in a Mini → it doesn't sleep, unseen for long, short of memory or busy; one that goes to sleep anyway shows that card, never an empty page.
   Test: EdgeSidebarTests.aPreviewedPageStaysAwakeAndShowsItsCardIfItSleeps
-- A row of Zigzag's own pages, like History or Settings → nothing comes out beside the sidebar; a click opens it in the browser window.
-  Test: EdgeSidebarTests.zigzagsOwnPagesOpenInTheWindow
-  Test: EdgeSidebarTests.anOwnPagesRowPutsThePageAway
+- A row of Zigzag's own pages, like Settings, History or Archive → its page comes out beside the sidebar like any other, Settings with its own view; a click opens it in the browser window.
+  Test: EdgeSidebarTests.zigzagsOwnPagesPreviewLikeAnyPage
+- A row with no page, like a new tab's → nothing comes out beside the sidebar, and a page already out folds back.
+  Test: EdgeSidebarTests.aRowWithNoPagePutsThePageAway
 - Click a row while its page is out → the panel and the page go, and the browser window comes forward with that tab, its page in the window.
   Test: EdgeSidebarTests.clickingAPreviewedRowShowsItsPageInTheWindow
   Test: InPageMiniHostTests.aBorrowedPageSelectedWhileOutComesBackToTheCard
 - Esc, or the pointer off the rows and the page → the page folds back and the sidebar stays out.
   Test: EdgeSidebarTests.escPutsThePageAwayFirst
   Test: EdgeSidebarTests.leavingTheRowsAndThePageFoldsItBack
+- The pointer on its way from the page to a row, across the gap or the sidebar's empty part → the page stays out while it moves, and folds back once it stops off the rows and the page.
+  Test: EdgeSidebarTests.aPointerOnItsWayToARowKeepsThePage
+- Switch spaces in the panel while a page is out → the page goes back to its tab at once, also one still folding back, and the sidebar stays out on the new space. A row of the space left never brings its page out again; resting on a row of the new space brings that row's page out.
+  Test: EdgeSidebarTests.aSpaceSwitchPutsThePageAwayAndNeverShowsTheOldSpace
+  Test: EdgeSidebarTests.aSpaceSwitchDuringTheFoldGivesThePageBackAtOnce
+  Test: EdgeSidebarTests.aRestBegunBeforeASpaceSwitchShowsNothing
 - Rest on the same row again while its page is folding away → the new preview has the page, and the tab is never left without one.
   Test: InPageMiniHostTests.reopeningDuringTheFoldOutEndsTheOldBorrowFirst
 - Click into the page → Zigzag comes forward, and the sidebar and the page stay out until the pointer leaves them.
@@ -63,6 +77,8 @@ Settings › Appearance › Sidebar from the screen edge (#363).
 - The page clicked into, then Esc or the pointer back on the sidebar → the page folds back and the panel keeps the keyboard; the browser window stays where it was.
   Test: EdgeSidebarTests.aPageFoldingBackGivesTheKeyboardToThePanel
   Test: EdgeSidebarTests.aPageFoldingBackUnclickedLeavesTheKeyboard
+- Keys pressed in the page clicked into → the page's own first: ⌘W puts it away, its tab still in the list, ⌘R reloads it and ⌘L edits its address. The browser's other keys do what they do in the panel.
+  Test: EdgeSidebarTests.keysInThePreviewActOnThePanel
 - A menu from the panel while a page is out → the page steps aside until the menu closes, so no part of the menu is under it.
   Test: EdgeSidebarTests.aMenuFromThePanelIsNeverUnderThePage
 - Open in Zigzag in the page's strip → the browser window comes forward on that tab. Expand → the page leaves the list for a Zigzag Mini of its own, and the panel goes.
