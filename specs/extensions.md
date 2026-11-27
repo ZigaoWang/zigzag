@@ -126,6 +126,8 @@
   Test: ExtensionScriptTests.bridgedCallsChromeAnswersWithAPromiseReturnOne
 - `webNavigation.getAllFrames` for a tab asleep → no frames; for a tab or frame that isn't there, it and `getFrame` → null, not an error, as in Chrome; frames come with Chrome's frameType, documentLifecycle and parentDocumentId.
   Test: ExtensionScriptTests.framesOfAMissingOrSleepingTabAnswerAsInChrome
+- `proxy.settings.set` with a PAC script, which Zigzag can't run → refused and nothing changes; with a callback, it gets no answer and reads why in runtime.lastError, as Chrome gives a failed call's.
+  Test: ExtensionScriptTests.aRefusedProxySettingIsLastErrorForACallback
 
 ## Windows
 - An extension's `windows.create` with `state: 'minimized'` → the window goes straight to the Dock, never shown in front or focused, as in Chrome.

@@ -305,6 +305,22 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("__seen.sort().join()").toString() == "accounts 0,cleared,open refused,promised 0")
     }
 
+    @Test func aRefusedProxySettingIsLastErrorForACallback() {
+        // Hotspot Shield sets its PAC script with a callback and checks runtime.lastError there (#475).
+        let context = Self.bridgeWorld(permissions: ["proxy"])
+        context.evaluateScript("""
+        var __seen = [];
+        const heard = (name) => (...args) => __seen.push([name, args.length, chrome.runtime.lastError && chrome.runtime.lastError.message]);
+        chrome.proxy.settings.set({ value: { mode: 'pac_script', pacScript: { data: '' } } }, heard('set'));
+        chrome.proxy.settings.clear({}, heard('clear'));
+        chrome.proxy.settings.set({ value: { mode: 'direct' } }).catch((e) => __seen.push(['rejected', e.message]));
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__seen.map((s) => JSON.stringify(s)).sort().join(' ')").toString()
+                == #"["clear",0,"proxy.settings.clear could not be answered"] ["rejected","proxy.settings.set could not be answered"] ["set",0,"proxy.settings.set could not be answered"]"#)
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
     @Test func aCompatibilityLayerFailureKeepsMainsCallbackShape() {
         let context = Self.compatibilityWorld(permissions: ["debugger"])
         context.evaluateScript("""

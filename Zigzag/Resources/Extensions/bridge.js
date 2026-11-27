@@ -441,12 +441,16 @@
     globalThis.XMLHttpRequest = LocalXHR;
   }
 
-  // A Chrome-style method: a promise, or the trailing callback Chrome extensions often pass instead.
-  const method = (ns, fn, { before, after } = {}) => (...args) => {
+  // A Chrome-style method: a promise, or the trailing callback Chrome extensions often pass instead. A failure reaches
+  // the callback as one undefined answer; with `loud`, as Chrome's does: no arguments, the reason in runtime.lastError.
+  const method = (ns, fn, { before, after, loud } = {}) => (...args) => {
     const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
     const result = send(ns, fn, before ? before(args) : args).then((value) => (after ? after(value, args) : value));
     if (!callback) return result;
-    result.then((value) => callback(value), (error) => { console.warn(`chrome.${ns}.${fn}:`, error.message); callback(undefined); });
+    result.then((value) => callback(value), (error) => {
+      console.warn(`chrome.${ns}.${fn}:`, error.message);
+      if (loud) withLastError(() => callback(), error); else callback(undefined);
+    });
   };
 
   // A fixed answer, as a promise or to the callback.
@@ -729,12 +733,13 @@
   });
 
   // proxy.settings is one of Chrome's ChromeSettings. Zigzag follows fixed servers (BridgeProxy.swift); a setting it
-  // can't follow, a PAC script, is refused and changes nothing.
+  // can't follow, a PAC script, is refused and changes nothing. The refusal is runtime.lastError for a callback, so a
+  // VPN that checks it (Hotspot Shield, #475) doesn't take its pages for proxied.
   install('proxy', {
     settings: {
       get: method('proxy', 'settings.get'),
-      set: method('proxy', 'settings.set'),
-      clear: method('proxy', 'settings.clear'),
+      set: method('proxy', 'settings.set', { loud: true }),
+      clear: method('proxy', 'settings.clear', { loud: true }),
       onChange: event('proxy.settings.onChange'),
     },
     // WebKit doesn't say when a proxy fails, so this never fires.
