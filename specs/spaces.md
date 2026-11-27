@@ -77,5 +77,12 @@
   Test: TopBarTests.theSidebarsToggleIsInTheBarOnlyWhileTheSidebarIsHidden
 - Pointer at the sidebar's edge of the window while it's hidden → it slides out once, and back when you leave it.
   Test: SidebarEdgeRevealTests.runningOnPastTheEdgeAndComingBackBringsItOutOnce
+- A menu opened from the sidebar while it's slid out (a row's, the +, a space's, a favorite's, the address's), its icon picker, or a row being renamed → it stays out with the pointer anywhere; once that's gone, it stays if the pointer is on it and slides back if not. The shorter floating sidebar and the screen-edge sidebar do the same.
+  Test: SidebarMenuHoldTests.aRowMenuKeepsItOutWithThePointerAway
+  Test: SidebarMenuHoldTests.closedWithThePointerAwayItGoesBack
+  Test: SidebarMenuHoldTests.closedWithThePointerOnItItStays
+  Test: SidebarMenuHoldTests.escAndAnItemChosenLetItGo
+  Test: SidebarMenuHoldTests.anAppKitMenuFromItHoldsItUntilItEnds
+  Test: SidebarMenuHoldTests.theShorterSidebarIsHeldTheSameWay
 - Hover and press on sidebar rows and buttons → visible on every space color, white and black included, light and dark.
   Test: ContrastTokensTests.hoverShowsOnEverySpace
