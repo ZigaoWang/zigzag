@@ -15534,7 +15534,7 @@
     "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Sugiere las llaves de acceso guardadas en este Mac bajo los campos de inicio de sesión. macOS te lo pregunta antes."
+        "value": "Sugiere las llaves de acceso guardadas en este Mac bajo los campos de inicio de sesión. macOS te pregunta antes."
       }
     },
     "Allow…": {

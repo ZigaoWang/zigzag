@@ -14886,7 +14886,7 @@
     "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
       "stringUnit": {
         "state": "translated",
-        "value": "로그인 필드 아래에, 각 패스키를 만든 사이트에서만 제안됩니다. 시스템 설정 › 개인정보 보호 및 보안에서 변경하세요."
+        "value": "각 패스키를 만든 사이트에서만 로그인 필드 아래에 제안됩니다. 시스템 설정 › 개인정보 보호 및 보안에서 변경할 수 있습니다."
       }
     },
     "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {

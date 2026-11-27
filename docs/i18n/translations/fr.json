@@ -15265,13 +15265,13 @@
     "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Suggérées sous les champs de connexion, uniquement sur le site pour lequel chacune a été créée. Modifiez cela dans Réglages Système › Confidentialité et sécurité."
+        "value": "Suggérées sous les champs de connexion, uniquement sur le site pour lequel chacune a été créée. Vous pouvez modifier ce réglage dans Réglages Système › Confidentialité et sécurité."
       }
     },
     "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Non suggérées, selon le réglage de Réglages Système › Confidentialité et sécurité. Un site qui demande une clé d’identification peut toujours l’utiliser."
+        "value": "Non suggérées, selon le réglage défini dans Réglages Système › Confidentialité et sécurité. Un site qui demande une clé d’identification peut toujours l’utiliser."
       }
     },
     "Passkeys": {

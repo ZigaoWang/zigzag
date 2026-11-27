@@ -15583,7 +15583,7 @@
     "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Sugerir as chaves de acesso salvas neste Mac abaixo de campos de login. O macOS pergunta antes."
+        "value": "Sugerir as chaves de acesso salvas neste Mac abaixo dos campos de login. O macOS pergunta antes."
       }
     },
     "Allow…": {
@@ -15595,13 +15595,13 @@
     "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Sugeridas abaixo de campos de login, somente no site para o qual cada uma foi criada. Altere isso em Ajustes do Sistema › Privacidade e segurança."
+        "value": "São sugeridas abaixo dos campos de login, somente no site para o qual cada uma foi criada. Altere isso em Ajustes do Sistema › Privacidade e segurança."
       }
     },
     "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Não sugeridas, conforme definido em Ajustes do Sistema › Privacidade e segurança. Um site que pede uma chave de acesso ainda pode usá-la."
+        "value": "Não são sugeridas, conforme definido em Ajustes do Sistema › Privacidade e segurança. Um site que pede uma chave de acesso ainda pode usá-la."
       }
     },
     "Passkeys": {

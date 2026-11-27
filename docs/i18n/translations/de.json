@@ -15265,13 +15265,13 @@
     "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Unter Anmeldefeldern vorgeschlagen, nur auf der Website, für die der Passkey erstellt wurde. Ändern kannst du das unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“."
+        "value": "Werden unter Anmeldefeldern vorgeschlagen, jeweils nur auf der Website, für die der Passkey erstellt wurde. Ändern kannst du das unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“."
       }
     },
     "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Nicht vorgeschlagen, wie unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“ festgelegt. Eine Website, die nach einem Passkey fragt, kann ihn weiterhin nutzen."
+        "value": "Werden nicht vorgeschlagen, wie unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“ festgelegt. Eine Website, die nach einem Passkey fragt, kann ihn weiterhin nutzen."
       }
     },
     "Passkeys": {

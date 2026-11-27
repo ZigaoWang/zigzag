@@ -15216,13 +15216,13 @@
     "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Suggerite sotto i campi di accesso, solo sul sito per cui ciascuna è stata creata. Puoi cambiarlo in Impostazioni di Sistema › Privacy e sicurezza."
+        "value": "Vengono suggerite sotto i campi di accesso, solo sul sito per cui ciascuna è stata creata. Puoi cambiarlo in Impostazioni di Sistema › Privacy e sicurezza."
       }
     },
     "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Non suggerite, come impostato in Impostazioni di Sistema › Privacy e sicurezza. Un sito che chiede una passkey può ancora usarla."
+        "value": "Non vengono suggerite, come impostato in Impostazioni di Sistema › Privacy e sicurezza. Un sito che chiede una passkey può ancora usarla."
       }
     },
     "Passkeys": {

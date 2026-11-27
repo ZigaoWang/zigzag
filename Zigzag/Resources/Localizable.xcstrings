@@ -2142,7 +2142,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nicht vorgeschlagen, wie unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“ festgelegt. Eine Website, die nach einem Passkey fragt, kann ihn weiterhin nutzen."
+            "value" : "Werden nicht vorgeschlagen, wie unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“ festgelegt. Eine Website, die nach einem Passkey fragt, kann ihn weiterhin nutzen."
           }
         },
         "es" : {
@@ -2154,13 +2154,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non suggérées, selon le réglage de Réglages Système › Confidentialité et sécurité. Un site qui demande une clé d’identification peut toujours l’utiliser."
+            "value" : "Non suggérées, selon le réglage défini dans Réglages Système › Confidentialité et sécurité. Un site qui demande une clé d’identification peut toujours l’utiliser."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non suggerite, come impostato in Impostazioni di Sistema › Privacy e sicurezza. Un sito che chiede una passkey può ancora usarla."
+            "value" : "Non vengono suggerite, come impostato in Impostazioni di Sistema › Privacy e sicurezza. Un sito che chiede una passkey può ancora usarla."
           }
         },
         "ja" : {
@@ -2178,7 +2178,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niet voorgesteld, zoals ingesteld in Systeeminstellingen › Privacy en beveiliging. Een website die om een passkey vraagt, kan die nog steeds gebruiken."
+            "value" : "Worden niet voorgesteld, zoals ingesteld in Systeeminstellingen › Privacy en beveiliging. Een website die om een passkey vraagt, kan die nog steeds gebruiken."
           }
         },
         "pl" : {
@@ -2190,7 +2190,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não sugeridas, conforme definido em Ajustes do Sistema › Privacidade e segurança. Um site que pede uma chave de acesso ainda pode usá-la."
+            "value" : "Não são sugeridas, conforme definido em Ajustes do Sistema › Privacidade e segurança. Um site que pede uma chave de acesso ainda pode usá-la."
           }
         },
         "ru" : {
@@ -2208,13 +2208,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不建议：已在“系统设置 › 隐私与安全性”中关闭。网站请求通行密钥时仍可使用。"
+            "value" : "根据“系统设置 › 隐私与安全性”中的设置，不会建议通行密钥。网站请求通行密钥时仍可使用。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不建議：已在「系統設定 › 隱私權與安全性」中關閉。網站要求通行密鑰時仍可使用。"
+            "value" : "依「系統設定 › 隱私權與安全性」中的設定，不會建議通行密鑰。網站要求通行密鑰時仍可使用。"
           }
         }
       }
@@ -3808,7 +3808,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sugiere las llaves de acceso guardadas en este Mac bajo los campos de inicio de sesión. macOS te lo pregunta antes."
+            "value" : "Sugiere las llaves de acceso guardadas en este Mac bajo los campos de inicio de sesión. macOS te pregunta antes."
           }
         },
         "fr" : {
@@ -3850,7 +3850,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sugerir as chaves de acesso salvas neste Mac abaixo de campos de login. O macOS pergunta antes."
+            "value" : "Sugerir as chaves de acesso salvas neste Mac abaixo dos campos de login. O macOS pergunta antes."
           }
         },
         "ru" : {
@@ -3885,7 +3885,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unter Anmeldefeldern vorgeschlagen, nur auf der Website, für die der Passkey erstellt wurde. Ändern kannst du das unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“."
+            "value" : "Werden unter Anmeldefeldern vorgeschlagen, jeweils nur auf der Website, für die der Passkey erstellt wurde. Ändern kannst du das unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“."
           }
         },
         "es" : {
@@ -3897,13 +3897,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suggérées sous les champs de connexion, uniquement sur le site pour lequel chacune a été créée. Modifiez cela dans Réglages Système › Confidentialité et sécurité."
+            "value" : "Suggérées sous les champs de connexion, uniquement sur le site pour lequel chacune a été créée. Vous pouvez modifier ce réglage dans Réglages Système › Confidentialité et sécurité."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suggerite sotto i campi di accesso, solo sul sito per cui ciascuna è stata creata. Puoi cambiarlo in Impostazioni di Sistema › Privacy e sicurezza."
+            "value" : "Vengono suggerite sotto i campi di accesso, solo sul sito per cui ciascuna è stata creata. Puoi cambiarlo in Impostazioni di Sistema › Privacy e sicurezza."
           }
         },
         "ja" : {
@@ -3915,13 +3915,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "로그인 필드 아래에, 각 패스키를 만든 사이트에서만 제안됩니다. 시스템 설정 › 개인정보 보호 및 보안에서 변경하세요."
+            "value" : "각 패스키를 만든 사이트에서만 로그인 필드 아래에 제안됩니다. 시스템 설정 › 개인정보 보호 및 보안에서 변경할 수 있습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voorgesteld onder aanmeldvelden, alleen op de website waarvoor elke passkey is gemaakt. Wijzig dit in Systeeminstellingen › Privacy en beveiliging."
+            "value" : "Worden voorgesteld onder aanmeldvelden, alleen op de website waarvoor elke passkey is gemaakt. Wijzig dit in Systeeminstellingen › Privacy en beveiliging."
           }
         },
         "pl" : {
@@ -3933,7 +3933,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sugeridas abaixo de campos de login, somente no site para o qual cada uma foi criada. Altere isso em Ajustes do Sistema › Privacidade e segurança."
+            "value" : "São sugeridas abaixo dos campos de login, somente no site para o qual cada uma foi criada. Altere isso em Ajustes do Sistema › Privacidade e segurança."
           }
         },
         "ru" : {
@@ -3951,13 +3951,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "显示在登录框下方，只在通行密钥所属的网站上。可在“系统设置 › 隐私与安全性”中更改。"
+            "value" : "会在登录框下方建议，仅限通行密钥所属的网站。可在“系统设置 › 隐私与安全性”中更改。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "顯示在登入框下方，只在通行密鑰所屬的網站上。可在「系統設定 › 隱私權與安全性」中更改。"
+            "value" : "會在登入框下方建議，僅限通行密鑰所屬的網站。可在「系統設定 › 隱私權與安全性」中更改。"
           }
         }
       }

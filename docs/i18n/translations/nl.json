@@ -15216,13 +15216,13 @@
     "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Voorgesteld onder aanmeldvelden, alleen op de website waarvoor elke passkey is gemaakt. Wijzig dit in Systeeminstellingen › Privacy en beveiliging."
+        "value": "Worden voorgesteld onder aanmeldvelden, alleen op de website waarvoor elke passkey is gemaakt. Wijzig dit in Systeeminstellingen › Privacy en beveiliging."
       }
     },
     "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Niet voorgesteld, zoals ingesteld in Systeeminstellingen › Privacy en beveiliging. Een website die om een passkey vraagt, kan die nog steeds gebruiken."
+        "value": "Worden niet voorgesteld, zoals ingesteld in Systeeminstellingen › Privacy en beveiliging. Een website die om een passkey vraagt, kan die nog steeds gebruiken."
       }
     },
     "Passkeys": {
