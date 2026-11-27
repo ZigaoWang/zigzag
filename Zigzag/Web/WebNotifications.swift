@@ -393,7 +393,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         static get permission() { return permission; }
         static get maxActions() { return 0; }
         static requestPermission(callback) {
-          const ask = permission === 'default' && usable && !isPrivate
+          const ask = permission === 'default' && usable && !denied
             ? send({ kind: 'request', gesture: gesture() }).then((answer) => { if (answer === 'granted' || answer === 'denied' || answer === 'default') permission = answer; return permission; })
             : Promise.resolve(permission);
           return ask.then((answer) => { if (typeof callback === 'function') { try { callback(answer); } catch (e) { setTimeout(() => { throw e; }); } } return answer; });
@@ -427,7 +427,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         ServiceWorkerRegistration.prototype.getNotifications = function () { return Promise.resolve([]); };
       }
       // The answer may have changed since this window opened (allowed in another tab): ask for the current one.
-      if (usable && !isPrivate) send({ kind: 'state' }).then((state) => { if (state === 'granted' || state === 'denied' || state === 'default') permission = state; });
+      if (usable && !denied) send({ kind: 'state' }).then((state) => { if (state === 'granted' || state === 'denied' || state === 'default') permission = state; });
     })();
     """
 }

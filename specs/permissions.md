@@ -3,6 +3,8 @@
 ## Questions
 - A site asks for notifications, the camera, the microphone, your location, your screen or to open an app → a card at the top of its page, Don't Allow first and the main yes last.
   Test: PermissionPromptTests.denyComesFirstAndTheProminentYesLast
+- A page calls `Notification.requestPermission()` → it gets a promise of the answer, never an error, even as it loads.
+  Test: WebNotificationsTests.askingReturnsAPromise
 - Camera and microphone → two questions, one answer each; a call that wants both gets them only if both are allowed.
   Test: SiteControlsPermissionTests.aRequestForBothTakesTwoAnswers
 - Screen sharing → Don't Allow, Share Screen… or Share Window…, then macOS's own picker.
