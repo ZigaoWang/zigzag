@@ -10,7 +10,7 @@ struct SyncLibrary {
 
 /// This Mac's IDs for items the first sync matched with differently named ones in iCloud (a space by name, a page by
 /// address). Local IDs stay as they are, so open tabs and website data keep finding their spaces and profiles.
-struct SyncAliases: Codable, Equatable {
+nonisolated struct SyncAliases: Codable, Equatable, Sendable {
     /// Local ID to the ID in iCloud.
     private(set) var toServer: [UUID: UUID] = [:]
     private var toLocal: [UUID: UUID] = [:]

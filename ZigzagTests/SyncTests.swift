@@ -1255,19 +1255,52 @@ extension SyncLibrary {
         #expect(!SyncSettingsRows.describe(.synced(a.clock), hasCopy: true, tooBig: a.session.tooBig).detail.isEmpty)
     }
 
+    @Test func theStateIsWrittenOffTheMainThreadInOrder() throws {
+        let pages = (0..<3000).map { Sample.page("p\($0)", "A pinned page with a title about this long \($0)") }
+        let (_, _, b) = twoMacs(Sample.library([Sample.space("Personal", pages)]))
+        // iCloud's own fields for each record, about as big as CloudKit's.
+        b.session.updateState { s in for name in s.systemFields.keys { s.systemFields[name] = Data((0..<550).map { UInt8($0 % 251) }) } }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("SyncTests-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let file = SyncStateFile(url: url)
+        // The main thread only hands a copy over.
+        var slowest: TimeInterval = 0
+        for i in 1...5 {
+            b.session.updateState { $0.fetches = i }
+            let start = Date()
+            file.save(b.session.state)
+            slowest = max(slowest, Date().timeIntervalSince(start))
+        }
+        #expect(slowest < 0.003, "\(Int(slowest * 1000)) ms on the main thread")
+        // In order, none lost: the last asked for is what's there, and one written now lands after those before it.
+        #expect(file.load()?.fetches == 5)
+        b.session.updateState { $0.fetches = 9 }
+        file.save(b.session.state)
+        var off = b.session.state
+        off.fetches = 10
+        #expect(file.saveNow(off))
+        let read = try #require(file.load())
+        #expect(read.fetches == 10 && read.base.count == b.session.state.base.count)
+    }
+
     @Test func aThousandPinnedPagesSyncQuickly() {
         let pages = (0..<1000).map { Sample.page("p\($0)") }
         let start = Date()
         let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", pages)]))
         #expect(b.library.space(named: "Personal")?.bookmarks.count == 1000)
+        let firstSync = Date().timeIntervalSince(start)
         let sent = a.sent
+        let edited = Date()
         a.edit { $0.editSpace("Personal") { $0.bookmarks[500].title = "Changed" } }
         a.sync()
         // One edit sends one record.
         #expect(a.sent == sent + 1)
         b.sync()
         #expect(b.library.space(named: "Personal")?.bookmarks[500].title == "Changed")
-        #expect(Date().timeIntervalSince(start) < 20)
+        // Debug build, both Macs in one process: an edit's round trip in well under a second, both first syncs in a few.
+        let roundTrip = Date().timeIntervalSince(edited)
+        #expect(roundTrip < 0.5, "\(Int(roundTrip * 1000)) ms")
+        #expect(firstSync < 2, "\(Int(firstSync * 1000)) ms")
     }
 
     // MARK: Many removals at once

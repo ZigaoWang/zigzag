@@ -124,6 +124,8 @@
   Test: SyncTests.onceSettledNothingMoreIsSent
 - A thousand pinned pages → sync without a wait, and one edit sends one record.
   Test: SyncTests.aThousandPinnedPagesSyncQuickly
+- Sync's own state (Sync/State.json, megabytes with a big library) → encoded and written off the main thread, so typing and scrolling never wait for it: one write at a time, in the order asked, none lost; before quitting and when sync turns off it's on disk before Zigzag goes on.
+  Test: SyncTests.theStateIsWrittenOffTheMainThreadInOrder
 - Records a newer Zigzag wrote → read, and their new fields and kinds are kept when this Mac edits or removes around them.
   Test: SyncTests.olderAndNewerRecordsStillRead
   Test: SyncTests.aNewerZigzagsFieldsSurviveAnEditHere

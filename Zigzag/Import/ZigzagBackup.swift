@@ -251,7 +251,7 @@ struct ZigzagBackup: Codable {
 }
 
 /// A preference value as JSON: what `UserDefaults` holds. Data and dates are tagged, the rest is plain JSON.
-indirect enum SettingValue: Codable, Equatable {
+nonisolated indirect enum SettingValue: Codable, Equatable, Sendable {
     case bool(Bool), int(Int), double(Double), string(String), data(Data), date(Date)
     case array([SettingValue]), dictionary([String: SettingValue])
 

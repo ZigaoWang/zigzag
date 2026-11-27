@@ -108,7 +108,7 @@ enum SyncMerge {
 
         // What's only here joins iCloud's lists next to the item it follows here.
         func group(_ body: SyncBody, server isServer: Bool) -> String? {
-            let map: (UUID) -> UUID = isServer ? { $0 } : aliases.server
+            let map: (UUID) -> UUID = { isServer ? $0 : aliases.server($0) }
             switch body {
             case .profile: return "profiles"
             case .space: return "spaces"

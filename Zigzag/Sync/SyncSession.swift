@@ -36,7 +36,7 @@ enum SyncFetchScope {
 }
 
 /// A record as the server has it.
-struct SyncRemote: Codable {
+nonisolated struct SyncRemote: Codable, Sendable {
     var name: String
     var type: String
     /// Its fields as the server holds them, a newer Zigzag's included.
@@ -82,7 +82,7 @@ enum SyncSaveFailure {
 
 /// A favorite or a preference of a profile removed on another Mac, or a space moved off it, read just before the
 /// profile's own removal: kept for that fetch and the next only, so one removed on purpose never comes back later.
-struct SyncLeftover: Codable {
+nonisolated struct SyncLeftover: Codable, Sendable {
     /// The fetch it came in (`SyncState.fetches`).
     var fetch: Int
     var favorite: SyncItem?
@@ -100,7 +100,7 @@ enum SyncDeleteFailure {
 }
 
 /// What sync keeps between launches, beside the server's own state.
-struct SyncState: Codable {
+nonisolated struct SyncState: Codable, Sendable {
     /// The records as this Mac and iCloud last agreed on them, with what this Mac changed since on top.
     var base: [String: SyncItem] = [:]
     /// Each record's fields as the server last had them, a newer Zigzag's included.

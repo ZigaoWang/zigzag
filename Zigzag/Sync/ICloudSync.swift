@@ -89,7 +89,7 @@ final class ICloudSync {
     private var network: NWPathMonitor?
     private var reachable: Bool?
 
-    private static var stateFile: URL { Paths.directory("Sync").appendingPathComponent("State.json") }
+    private let stateFile = SyncStateFile(url: Paths.directory("Sync").appendingPathComponent("State.json"))
 
     private init() {
         retry.onRetry = { [weak self] in self?.tryAgain() }
@@ -110,7 +110,7 @@ final class ICloudSync {
         watchPreferencesWhileOff()
         guard isOn, session == nil else { return }
         let library = Library.shared
-        let saved = JSONStore.load(SyncState.self, from: Self.stateFile) ?? SyncState()
+        let saved = stateFile.load() ?? SyncState()
         start(state: Self.stateAtLaunch(saved: saved, libraryWasRead: Self.libraryWasRead(library.wasRead && !library.profilesWereSetAside,
                                                                                         profilesFile: library.profilesFileExisted, saved: saved),
                                         account: UserDefaults.standard.string(forKey: Self.accountKey)))
@@ -229,7 +229,7 @@ final class ICloudSync {
         guard backingUp() != nil else { shown = .backupFailed; return }
         UserDefaults.standard.set(true, forKey: Self.enabledKey)
         stop()
-        start(state: Self.stateTurningOn(saved: JSONStore.load(SyncState.self, from: Self.stateFile)))
+        start(state: Self.stateTurningOn(saved: stateFile.load()))
     }
 
     /// What's kept while sync is off: which items here match which in iCloud, and what this Mac and iCloud last agreed
@@ -272,10 +272,10 @@ final class ICloudSync {
     /// Turned off: everything stays on this Mac, and iCloud keeps its copy.
     func turnOff(keepingLibrary: Bool = true) {
         UserDefaults.standard.set(false, forKey: Self.enabledKey)
-        let state = session?.state ?? JSONStore.load(SyncState.self, from: Self.stateFile)
+        let state = session?.state ?? stateFile.load()
         stop()
         NSApplication.shared.unregisterForRemoteNotifications()
-        JSONStore.save(Self.stateTurningOff(state, keepingLibrary: keepingLibrary), to: Self.stateFile)
+        stateFile.saveNow(Self.stateTurningOff(state, keepingLibrary: keepingLibrary))
         UserDefaults.standard.removeObject(forKey: Self.accountKey)
         shown = .off
     }
@@ -562,20 +562,21 @@ final class ICloudSync {
     private func saveSoon() { saveDebouncer.call { [weak self] in self?.writeState() } }
 
     /// Before quitting, and when sync stops: Library.json first, then what changed in it read now, not at the next
-    /// launch, then sync's own state.
+    /// launch, then sync's own state, on disk before this returns.
     func saveNow() {
         Library.shared.saveNow()
         localDebouncer.cancel()
         session?.localChanged()
-        writeState()
+        writeState(now: true)
     }
 
-    private func writeState() {
+    /// A copy of the state goes to `stateFile`, which encodes and writes it off the main thread.
+    private func writeState(now: Bool = false) {
         saveDebouncer.cancel()
         guard let session else { return }
         var state = session.state
         if let engine { state.engine = engine.serialization ?? state.engine }
-        JSONStore.save(state, to: Self.stateFile)
+        if now { stateFile.saveNow(state) } else { stateFile.save(state) }
     }
 
     // MARK: Before the first sync
@@ -694,6 +695,39 @@ final class ICloudSync {
         case .managedAccountRestricted: return .restricted
         default: return nil
         }
+    }
+}
+
+// MARK: - The state file
+
+/// Sync's State.json, encoded and written off the main thread: one write at a time, in the order they were asked
+/// for, each from the copy handed over then, and none when it would write what's there already. Reads wait for the
+/// writes before them.
+nonisolated final class SyncStateFile: @unchecked Sendable {
+    let url: URL
+    private let queue = DispatchQueue(label: "app.zigzag.sync-state", qos: .utility)
+    /// What was written last; touched only on `queue`.
+    private var lastWritten: Data?
+
+    init(url: URL) { self.url = url }
+
+    /// Written soon, after what was asked for before it.
+    func save(_ state: SyncState) { queue.async { self.write(state) } }
+
+    /// Written now, after what was asked for before it: before quitting, and when sync stops or turns off.
+    @discardableResult
+    func saveNow(_ state: SyncState) -> Bool { queue.sync { write(state) } }
+
+    /// What's on disk once every write asked for has landed.
+    func load() -> SyncState? { queue.sync { JSONStore.load(SyncState.self, from: url) } }
+
+    @discardableResult
+    private func write(_ state: SyncState) -> Bool {
+        guard let data = JSONStore.encode(state) else { return false }
+        if data == lastWritten { return true }
+        guard JSONStore.write(data, to: url) else { return false }
+        lastWritten = data
+        return true
     }
 }
 
