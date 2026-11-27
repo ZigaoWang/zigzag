@@ -531,6 +531,9 @@ final class BrowserWindow: NSWindow {
             if event.type == .leftMouseDown {
                 makeKeyAndOrderFront(nil)
                 target.mouseDown(with: event)
+            } else if (target as? InteractiveView)?.drawsMenu == true {
+                // Zigzag's own menu, which follows the press from here.
+                target.rightMouseDown(with: event)
             } else if let menu = target.menu(for: event) {
                 NSMenu.popUpContextMenu(menu, with: event, for: target)
             }
@@ -543,6 +546,15 @@ final class BrowserWindow: NSWindow {
             guard let target = pressTarget else { return false }
             pressTarget = nil
             target.mouseUp(with: event)
+            return true
+        case .rightMouseDragged:
+            guard let target = pressTarget else { return false }
+            target.rightMouseDragged(with: event)
+            return true
+        case .rightMouseUp:
+            guard let target = pressTarget else { return false }
+            pressTarget = nil
+            target.rightMouseUp(with: event)
             return true
         default:
             return false
