@@ -277,7 +277,9 @@ final class SidebarListView: NSView {
         let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
         // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
         // open without opening every folder on the way to it. The page you're on is always open.
-        let isOpen: (UUID) -> Bool = { manager.bookmarkTab(for: $0) != nil }
+        // Folded, a pinned page closed since you came to the space keeps its row, unloaded, until you leave or refold.
+        let kept = collapsed && spaceID == manager.currentSpaceID ? manager.closedPins : []
+        let isOpen: (UUID) -> Bool = { manager.bookmarkTab(for: $0) != nil || kept.contains($0) }
         // Shown as tiles under the favorites instead (#539): the pages in no folder.
         let tiled: Set<UUID> = SidebarView.pinnedTabsAsTiles ? Set(Library.shared.pinnedTiles(in: spaceID).flatMap { [$0.0.id] + $0.partners.map(\.id) }) : []
         let pinned = Self.pinnedRows(bookmarks: bookmarks.map(\.id).filter { !riders.contains($0) && !tiled.contains($0) }, folders: folders,
@@ -1541,6 +1543,9 @@ final class SidebarListView: NSView {
     /// The rows the list holds, top to bottom, laid out or not.
     var debugItems: [SidebarItem] { items }
 
+    /// Folds or opens the pinned section, as its header does.
+    func debugToggleFold() { toggleCollapsed() }
+
     /// Where the drop line is, while it shows.
     var debugInsertionLine: NSRect? { insertionLine.superview === self && !insertionLine.isHidden ? insertionLine.frame : nil }
 
@@ -1699,6 +1704,7 @@ final class SidebarListView: NSView {
     private func toggleCollapsed() {
         guard let manager, !Library.shared.bookmarks(in: manager.currentSpaceID).isEmpty else { return }
         Self.setCollapsed(manager.currentSpaceID, !Self.isCollapsed(manager.currentSpaceID))
+        manager.forgetClosedPins()
         reload(animated: true)
         onFold?()
     }
