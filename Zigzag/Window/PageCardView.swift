@@ -736,8 +736,9 @@ final class PageCardView: NSView {
         }
     }
 
-    /// Animates the page back into place, then removes the backdrop.
-    func settleSwipe() {
+    /// Animates the page back into place from `velocity` points a second (positive to the right), then removes the
+    /// backdrop.
+    func settleSwipe(velocity: CGFloat = 0) {
         swipeSettles += 1
         let settle = swipeSettles
         let finish = { [weak self] in
@@ -752,21 +753,17 @@ final class PageCardView: NSView {
             let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
             Tokens.Motion.withoutAnimation { layer.setAffineTransform(.identity) }
             guard from != .identity, !Tokens.Motion.reduceMotion else { continue }
-            // The app's critically damped spring (perceptual 0.35 s).
-            let back = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
-            back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
-            back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            layer.add(back, forKey: "swipe.settle")
+            layer.add(SwipeExit.springHome(from: from, velocity: velocity), forKey: "swipe.settle")
         }
         CATransaction.commit()
     }
 
     /// After a swipe that went back or forward: the page carries on to `offset` and dims until `endSwipe` (#508).
-    func carrySwipe(to offset: CGFloat) {
+    func carrySwipe(to offset: CGFloat, velocity: CGFloat? = nil) {
         swipeSettles += 1
         swipeDimmed = true
         let shade = swipeShade
-        for layer in swipeMoving { SwipeExit.carry(layer, to: offset, dims: layer !== shade) }
+        for layer in swipeMoving { SwipeExit.carry(layer, to: offset, dims: layer !== shade, velocity: velocity) }
     }
 
     /// The page gone to has arrived: everything back in place at once.

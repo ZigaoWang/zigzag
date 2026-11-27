@@ -228,7 +228,9 @@ final class SwipeNavigator {
         if state == .leaning { cancel() }
         if wasTracking {
             // Letting go goes when the arrow is filled, or with a flick still moving as the fingers lift.
-            if ended, arming.release(progress: progress, speed: speed(at: time)) { go() } else { cancel() }
+            let fingers = speed(at: time)
+            letGoSpeed = pageSpeed(fingers)
+            if ended, arming.release(progress: progress, speed: fingers) { go() } else { cancel() }
             state = .finishing
         } else {
             state = .idle
@@ -304,7 +306,9 @@ final class SwipeNavigator {
     /// Lifted at `time`: goes when the arrow is filled or with a flick, as letting go of the trackpad does.
     func touchEnded(at time: TimeInterval, cancelled: Bool) {
         guard state == .tracking else { return }
-        if !cancelled, arming.release(progress: progress, touchSpeed: speed(at: time)) { go() } else { cancel() }
+        let fingers = speed(at: time)
+        letGoSpeed = pageSpeed(fingers)
+        if !cancelled, arming.release(progress: progress, touchSpeed: fingers) { go() } else { cancel() }
         state = .idle
     }
 
@@ -609,6 +613,14 @@ final class SwipeNavigator {
     }
     private static let maxShift: CGFloat = 72
 
+    /// Points a second the page moves (positive to the right) with the fingers going `fingers` the swipe's way:
+    /// slower than they do, as it holds back more the further it goes.
+    private func pageSpeed(_ fingers: CGFloat) -> CGFloat {
+        guard !Tokens.Motion.reduceMotion else { return 0 }
+        let pulled = max(0, CGFloat(-direction) * dx)
+        return CGFloat(-direction) * exp(-pulled / (Self.maxShift * 1.6)) / 1.6 * fingers
+    }
+
     /// `time`: the moment of the step that moved the fingers, whose speed can arm it as a flick.
     private func update(at time: TimeInterval? = nil) {
         guard let webView, let arrow, let overlay = arrow.superview else { return }
@@ -636,16 +648,15 @@ final class SwipeNavigator {
 
     /// Let go too soon: the page springs back into place.
     private func settlePage() {
-        if let card { card.settleSwipe(); return }
+        // It springs back at the speed the fingers left it with.
+        let velocity = letGoSpeed
+        letGoSpeed = 0
+        if let card { card.settleSwipe(velocity: velocity); return }
         guard let layer = webView?.layer else { return }
         let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
         Tokens.Motion.withoutAnimation { layer.setAffineTransform(.identity) }
         guard from != .identity, !Tokens.Motion.reduceMotion else { return }
-        // The app's critically damped spring, as stiff as before (a perceptual 0.35 s).
-        let back = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
-        back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
-        back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        layer.add(back, forKey: "swipe.settle")
+        layer.add(SwipeExit.springHome(from: from, velocity: velocity), forKey: "swipe.settle")
     }
 
     private func go() {
@@ -671,11 +682,13 @@ final class SwipeNavigator {
     private func carryOn() {
         guard let webView else { return }
         let to = SwipeExit.offset(from: shift * CGFloat(-direction), direction: direction)
+        let velocity = letGoSpeed
+        letGoSpeed = 0
         if let card {
-            card.carrySwipe(to: to)
+            card.carrySwipe(to: to, velocity: velocity)
             carried = card
         } else if let layer = webView.layer {
-            SwipeExit.carry(layer, to: to)
+            SwipeExit.carry(layer, to: to, velocity: velocity)
         }
         arrival?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.pageArrived() }
@@ -716,8 +729,37 @@ enum SwipeExit {
         offset + travel * CGFloat(-direction)
     }
 
-    /// Slides `layer` on to `offset` and dims it, eased out.
-    @MainActor static func carry(_ layer: CALayer, to offset: CGFloat, dims: Bool = true) {
+    /// The house ease-out's first control point: its slope there is how fast it starts.
+    private static let easeStart: (x: Float, y: Float) = (0.23, 1)
+
+    /// The ease-out for going `distance` points in `duration` from a page moving `velocity` points a second the same
+    /// way: it starts at that speed, never slower than an even pace nor faster than the house ease-out does.
+    static func carryTiming(distance: CGFloat, velocity: CGFloat?) -> CAMediaTimingFunction {
+        guard let velocity, distance != 0 else { return Tokens.Motion.easeOut }
+        let fastest = easeStart.y / easeStart.x
+        let slope = min(max(Float(velocity * CGFloat(duration) / distance), 1), fastest)
+        return CAMediaTimingFunction(controlPoints: easeStart.x, easeStart.x * slope, 0.32, 1)
+    }
+
+    /// The app's critically damped spring home from `from` (a perceptual 0.28 s), starting at `velocity` points a
+    /// second (positive to the right), as the fingers left the page.
+    @MainActor static func springHome(from: CGAffineTransform, velocity: CGFloat) -> CASpringAnimation {
+        let back = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+
+        if from.tx != 0, velocity != 0 {
+            // The spring counts speed in whole distances a second toward home; past its natural frequency it would
+            // go past home, so it's capped there.
+            let natural = sqrt(back.stiffness / back.mass)
+            back.initialVelocity = max(-natural, min(natural, -velocity / from.tx))
+            back.duration = back.settlingDuration
+        }
+        back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
+        back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        return back
+    }
+
+    /// Slides `layer` on to `offset` and dims it, eased out from the page's `velocity` (points a second) when known.
+    @MainActor static func carry(_ layer: CALayer, to offset: CGFloat, dims: Bool = true, velocity: CGFloat? = nil) {
         let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
         let opacity = layer.presentation()?.opacity ?? layer.opacity
         Tokens.Motion.withoutAnimation {
@@ -729,7 +771,7 @@ enum SwipeExit {
         move.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
         move.toValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(layer.affineTransform()))
         move.duration = duration
-        move.timingFunction = Tokens.Motion.easeOut
+        move.timingFunction = carryTiming(distance: offset - from.tx, velocity: velocity)
         layer.add(move, forKey: "swipe.settle")
         guard dims else { return }
         let fade = CABasicAnimation(keyPath: "opacity")
@@ -836,8 +878,10 @@ enum SwipeDecision: Equatable {
     /// How fast the fingers were going `direction`'s way (-1 back, 1 forward) over the last `flickWindow` before
     /// `now`, points a second, from `samples` of the scroll so far. Still for that long, they aren't going at all.
     static func speed(_ samples: [(time: TimeInterval, dx: CGFloat)], at now: TimeInterval, direction: Int) -> CGFloat {
-        let recent = samples.filter { now - $0.time < flickWindow }
-        guard let first = recent.first, let last = recent.last, last.time > first.time else { return 0 }
+        // Each step asks, so no array is made for it.
+        guard let start = samples.firstIndex(where: { now - $0.time < flickWindow }), let end = samples.lastIndex(where: { now - $0.time < flickWindow }) else { return 0 }
+        let first = samples[start], last = samples[end]
+        guard last.time > first.time else { return 0 }
         return CGFloat(-direction) * (last.dx - first.dx) / CGFloat(last.time - first.time)
     }
 
