@@ -265,6 +265,11 @@ final class MiniPlayer {
                                        : String(localized: "Play", comment: "Tooltip of the mini player's play button while the video is paused.")) { [weak self] in
             self?.command("toggle")
         })
+        for (action, title) in [(MediaSessionActions.Action.previous, String(localized: "Previous Video", comment: "Tooltip, VoiceOver name and menu item of the mini player's button that goes to the page's previous video, shown when the site offers one.")),
+                                (.next, String(localized: "Next Video", comment: "Tooltip, VoiceOver name and menu item of the mini player's button that goes to the page's next video, shown when the site offers one."))]
+        where card.tracks.contains(action) {
+            menu.addItem(SidebarMenus.Item(title) { [weak self] in self?.track(action) })
+        }
         menu.addItem(.separator())
         menu.addItem(SidebarMenus.Item(String(localized: "Minimize", comment: "Tooltip of the mini player's button that hides it; the video keeps playing in its tab.")) { [weak self] in
             self?.minimize()
@@ -339,6 +344,7 @@ final class MiniPlayer {
         card.onToggle = { [weak self] in self?.command("toggle") }
         card.onSeek = { [weak self] by in self?.command("seek", [("by", by)]) }
         card.onSeekTo = { [weak self] fraction in self?.command("seekTo", [("f", fraction)]) }
+        card.onTrack = { [weak self] action in self?.track(action) }
         card.onMoved = { [weak self] in self?.dropped() }
         card.onResize = { [weak self] in self?.place() }
         card.onResized = { [weak self] in self?.resized() }
@@ -366,9 +372,13 @@ final class MiniPlayer {
                 guard let self, page === webView else { return }
                 self.pageReported()
             },
+            MediaSessionActions.shared.changed.observe { [weak self, weak webView] page in
+                guard let self, page === webView else { return }
+                self.askTracks()
+            },
             tab.changed.observe { [weak self, weak tab] change in
                 guard let self, let tab else { return }
-                if change == .url { self.card?.siteName = Self.siteName(tab.url) }
+                if change == .url { self.card?.siteName = Self.siteName(tab.url); self.askTracks() }
                 guard change == .webView || change == .url else { return }
                 if tab.webView !== self.webView { self.apply(self.model.lost(tab.id)) }
             },
@@ -380,6 +390,7 @@ final class MiniPlayer {
             _ = await PageVideos.shared.run("reveal", [("i", video.index)], in: frame, of: webView)
             _ = await PageVideos.shared.run("watch", [("on", true)], in: frame, of: webView)
             self.isolate()
+            self.askTracks()
         }
     }
 
@@ -548,6 +559,25 @@ final class MiniPlayer {
         if !frame.isMain { _ = await PageVideos.shared.run("unisolate", in: nil, of: webView) }
     }
 
+    /// Asks the video's frame which of its own previous and next it has set, for the card's buttons.
+    private func askTracks() {
+        guard let webView, let frame = currentFrame else { return }
+        Task { [weak self] in
+            let tracks = await MediaSessionActions.shared.actions(in: frame.info, of: webView)
+            guard let self, self.webView === webView, self.frameID == frame.id else { return }
+            self.card?.setTracks(tracks)
+        }
+    }
+
+    /// Previous or Next: the page's own handler runs in the video's frame, as a press of yours.
+    private func track(_ action: MediaSessionActions.Action) {
+        guard let webView, let frame = currentFrame else { return }
+        Task {
+            await MediaSessionActions.shared.run(action, in: frame.info, of: webView)
+            _ = await PageVideos.shared.run("report", in: frame, of: webView)
+        }
+    }
+
     private func command(_ name: String, _ arguments: [(String, Any)] = []) {
         guard let webView, let frame = currentFrame else { return }
         let all = [("i", videoIndex as Any)] + arguments
@@ -595,6 +625,8 @@ final class MiniPlayer {
         } ?? elsewhere.map { found in
             frameID = found.frame.id
             frameOrigin = .zero
+            // Another frame's video: its own previous and next.
+            askTracks()
             return found.video
         }
         guard let found else {
@@ -785,7 +817,7 @@ final class MiniPlayer {
                      "presenting": tab.webView.map { PageVideos.shared.isPresentingItself($0) } ?? false]
          } ?? [],
          "reporting": controller?.tabManager.allTabs.filter { $0.webView.map { !PageVideos.shared.frames(in: $0).isEmpty } ?? false }.map(\.displayTitle) ?? [],
-         "hovered": card?.showsControls ?? false, "webViewInCard": webView.map { $0.isDescendant(of: card ?? NSView()) } ?? false,
+         "hovered": card?.showsControls ?? false, "tracks": card.map { $0.shownTracks.map(\.rawValue).sorted() } ?? [], "webViewInCard": webView.map { $0.isDescendant(of: card ?? NSView()) } ?? false,
          "parked": parked.compactMap { $0.tab?.displayTitle }, "parkedInWindow": parked.compactMap { $0.holder.map { $0.superview === parking && $0.window != nil } }]
     }
     #endif
@@ -855,6 +887,11 @@ final class MiniPlayerView: NSView {
         tip: String(localized: "Pause", comment: "Tooltip of the mini player's play button while the video plays."))
     private let forwardButton = MiniPlayerView.overlayButton("goforward.15", side: MiniPlayerView.centerSide, glyph: MiniPlayerView.skipGlyph,
         tip: String(localized: "Forward 15 Seconds", comment: "Tooltip of the mini player's button that skips the video ahead 15 seconds."))
+    /// The page's own previous and next (`MediaSessionActions`), only while it has set them.
+    private let previousButton = MiniPlayerView.overlayButton("backward.end.fill", side: MiniPlayerView.centerSide, glyph: MiniPlayerView.trackGlyph,
+        tip: String(localized: "Previous Video", comment: "Tooltip, VoiceOver name and menu item of the mini player's button that goes to the page's previous video, shown when the site offers one."))
+    private let nextButton = MiniPlayerView.overlayButton("forward.end.fill", side: MiniPlayerView.centerSide, glyph: MiniPlayerView.trackGlyph,
+        tip: String(localized: "Next Video", comment: "Tooltip, VoiceOver name and menu item of the mini player's button that goes to the page's next video, shown when the site offers one."))
     private let progress = MiniPlayerProgress()
     private weak var holder: PageHolder?
 
@@ -864,6 +901,8 @@ final class MiniPlayerView: NSView {
     var onToggle: (() -> Void)?
     var onSeek: ((Double) -> Void)?
     var onSeekTo: ((Double) -> Void)?
+    /// Previous or Next, pressed.
+    var onTrack: ((MediaSessionActions.Action) -> Void)?
     /// Let go after a drag.
     var onMoved: (() -> Void)?
     /// Resized by an edge or a corner: as it goes, and once let go.
@@ -905,6 +944,8 @@ final class MiniPlayerView: NSView {
     static let centerSide: CGFloat = 44
     static let skipGlyph: CGFloat = 22
     static let playGlyph: CGFloat = 26
+    /// Previous and next, filled as play is, a step under the skips so the row's ends stay lighter than its middle.
+    static let trackGlyph: CGFloat = 18
     /// The room around the controls, the same at every edge: the top row's circles, and the time line, this far in.
     static let controlsInset: CGFloat = Tokens.Space.x2
     /// The controls go this long after the pointer stops moving over the video.
@@ -952,7 +993,11 @@ final class MiniPlayerView: NSView {
         controls.layer?.cornerCurve = .continuous
         controls.alphaValue = 0
         controls.addSubview(scrim)
-        for view in [backButton, minimizeButton, closeButton, rewindButton, playButton, forwardButton, progress] as [NSView] { controls.addSubview(view) }
+        for view in [backButton, minimizeButton, closeButton, previousButton, rewindButton, playButton, forwardButton, nextButton, progress] as [NSView] {
+            controls.addSubview(view)
+        }
+        previousButton.isHidden = true
+        nextButton.isHidden = true
         addSubview(controls)
         showControls(animated: false)
 
@@ -965,6 +1010,8 @@ final class MiniPlayerView: NSView {
         rewindButton.onClick = { [weak self] _ in self?.onSeek?(-15) }
         forwardButton.onClick = { [weak self] _ in self?.onSeek?(15) }
         playButton.onClick = { [weak self] _ in self?.onToggle?() }
+        previousButton.onClick = { [weak self] _ in self?.onTrack?(.previous) }
+        nextButton.onClick = { [weak self] _ in self?.onTrack?(.next) }
         progress.onSeek = { [weak self] fraction in self?.onSeekTo?(fraction) }
         // Holding the bar keeps the controls up.
         progress.onScrub = { [weak self] _ in self?.keepControls() }
@@ -1048,11 +1095,17 @@ final class MiniPlayerView: NSView {
         let line = MiniPlayerProgress.line
         progress.frame = NSRect(x: pad, y: bounds.height - pad - line / 2 - MiniPlayerProgress.height / 2,
                                 width: max(0, bounds.width - pad * 2), height: MiniPlayerProgress.height)
-        // The three in the middle, on the card's own middle, the same distance apart, as a player's controls sit.
+        // The ones in the middle, on the card's own middle, the same distance apart, as a player's controls sit.
         let side = Self.centerSide
         let middle = NSPoint(x: bounds.midX, y: round(bounds.midY))
-        let gap = round(min(max(bounds.width * 0.18, side + Tokens.Space.x2), 76))
-        for (button, dx) in [(rewindButton, -gap), (playButton, 0), (forwardButton, gap)] {
+        let row = MiniPlayerLayout.centerRow(width: bounds.width, side: side, least: side + Tokens.Space.x2, inset: pad,
+                                             seekable: isSeekable, tracks: !tracks.isEmpty)
+        rewindButton.isHidden = !row.skips
+        forwardButton.isHidden = !row.skips
+        previousButton.isHidden = !tracks.contains(.previous)
+        nextButton.isHidden = !tracks.contains(.next)
+        let outer = row.skips ? row.gap * 2 : row.gap
+        for (button, dx) in [(previousButton, -outer), (rewindButton, -row.gap), (playButton, 0), (forwardButton, row.gap), (nextButton, outer)] {
             button.frame = NSRect(x: round(middle.x + dx - side / 2), y: round(middle.y - side / 2), width: side, height: side)
         }
     }
@@ -1085,10 +1138,30 @@ final class MiniPlayerView: NSView {
             playButton.toolTip = tip
         }
         let seekable = video.duration != nil
-        rewindButton.isHidden = !seekable
-        forwardButton.isHidden = !seekable
+        if seekable != isSeekable {
+            isSeekable = seekable
+            needsLayout = true
+        }
         progress.isHidden = !seekable
         if let duration = video.duration, duration > 0 { progress.setFraction(video.time / duration) }
+    }
+
+    /// The video can be skipped through: the skips show where there's room (`layoutControls`).
+    private var isSeekable = false
+
+    /// The page's previous and next it has set, for the buttons that show.
+    private(set) var tracks: Set<MediaSessionActions.Action> = []
+
+    func setTracks(_ tracks: Set<MediaSessionActions.Action>) {
+        guard tracks != self.tracks else { return }
+        self.tracks = tracks
+        needsLayout = true
+    }
+
+    /// The previous and next buttons laid out to show.
+    var shownTracks: Set<MediaSessionActions.Action> {
+        layoutSubtreeIfNeeded()
+        return Set([(MediaSessionActions.Action.previous, previousButton), (.next, nextButton)].filter { !$0.1.isHidden }.map(\.0))
     }
 
     // MARK: Showing up and going
@@ -1243,6 +1316,12 @@ final class MiniPlayerView: NSView {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
         if window?.firstResponder === self, flags == .command, event.charactersIgnoringModifiers == "w" { onClose?(); return true }
+        // ⌘← and ⌘→ go to the page's previous and next, as in Music, when it has them.
+        let arrows: [UInt16: MediaSessionActions.Action] = [123: .previous, 124: .next]
+        if window?.firstResponder === self, flags == .command, let action = arrows[event.keyCode], tracks.contains(action) {
+            onTrack?(action)
+            return true
+        }
         return super.performKeyEquivalent(with: event)
     }
 
@@ -1283,14 +1362,14 @@ final class MiniPlayerView: NSView {
         guard on != showsControls else { return }
         showsControls = on
         showControls(animated: animated)
-        if !on { [backButton, minimizeButton, closeButton, rewindButton, playButton, forwardButton].forEach { $0.isHovered = false } }
+        if !on { [backButton, minimizeButton, closeButton, previousButton, rewindButton, playButton, forwardButton, nextButton].forEach { $0.isHovered = false } }
     }
 
     /// When paused, the play button stays visible without hover; other controls show only on hover.
     private func showControls(animated: Bool) {
         let all: CGFloat = showsControls ? 1 : 0
         let play: CGFloat = showsControls || !isPlaying ? 1 : 0
-        let rest: [NSView] = [scrim, backButton, minimizeButton, closeButton, rewindButton, forwardButton, progress]
+        let rest: [NSView] = [scrim, backButton, minimizeButton, closeButton, previousButton, rewindButton, forwardButton, nextButton, progress]
         let apply = {
             self.controls.animator().alphaValue = play
             rest.forEach { $0.animator().alphaValue = all }
@@ -1450,7 +1529,8 @@ final class MiniPlayerView: NSView {
     /// One control as if the pointer were on it (`hover`), pressing it (`press`), or neither (`off`).
     func debugButton(_ name: String, _ state: String) {
         let all: [String: InteractiveView] = ["site": backButton, "minimize": minimizeButton, "close": closeButton,
-                                              "rewind": rewindButton, "play": playButton, "forward": forwardButton]
+                                              "rewind": rewindButton, "play": playButton, "forward": forwardButton,
+                                              "previous": previousButton, "next": nextButton]
         guard let button = all[name] else { return }
         button.isHovered = state != "off"
         button.isPressed = state == "press"
@@ -1463,6 +1543,8 @@ final class MiniPlayerView: NSView {
         case "play": onToggle?()
         case "rewind": onSeek?(-15)
         case "forward": onSeek?(15)
+        case "previous": if tracks.contains(.previous) { onTrack?(.previous) }
+        case "next": if tracks.contains(.next) { onTrack?(.next) }
         case "double": onBack?()
         default: break
         }

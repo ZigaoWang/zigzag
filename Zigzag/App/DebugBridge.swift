@@ -634,7 +634,7 @@ enum DebugBridge {
     }
 
     /// The mini player, without bringing the window forward: mpstate <path> (JSON), mphover on|off (its controls, as
-    /// the pointer brings them), mppress back|site|double|minimize|close|play|rewind|forward, mpdrag <dx> <dy> (dragged that far and
+    /// the pointer brings them), mppress back|site|double|minimize|close|play|rewind|forward|previous|next, mpdrag <dx> <dy> (dragged that far and
     /// let go), mpselect <index> (as `select`), mpwindow <path> (window number and process), mpeval <index> <path> <script>
     /// (the script's result in that tab's page, which it may await, written to the file).
     private static func runMiniPlayer(_ name: String, _ arg: String, in controller: BrowserWindowController) {
@@ -645,7 +645,7 @@ enum DebugBridge {
         case "mphover": player.card?.debugHover(arg != "off")
         // mpoff: Turn Off Mini Player, from its menu.
         case "mpoff": player.turnOff()
-        // mpbutton <site|minimize|close|rewind|play|forward> <hover|press|off>: one of the card's controls as the pointer has it.
+        // mpbutton <site|minimize|close|rewind|play|forward|previous|next> <hover|press|off>: one of the card's controls as the pointer has it.
         case "mpbutton":
             let f = arg.split(separator: " ").map(String.init)
             if f.count == 2 { player.card?.debugButton(f[0], f[1]) }

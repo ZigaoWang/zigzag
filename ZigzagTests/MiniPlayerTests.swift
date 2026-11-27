@@ -553,6 +553,21 @@ struct MiniPlayerTests {
         #expect(MiniPlayerLayout.growPoint(of: CGRect(x: 1080, y: 20, width: 340, height: 190), in: area) == CGPoint(x: 1, y: 0))
     }
 
+    @Test func thePagesPreviousAndNextSitOutsideTheSkipsWhileTheyFit() {
+        func row(_ width: CGFloat, seekable: Bool = true, tracks: Bool = true) -> MiniPlayerLayout.CenterRow {
+            MiniPlayerLayout.centerRow(width: width, side: 44, least: 52, inset: 8, seekable: seekable, tracks: tracks)
+        }
+        // Without them, the row is as it was.
+        #expect(row(400, tracks: false) == .init(skips: true, tracks: false, gap: 72))
+        #expect(row(240, tracks: false) == .init(skips: true, tracks: false, gap: 52))
+        // With them, five in a row while they fit; on a narrow card the skips give way.
+        #expect(row(480) == .init(skips: true, tracks: true, gap: 64))
+        #expect(row(400) == .init(skips: true, tracks: true, gap: 56))
+        #expect(row(240) == .init(skips: false, tracks: true, gap: 52))
+        // A live stream has no skips: previous and next sit beside play.
+        #expect(row(400, seekable: false) == .init(skips: false, tracks: true, gap: 72))
+    }
+
     @MainActor @Test func itsButtonsTakeTheSameWashesAsItsSiteName() {
         let button = IconButton(symbol: "xmark", size: 28, symbolSize: 13)
         button.isOverMedia = true

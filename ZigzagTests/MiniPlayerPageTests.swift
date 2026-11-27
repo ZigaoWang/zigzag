@@ -308,4 +308,89 @@ struct MiniPlayerPageTests {
         parking.release(holder)
         #expect(try await becomes("hidden"))
     }
+
+    // MARK: The page's previous and next (#565)
+
+    /// A page that sets its own previous and next as it loads.
+    private func mediaSessionPage(_ body: String) async -> (WKWebView, WKUserContentController) {
+        let configuration = WKWebViewConfiguration()
+        MediaSessionActions.attach(to: configuration.userContentController)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<html><body><video muted></video><script>window.ran = [];\n\(body)</script></body></html>",
+                                   baseURL: URL(string: "https://videos.test/"))
+        }
+        return (webView, configuration.userContentController)
+    }
+
+    private func ran(in webView: WKWebView) async throws -> [String] {
+        try await webView.callAsyncJavaScript("return window.ran", arguments: [:], in: nil, contentWorld: .page) as? [String] ?? []
+    }
+
+    private func card(showing tracks: Set<MediaSessionActions.Action>) -> MiniPlayerView {
+        let card = MiniPlayerView(frame: NSRect(x: 0, y: 0, width: 480, height: 270))
+        card.setTracks(tracks)
+        return card
+    }
+
+    @Test func aPagesPreviousAndNextShowAndRunItsOwnHandlers() async throws {
+        let (webView, controller) = await mediaSessionPage("""
+            navigator.mediaSession.setActionHandler('nexttrack', (d) => ran.push('next ' + d.action));
+            navigator.mediaSession.setActionHandler('previoustrack', (d) => ran.push('previous ' + d.action));
+            """)
+        defer { controller.removeScriptMessageHandler(forName: MediaSessionActions.messageName, contentWorld: .page) }
+        let tracks = await MediaSessionActions.shared.actions(in: nil, of: webView)
+        #expect(tracks == [.previous, .next])
+        let card = card(showing: tracks)
+        #expect(card.shownTracks == [.previous, .next])
+        var pressed: [MediaSessionActions.Action] = []
+        card.onTrack = { pressed.append($0) }
+        card.debugPress("next")
+        card.debugPress("previous")
+        #expect(pressed == [.next, .previous])
+        for action in pressed { #expect(await MediaSessionActions.shared.run(action, in: nil, of: webView)) }
+        #expect(try await ran(in: webView) == ["next nexttrack", "previous previoustrack"])
+    }
+
+    @Test func aPageWithoutHandlersHasNoButtons() async throws {
+        let (webView, controller) = await mediaSessionPage("navigator.mediaSession.setActionHandler('play', () => ran.push('play'));")
+        defer { controller.removeScriptMessageHandler(forName: MediaSessionActions.messageName, contentWorld: .page) }
+        let tracks = await MediaSessionActions.shared.actions(in: nil, of: webView)
+        #expect(tracks.isEmpty)
+        let card = card(showing: tracks)
+        #expect(card.shownTracks.isEmpty)
+        card.onTrack = { _ in Issue.record("no button to press") }
+        card.debugPress("next")
+        #expect(await MediaSessionActions.shared.run(.next, in: nil, of: webView) == false)
+        #expect(try await ran(in: webView).isEmpty)
+    }
+
+    @Test func handlersTakenAwayTakeTheirButtons() async throws {
+        let (webView, controller) = await mediaSessionPage("""
+            navigator.mediaSession.setActionHandler('nexttrack', () => ran.push('next'));
+            navigator.mediaSession.setActionHandler('previoustrack', () => ran.push('previous'));
+            """)
+        defer { controller.removeScriptMessageHandler(forName: MediaSessionActions.messageName, contentWorld: .page) }
+        let card = card(showing: await MediaSessionActions.shared.actions(in: nil, of: webView))
+        #expect(card.shownTracks == [.previous, .next])
+        // The page says so as it changes them, and the card follows.
+        var told = 0
+        let token = MediaSessionActions.shared.changed.observe { page in if page === webView { told += 1 } }
+        defer { token.cancel() }
+        let steps: [(String, Set<MediaSessionActions.Action>)] = [("nexttrack", [.previous]), ("previoustrack", [])]
+        for (action, left) in steps {
+            let before = told
+            _ = try await webView.callAsyncJavaScript("navigator.mediaSession.setActionHandler('\(action)', null); return true",
+                                                      arguments: [:], in: nil, contentWorld: .page)
+            for _ in 0..<40 where told == before { try await Task.sleep(for: .milliseconds(25)) }
+            #expect(told == before + 1)
+            card.setTracks(await MediaSessionActions.shared.actions(in: nil, of: webView))
+            #expect(card.shownTracks == left)
+        }
+        #expect(await MediaSessionActions.shared.run(.next, in: nil, of: webView) == false)
+        #expect(try await ran(in: webView).isEmpty)
+    }
 }

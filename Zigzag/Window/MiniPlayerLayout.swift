@@ -226,6 +226,27 @@ nonisolated enum MiniPlayerLayout {
         frame(for: Anchor(corner: corner, offset: CGSize(width: margin, height: margin)), size: size, in: area)
     }
 
+    // MARK: Its controls
+
+    /// The buttons along the card's middle, around play: the 15-second skips beside it, and the page's previous and
+    /// next outside them, both kept whenever the page set either, so play stays in the middle.
+    struct CenterRow: Equatable {
+        var skips: Bool
+        var tracks: Bool
+        /// From one button's middle to the next.
+        var gap: CGFloat
+    }
+
+    /// The row for a card this wide, its buttons `side` across and never nearer than `least` apart, `inset` from its
+    /// edges. Where all five don't fit, the skips give way to the page's previous and next.
+    static func centerRow(width: CGFloat, side: CGFloat, least: CGFloat, inset: CGFloat, seekable: Bool, tracks: Bool) -> CenterRow {
+        let three = round(min(max(width * 0.18, least), 76))
+        guard tracks, seekable else { return CenterRow(skips: seekable, tracks: tracks, gap: three) }
+        let five = round(min(max(width * 0.14, least), 64))
+        guard five * 4 + side <= width - inset * 2 else { return CenterRow(skips: false, tracks: true, gap: three) }
+        return CenterRow(skips: true, tracks: true, gap: five)
+    }
+
     // MARK: Where it sits
 
     /// It never goes nearer the screen's edges than this, so its rounded edge always shows whole.

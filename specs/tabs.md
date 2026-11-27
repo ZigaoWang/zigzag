@@ -213,6 +213,16 @@
 - The same, with the window still in view on another display → the video stays in its page until that window goes out of sight.
   Test: AutoPictureInPictureTests.aWindowInViewOnAnotherDisplayKeepsItsVideo
 
+## Previous and next in the mini player
+- A video in the mini player whose page set its own previous or next (the Media Session API's `previoustrack`, `nexttrack`) → Previous and Next buttons beside its 15-second skips, as in Safari's and Chrome's picture in picture; pressing one, its right-click menu's item or ⌘← / ⌘→ runs the page's own.
+  Test: MiniPlayerPageTests.aPagesPreviousAndNextShowAndRunItsOwnHandlers
+- A page that set neither → no Previous or Next.
+  Test: MiniPlayerPageTests.aPageWithoutHandlersHasNoButtons
+- The page takes one away → its button goes at once.
+  Test: MiniPlayerPageTests.handlersTakenAwayTakeTheirButtons
+- A card too narrow for five buttons → the 15-second skips give way to Previous and Next; play stays in the middle.
+  Test: MiniPlayerTests.thePagesPreviousAndNextSitOutsideTheSkipsWhileTheyFit
+
 ## Picked rows
 - ⌫, ⌦ or ⌘⌫ with two or more rows picked → picked tabs close and picked pinned pages are removed, once per press.
   Test: SidebarDeleteKeyTests.deleteClosesPickedRowsOnceAndOnlyWhilePicked
