@@ -5,22 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Closing a pinned tab with ⌘W while the space's pinned tabs are folded, or one shown under a closed folder, no longer takes its row out of the sidebar: it stays, unloaded, until you switch spaces or open or close the pinned tabs or that folder again.
-- Zoom's web app at app.zoom.us no longer stays blank: a site asking whether it may show notifications got an error instead of an answer. Websites also no longer see `window.browser`, an extension object Chrome never gives them. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
-- Quitting and opening Zigzag again on your last session keeps you signed in to sites like Azure DevOps and Microsoft 365 again: Zigzag could skip saving their session cookies and then lose the ones it had kept at the next launch. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-- ⇧⌘T brings back a pinned tab you closed with ⌘W: it loads again in its row, at the page and history it had. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#549](https://github.com/ZigaoWang/zigzag/issues/549))
-- Settings no longer freezes when it opens on Profiles with data from many profiles that are no longer listed: past three, they fold into one box that says how many.
-- A translated page stays translated as it changes: posts and comments that load as you scroll, text the page updates and another page of a site that doesn't reload, like Reddit, are translated as they come, and a long page is translated all the way down instead of stopping partway.
-- A window sitting still no longer keeps the GPU busy in bursts: a change in your library that leaves the space as it was, like one from sync, or the battery reporting its charge, faded the whole window from its color to the same color.
-- Closing a tab you just opened with ⌘T goes back to the tab you were on, as in Safari and Chrome, instead of the tab below it.
-- The screen edge's page preview no longer closes and comes back while you move from one tab to the next, folds back when the pointer leaves the tabs and the page for the sidebar's empty part, and no longer shows up to extensions as a window of its own. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
-- In the screen edge's page preview, a click on a sleeping tab's card opens that tab in the window as a click on its row does, a menu from the panel is no longer drawn under the page, and Esc or moving back to the sidebar after clicking into the page leaves the keyboard with the panel instead of bringing the browser window forward. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
-
-### New
-- A download rule can send the saved file itself to a service with {file_raw}, so Send to rTorrent now hands over the .torrent file and works with private trackers. A service's username and password are kept in the Keychain instead of in its address. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
-- On a touch display or a Sidecar iPad, menus a finger opens have taller rows, a tap just beside a small button presses it, touch and hold on one of several picked tabs carries them all, and the sidebar's edge is easier to take with a finger.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
@@ -42,6 +26,8 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - The New and Edit Live Folder sheet shows the folder's own icon, as the sidebar does: GitHub's for a GitHub list, the site's for a feed, or the one you chose. Click it to change the icon, as Change Icon… does, and a new folder keeps the icon you pick.
 - Sync with iCloud, in Settings › General: your spaces, profiles, pinned tabs, folders, favorites, live folders and settings stay the same on every Mac signed in to your iCloud, kept in your own iCloud's private database. Open tabs, history, website data and extensions stay on each Mac, and passwords keep syncing through iCloud Keychain. Turning it on puts the Mac's library together with iCloud's: where something is in both, the newer edit wins, nothing is removed without asking, and a backup is saved first. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 - The sidebar from the screen edge previews pages: rest the pointer on a tab and its page comes out beside the sidebar, over the app you're in. A sleeping tab shows its name and stays asleep, and a click still takes you to the tab in Zigzag. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
+- A download rule can send the saved file itself to a service with {file_raw}, so Send to rTorrent now hands over the .torrent file and works with private trackers. A service's username and password are kept in the Keychain instead of in its address. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
+- On a touch display or a Sidecar iPad, menus a finger opens have taller rows, a tap just beside a small button presses it, touch and hold on one of several picked tabs carries them all, and the sidebar's edge is easier to take with a finger.
 
 ### Changed
 - Two-finger swipes back and forward are smoother, go at a shorter distance or a lighter flick, keep the page from drifting up and down, and never leave the arrow up or the page shifted, in tabs, split view and Zigzag Mini.
@@ -69,6 +55,16 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - The Marvellous Suspender and other extensions that set alarms work again: setting an alarm now gives them back a promise, as in Chrome.
 - Closing a tab you just opened with ⌘T goes back to the tab you were on, as in Safari and Chrome, instead of the tab below it.
 - The screen edge's page preview no longer closes and comes back while you move from one tab to the next, folds back when the pointer leaves the tabs and the page for the sidebar's empty part, and no longer shows up to extensions as a window of its own. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- Closing a pinned tab with ⌘W while the space's pinned tabs are folded, or one shown under a closed folder, no longer takes its row out of the sidebar: it stays, unloaded, until you switch spaces or open or close the pinned tabs or that folder again.
+- Zoom's web app at app.zoom.us no longer stays blank: a site asking whether it may show notifications got an error instead of an answer. Websites also no longer see `window.browser`, an extension object Chrome never gives them. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- Quitting and opening Zigzag again on your last session keeps you signed in to sites like Azure DevOps and Microsoft 365 again: Zigzag could skip saving their session cookies and then lose the ones it had kept at the next launch. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- ⇧⌘T brings back a pinned tab you closed with ⌘W: it loads again in its row, at the page and history it had. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#549](https://github.com/ZigaoWang/zigzag/issues/549))
+- Settings no longer freezes when it opens on Profiles with data from many profiles that are no longer listed: past three, they fold into one box that says how many.
+- A translated page stays translated as it changes: posts and comments that load as you scroll, text the page updates and another page of a site that doesn't reload, like Reddit, are translated as they come, and a long page is translated all the way down instead of stopping partway.
+- A window sitting still no longer keeps the GPU busy in bursts: a change in your library that leaves the space as it was, like one from sync, or the battery reporting its charge, faded the whole window from its color to the same color.
+- Closing a tab you just opened with ⌘T goes back to the tab you were on, as in Safari and Chrome, instead of the tab below it.
+- The screen edge's page preview no longer closes and comes back while you move from one tab to the next, folds back when the pointer leaves the tabs and the page for the sidebar's empty part, and no longer shows up to extensions as a window of its own. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- In the screen edge's page preview, a click on a sleeping tab's card opens that tab in the window as a click on its row does, a menu from the panel is no longer drawn under the page, and Esc or moving back to the sidebar after clicking into the page leaves the keyboard with the panel instead of bringing the browser window forward. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
 ## [0.9.6] - 2026-11-27
 
