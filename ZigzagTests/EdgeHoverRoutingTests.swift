@@ -10,20 +10,19 @@ struct EdgeHoverRoutingTests {
     @Test func aCrossingBetweenRowsDoesNotCloseThePage() {
         // Still in the list: a crossing, not leaving. The next row's report cancels the close anyway; this is what
         // makes a slow crossing, or a pause on the edge of a row, behave the same.
-        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: true, pointerOverPreview: false, panelKept: false))
+        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: true, pointerOverPreview: false, stillMoving: false))
     }
 
     @Test func restingOnThePageKeepsIt() {
-        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: true, panelKept: false))
+        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: true, stillMoving: false))
     }
 
     @Test func leavingTheRowsClosesIt() {
-        #expect(EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false, panelKept: false))
+        #expect(EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false, stillMoving: false))
     }
 
-    @Test func aPageStaysWhileTheSidebarStays() {
-        // Off the rows and off the page, but still where the sidebar keeps itself open: the page waits rather than
-        // closing and coming back a moment later.
-        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false, panelKept: true))
+    @Test func aPointerOnItsWayToARowKeepsThePage() {
+        // Off the rows and off the page, but still moving: on its way somewhere, so the page waits.
+        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false, stillMoving: true))
     }
 }

@@ -478,20 +478,19 @@ final class EdgeSidebar {
         closeWork?.cancel()
         closeWork = nil
         guard preview != nil else { return }
+        let start = pointer
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.closeWork = nil
                 let point = self.pointer
-                // The sidebar's own leave rule decides whether the panel stays; a page doesn't go before the panel
-                // does. Off the rows and off the page, but still where the panel keeps itself open: the page waits
-                // rather than closing and coming back a moment later.
-                let overRows = evenOnRows ? false : self.rowNear(point) != nil
-                let kept = evenOnRows ? false
-                    : self.panel.map { EdgeSidebarLayout.keeps(at: point, panel: $0.frame) } ?? false
-                guard EdgeHoverRouting.closesAfterNilHover(pointerOverRows: overRows,
+                // A pointer still on its way somewhere, from the page to a row say, hasn't left: the page goes once it
+                // stops off the rows and the page.
+                let moving = abs(point.x - start.x) > EdgePreviewHoverPolicy.movement
+                    || abs(point.y - start.y) > EdgePreviewHoverPolicy.movement
+                guard EdgeHoverRouting.closesAfterNilHover(pointerOverRows: !evenOnRows && self.rowNear(point) != nil,
                                                            pointerOverPreview: self.pointerIsOnPage(point),
-                                                           panelKept: kept) else { return }
+                                                           stillMoving: !evenOnRows && moving) else { return }
                 self.closePreview()
             }
         }
