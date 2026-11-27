@@ -531,6 +531,91 @@ struct ShutFolderRowsTests {
     }
 }
 
+/// A page opened from a shut folder and closed with ⌘W or its row's × keeps its row under the folder, unloaded, until
+/// you leave the space or open or shut that folder again.
+@MainActor @Suite(.serialized)
+struct ShutFolderClosedPinTests {
+    private var space: UUID { Library.shared.spaces[0].id }
+
+    /// A window on the first space with one tab, and a pinned page alone in a shut folder.
+    private func inWindow(_ body: (BrowserWindowController, Bookmark, BookmarkFolder) throws -> Void) throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: nil, title: "Tab", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/shut/kept")!, title: "Kept", to: space))
+        let folder = try #require(Library.shared.addFolder(named: "Shut", with: [pin.id], in: space))
+        Library.shared.setFolderOpen(folder.id, false)
+        try body(controller, pin, folder)
+    }
+
+    /// The row of a pinned page the list shows, if it shows one.
+    private func pinRow(_ controller: BrowserWindowController, _ id: UUID) -> TabRowView? {
+        controller.sidebar.list.reload(animated: false)
+        guard controller.sidebar.list.debugItems.contains(.bookmark(id)) else { return nil }
+        controller.sidebar.layoutSubtreeIfNeeded()
+        return controller.sidebar.list.row(forBookmark: id) as? TabRowView
+    }
+
+    /// Opens the page and closes it again with ⌘W or its row's ×; its row stays under the folder, unloaded.
+    private func openAndClose(_ controller: BrowserWindowController, _ pin: Bookmark, _ folder: BookmarkFolder, byButton: Bool) throws {
+        let manager = controller.tabManager
+        #expect(pinRow(controller, pin.id) == nil)
+        manager.openBookmark(pin)
+        let page = try #require(manager.bookmarkTab(for: pin.id))
+        if byButton { try #require(pinRow(controller, pin.id)).onClose?() } else { controller.closeTab(nil) }
+        #expect(page.isClosed)
+        let row = try #require(pinRow(controller, pin.id), "byButton=\(byButton)")
+        #expect(row.isUnloaded)
+        let items = controller.sidebar.list.debugItems
+        #expect(items.firstIndex(of: .bookmark(pin.id)) == items.firstIndex(of: .folder(folder.id)).map { $0 + 1 })
+    }
+
+    @Test func aClosedPageStaysUnderItsShutFolderUntilYouLeaveTheSpace() throws {
+        for byButton in [false, true] {
+            try inWindow { controller, pin, folder in
+                let manager = controller.tabManager
+                let other = Library.shared.addSpace(name: "Other").id
+                try openAndClose(controller, pin, folder, byButton: byButton)
+                manager.switchToSpace(other)
+                manager.switchToSpace(space)
+                #expect(pinRow(controller, pin.id) == nil)
+            }
+        }
+    }
+
+    @Test func aClosedPageGoesWhenItsFolderIsOpenedAndShutAgain() throws {
+        try inWindow { controller, pin, folder in
+            try openAndClose(controller, pin, folder, byButton: false)
+            controller.listSetFolderOpen(folder.id, true)
+            #expect(pinRow(controller, pin.id) != nil)
+            controller.listSetFolderOpen(folder.id, false)
+            #expect(pinRow(controller, pin.id) == nil)
+            // Expand All and Collapse All count as opening and shutting it too.
+            try openAndClose(controller, pin, folder, byButton: false)
+            controller.setAllFoldersOpen(in: space, true)
+            controller.setAllFoldersOpen(in: space, false)
+            #expect(pinRow(controller, pin.id) == nil)
+        }
+    }
+
+    @Test func anotherFolderOpenedOrShutKeepsTheClosedPage() throws {
+        try inWindow { controller, pin, folder in
+            let elsewhere = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/shut/other")!, title: "Other", to: space))
+            let second = try #require(Library.shared.addFolder(named: "Second", with: [elsewhere.id], in: space))
+            try openAndClose(controller, pin, folder, byButton: false)
+            controller.listSetFolderOpen(second.id, false)
+            controller.listSetFolderOpen(second.id, true)
+            #expect(pinRow(controller, pin.id) != nil)
+        }
+    }
+}
+
 /// Big imports and folder-wide actions (#343): imported folders start shut, a space's folders fold at once, and
 /// Open All in Tabs opens the pages as new tabs.
 @MainActor

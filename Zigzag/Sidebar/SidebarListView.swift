@@ -277,8 +277,8 @@ final class SidebarListView: NSView {
         let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
         // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
         // open without opening every folder on the way to it. The page you're on is always open.
-        // Folded, a pinned page closed since you came to the space keeps its row, unloaded, until you leave or refold.
-        let kept = collapsed && spaceID == manager.currentSpaceID ? manager.closedPins : []
+        // A pinned page closed since you came to the space keeps its row, unloaded, in a folded section or shut folder.
+        let kept = spaceID == manager.currentSpaceID ? manager.closedPins : []
         let isOpen: (UUID) -> Bool = { manager.bookmarkTab(for: $0) != nil || kept.contains($0) }
         let pinned = Self.pinnedRows(bookmarks: bookmarks.map(\.id).filter { !riders.contains($0) }, folders: folders,
                                      current: current, folded: collapsed, isOpen: isOpen)

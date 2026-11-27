@@ -3734,19 +3734,28 @@ extension BrowserWindowController: SidebarDelegate {
         let folders = Library.shared.spaces.first { $0.folders?.contains { $0.id == id } == true }?.folders ?? []
         let pages = open ? [] : folders.pages(in: id)
         let tucking = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
+        forgetClosedPins(folders.pages(in: id))
         Library.shared.setFolderOpen(id, open, tucking: tucking)
     }
     /// Expand All / Collapse All for a folder and its subfolders (#343).
     func setFolderTreeOpen(_ id: UUID, _ open: Bool) {
         let pages = open ? [] : Library.shared.allBookmarkIDs(inFolder: id)
         let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
+        forgetClosedPins(Library.shared.allBookmarkIDs(inFolder: id))
         Library.shared.setFolderTreeOpen(id, open, shown: Set(shown))
     }
     /// Collapse All Folders / Expand All Folders for a space's pinned folders (#343).
     func setAllFoldersOpen(in spaceID: UUID, _ open: Bool) {
         let pages = open ? [] : Library.shared.bookmarks(in: spaceID).map(\.id)
         let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
+        forgetClosedPins(Library.shared.bookmarks(in: spaceID).map(\.id))
         Library.shared.setAllFoldersOpen(in: spaceID, open, shown: Set(shown))
+    }
+    /// A folder opened or shut: the closed pages it kept listed go, in every window.
+    private func forgetClosedPins(_ ids: some Sequence<UUID>) {
+        let ids = Array(ids)
+        tabManager.forgetClosedPins(ids)
+        for controller in WindowManager.shared.controllers where controller !== self { controller.tabManager.forgetClosedPins(ids) }
     }
     /// Whether any of the space's pinned folders is open (or shut, for `open` false).
     static func hasFolders(in spaceID: UUID, isOpen open: Bool) -> Bool {
