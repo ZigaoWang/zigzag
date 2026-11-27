@@ -9,7 +9,7 @@ privately.
 
 ## Build and run
 
-You need macOS 15.4 or later, Xcode 27 or later and XcodeGen. Before the first build, set your own
+You need macOS 15.4 or later, Xcode 27 or later with the macOS 27 SDK, and XcodeGen. Before the first build, set your own
 `DEVELOPMENT_TEAM` and Debug `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`, as the README's "Build from source"
 says.
 
@@ -78,7 +78,7 @@ happens when a tab closes should work the way those users expect, unless an issu
 Zigzag speaks English, Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French, Italian, Spanish,
 Brazilian Portuguese, Russian, Dutch, Polish, and Turkish. Every word people read goes through
 `String(localized: "…", comment: "…")`, with a comment that says where it appears. After adding or changing
-strings, build, bring the catalog in step and add Simplified Chinese in `Zigzag/Resources/Localizable.xcstrings`:
+strings, build and bring `Zigzag/Resources/Localizable.xcstrings` in step:
 
 ```sh
 xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -derivedDataPath build/dev build
