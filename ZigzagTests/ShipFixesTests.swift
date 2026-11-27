@@ -2037,6 +2037,47 @@ struct SwipeGestureTests {
         _ = host
     }
 
+    /// Swiping on: still for a moment, it watches for the hand doing something else, and the window going ends it.
+    private func expectRestWatched(_ page: BrowserWebView) {
+        let swipe = page.swipeNavigator
+        #expect(swipe.isShowing)
+        swipe.debugRest()
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: page.window)
+        #expect(swipe.isClean)
+    }
+
+    @Test mutating func aSwipeAfterANewGestureStillHasItsWatchdog() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        // A swipe, then another gesture starting over it: the second swipe's lost end is still caught.
+        try drag(page, steps: 10, dx: 10)
+        try drag(page, steps: 10, dx: 10)
+        expectRestWatched(page)
+        _ = host
+    }
+
+    @Test mutating func aSwipeAfterItsPageLeftTheWindowStillHasItsWatchdog() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        try drag(page, steps: 10, dx: 10)
+        page.swipeNavigator.leftWindow()
+        try drag(page, steps: 10, dx: 10)
+        expectRestWatched(page)
+        _ = host
+    }
+
+    @Test mutating func aSwipeAfterATouchSwipeStillHasItsWatchdog() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 10, dx: 10)
+        swipe.touchBegan(direction: -1)
+        swipe.touchEnded(at: ProcessInfo.processInfo.systemUptime, cancelled: true)
+        try drag(page, steps: 10, dx: 10)
+        expectRestWatched(page)
+        _ = host
+    }
+
     @Test mutating func aRestEndsWhenThePointerMovesInAWindowThatDoesntTrackIt() async throws {
         guard on else { return }
         // A standalone Zigzag Mini that isn't key gets no pointer moves as events.
