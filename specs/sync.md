@@ -83,6 +83,8 @@
   Test: SyncTests.editsToDifferentThingsBothArrive
 - The same thing edited on two Macs → the later edit wins on both.
   Test: SyncTests.theLastEditToOnePageWins
+- Which edit is later → each is dated by the Mac that made it, and that date is never later than when iCloud saved it, so a Mac whose clock runs ahead can't date its edits into the future. A Mac whose clock ran more than a minute ahead of iCloud's at its last save dates its own edits by iCloud's clock, so its edit made offline doesn't beat a later one from another Mac either. The same goes for each preference and each removal note.
+  Test: SyncTests.aMacWhoseClockRunsAheadDoesntWinALaterEdit
 - A page moved on one Mac while another pins a new one → both keep their places.
   Test: SyncTests.aMoveAndAnInsertAtOnceBothKeepTheirPlaces
 - Preferences changed on two Macs → each keeps the later value of each preference.

@@ -9,14 +9,16 @@ import Testing
 /// The private database's zone as CloudKit keeps it: each record with a change tag, saves that name a stale tag
 /// refused, and a change log each Mac reads from where it left off.
 @MainActor final class FakeCloud {
-    struct Stored { var type: String; var payload: Data; var modified: Date; var tag: Int }
+    struct Stored { var type: String; var payload: Data; var modified: Date; var tag: Int; var server: Date }
     private(set) var records: [String: Stored] = [:]
     private var log: [String] = []
     private var tags = 0
+    /// iCloud's own clock: when it last saved something. It only goes forward.
+    private var lastSave = Date(timeIntervalSince1970: 1_800_000_000)
 
     func remote(_ name: String) -> SyncRemote? {
         records[name].map { SyncRemote(name: name, type: $0.type, payload: $0.payload, modified: $0.modified, systemFields: Data(String($0.tag).utf8),
-                                       serverModified: Date(timeIntervalSince1970: 1_800_000_000 + Double($0.tag) / 1000)) }
+                                       serverModified: $0.server) }
     }
 
     enum Saved { case saved(SyncRemote), failed(SyncSaveFailure) }
@@ -31,8 +33,9 @@ import Testing
     }
     private(set) var zoneRemoved = false
 
+    /// `at`: the time it really is, as iCloud's clock has it; without one, the record's own date.
     @discardableResult
-    func save(_ upload: SyncUpload) -> Saved {
+    func save(_ upload: SyncUpload, at: Date? = nil) -> Saved {
         if zoneRemoved { return .failed(.zoneMissing) }
         let tag = upload.systemFields.flatMap { Int(String(decoding: $0, as: UTF8.self)) }
         if let current = records[upload.name] {
@@ -41,7 +44,8 @@ import Testing
             return .failed(.gone)
         }
         tags += 1
-        records[upload.name] = Stored(type: upload.type, payload: upload.payload, modified: upload.modified, tag: tags)
+        lastSave = max(lastSave.addingTimeInterval(0.001), at ?? upload.modified)
+        records[upload.name] = Stored(type: upload.type, payload: upload.payload, modified: upload.modified, tag: tags, server: lastSave)
         log.append(upload.name)
         return .saved(remote(upload.name)!)
     }
@@ -102,6 +106,8 @@ import Testing
     private(set) var deletes: [String] = []
     private(set) var sent = 0
     var clock = Date(timeIntervalSince1970: 1_800_000_000)
+    /// How far ahead of the real time this Mac's clock runs.
+    var skew: TimeInterval = 0
 
     init(_ cloud: FakeCloud, _ library: SyncLibrary, clock: Date = Date(timeIntervalSince1970: 1_800_000_000), state: SyncState = SyncState()) {
         self.cloud = cloud
@@ -191,7 +197,7 @@ import Testing
         for name in names {
             guard let upload = session.upload(name) else { continue }
             sent += 1
-            switch cloud.save(upload) {
+            switch cloud.save(upload, at: clock - skew) {
             case .saved(let record): saved.append(record)
             case .failed(let failure): session.saveFailed(name, failure)
             }
@@ -595,6 +601,45 @@ extension SyncLibrary {
         b.sync(); a.sync(); b.sync()
         #expect(a.library.titles(in: "Personal") == ["Newer"])
         #expect(b.library.titles(in: "Personal") == ["Newer"])
+    }
+
+    @Test func aMacWhoseClockRunsAheadDoesntWinALaterEdit() {
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        // B's clock runs an hour fast. B renames the page, then A renames it a minute later.
+        b.skew = 3600
+        b.clock = a.clock + 3600
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "From B" } }
+        b.sync()
+        a.clock = b.clock - 3600 + 60
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "From A, later" } }
+        a.sync(); b.sync(); a.sync()
+        #expect(a.library.titles(in: "Personal") == ["From A, later"])
+        #expect(b.library.titles(in: "Personal") == ["From A, later"])
+        // B edits offline; A edits a minute later and sends first. B's own clock doesn't make its earlier edit win.
+        b.online = false
+        b.clock += 120
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "B, offline" } }
+        a.clock = b.clock - 3600 + 60
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "A, a minute after" } }
+        a.sync()
+        b.online = true
+        b.sync(); a.sync()
+        #expect(a.library.titles(in: "Personal") == ["A, a minute after"])
+        #expect(b.library.titles(in: "Personal") == ["A, a minute after"])
+        // A later edit on B still wins.
+        b.clock = a.clock + 3600 + 60
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "B, later still" } }
+        b.sync(); a.sync()
+        #expect(a.library.titles(in: "Personal") == ["B, later still"])
+        // Preferences the same way, key by key.
+        b.clock += 60
+        b.edit { $0.settings["ReaderSize"] = .int(14) }
+        b.sync()
+        a.clock = b.clock - 3600 + 60
+        a.edit { $0.settings["ReaderSize"] = .int(22) }
+        a.sync(); b.sync(); a.sync()
+        #expect(a.library.settings["ReaderSize"] == .int(22))
+        #expect(b.library.settings["ReaderSize"] == .int(22))
     }
 
     @Test func aMoveAndAnInsertAtOnceBothKeepTheirPlaces() {
@@ -1656,6 +1701,8 @@ extension SyncLibrary {
         let waits = Waits()
         let retry = makeRetry(waits)
         var clock = Date(timeIntervalSince1970: 1_800_000_000)
+    /// How far ahead of the real time this Mac's clock runs.
+    var skew: TimeInterval = 0
         retry.now = { clock }
         var tries = 0
         retry.onRetry = { tries += 1; retry.failed(CKError(.networkUnavailable)) }
@@ -2224,6 +2271,7 @@ extension SyncTests {
     @Test func aRemovalFromAMacWhoseClockRunsFastDoesntBeatALaterEdit() throws {
         let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
         b.clock = a.clock + 86400
+        b.skew = 86400
         b.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 1) } }
         a.clock += 60
         a.edit { $0.editSpace("Personal") { $0.bookmarks[1].title = "edited after" } }
@@ -2347,6 +2395,7 @@ extension SyncTests {
         let cloud = FakeCloud()
         let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("y")])]))
         let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("z")])]), clock: Date(timeIntervalSince1970: 1_800_000_000 + SyncSession.claimTimeout + 60))
+        b.skew = SyncSession.claimTimeout + 60
         a.fetch(); b.fetch()
         if let up = a.session.upload(SyncName.claim) { if case .saved(let r) = cloud.save(up) { a.session.saved([r]) } }
         b.send()
