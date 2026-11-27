@@ -843,11 +843,15 @@ final class EdgeSidebarHost: NSView {
     var cardWidth: CGFloat = 0 { didSet { placeCard() } }
     /// A page is out beside the card.
     var pageShowing = false
-    /// The panel as a place for sheets and cards: they open here, over the card, not in the browser behind.
+    /// The card as a place for sheets and editors: they open here, over it, not in the browser behind.
     let overlay = PassthroughView()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
+        overlay.wantsLayer = true
+        overlay.layer?.cornerRadius = Tokens.Radius.card
+        overlay.layer?.cornerCurve = .continuous
+        overlay.layer?.masksToBounds = true
         addSubview(overlay)
     }
 
@@ -878,7 +882,8 @@ final class EdgeSidebarHost: NSView {
 
     func placeCard() {
         container?.frame = cardFrame
-        overlay.frame = bounds
+        // Sheets and editors over the panel are centered on the card, their dim inside its corners.
+        overlay.frame = cardFrame
     }
 
     override func layout() {

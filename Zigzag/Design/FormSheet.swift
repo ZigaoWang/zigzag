@@ -308,7 +308,14 @@ final class FormSheet: NSView, NSTextFieldDelegate {
 
     // MARK: Layout
 
-    private var width: CGFloat { min(Tokens.Dialog.width, bounds.width - Tokens.Space.x6 * 2) }
+    private var width: CGFloat { Self.width(in: bounds.width) }
+
+    /// The form's width over a host this wide. A host narrower than the form and its margins, like the screen edge's
+    /// sidebar, gives it the room a card's own margin leaves.
+    static func width(in room: CGFloat) -> CGFloat {
+        let margin = room < Tokens.Dialog.width + Tokens.Space.x6 * 2 ? Tokens.Space.x2 : Tokens.Space.x6
+        return min(Tokens.Dialog.width, room - margin * 2)
+    }
     private let rowGap = Tokens.Space.x3
 
     private func height(of row: Row, width: CGFloat) -> CGFloat {

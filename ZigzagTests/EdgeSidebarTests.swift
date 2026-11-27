@@ -642,6 +642,35 @@ struct EdgeSidebarTests {
         #expect(controller.window?.isKeyWindow != true)
     }
 
+    /// A sheet over the panel is centered on the card with its dim inside it; a space's editor from the + stands
+    /// above the + inside the card, the same margin on either side, the button still in sight.
+    @Test func sheetsAndEditorsFitThePanelsCard() async throws {
+        let (controller, _, _, done) = panelWithTabs(["https://example.test/a"])
+        defer { done() }
+        let (_, host) = try panelParts()
+        let sidebar = try #require(controller.edgeSidebar)
+        host.layoutSubtreeIfNeeded()
+        let card = host.cardFrame
+
+        controller.newLiveFolder()
+        let sheet = try #require(Self.find(FormSheet.self, in: host))
+        #expect(sheet.convert(sheet.bounds, to: host) == card)
+        sheet.layoutSubtreeIfNeeded()
+        let form = try #require(sheet.subviews.first { $0 is FloatingPanelView })
+        #expect(form.frame.minX == Tokens.Space.x2 && sheet.bounds.width - form.frame.maxX == Tokens.Space.x2,
+                "form \(form.frame) sheet \(sheet.bounds)")
+        sheet.close()
+
+        controller.newSpace(sidebar.newSpaceButton)
+        let editor = try #require(SpaceEditorPanel.current)
+        let frame = editor.convert(editor.bounds, to: host)
+        let button = sidebar.newSpaceButton.convert(sidebar.newSpaceButton.bounds, to: host)
+        #expect(card.contains(frame), "editor \(frame) card \(card)")
+        #expect(frame.minX - card.minX == card.maxX - frame.maxX, "editor \(frame) card \(card)")
+        #expect(frame.maxY <= button.minY, "editor \(frame) button \(button)")
+        editor.close()
+    }
+
     /// The panel's Downloads button opens the list in the panel, over the sidebar's lane; the panel stays out.
     @Test func downloadsOpenOverThePanel() throws {
         let (controller, _, _, done) = panelWithTabs(["https://example.test/a"])
@@ -657,7 +686,7 @@ struct EdgeSidebarTests {
         #expect(host.cardFrame.contains(list.frame), "list \(list.frame) card \(host.cardFrame)")
         // Its edges are the rows' edges, as in the window, against the side the sidebar is on.
         let lane = host.cardFrame.insetBy(dx: Tokens.Sidebar.edge, dy: 0)
-        #expect(controller.edgeSidebarOnRight ? list.frame.maxX == lane.maxX : list.frame.minX == lane.minX)
+        #expect(list.frame.minX == lane.minX && list.frame.maxX == lane.maxX, "list \(list.frame) lane \(lane)")
     }
 
     private static func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {

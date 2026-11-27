@@ -11,6 +11,14 @@ struct FormSheetTests {
         FormSheet.keyAction(keyCode: keyCode, modifiers: modifiers, characters: characters, destructive: destructive, canConfirm: canConfirm, composing: composing)
     }
 
+    /// In a window the form keeps its width and wide margins; in a host narrower than that, like the screen edge's
+    /// sidebar, it takes the room inside a card's margin.
+    @Test func aNarrowHostGivesTheFormItsRoom() {
+        #expect(FormSheet.width(in: 1200) == Tokens.Dialog.width)
+        #expect(FormSheet.width(in: Tokens.Dialog.width + Tokens.Space.x6 * 2) == Tokens.Dialog.width)
+        #expect(FormSheet.width(in: 234) == 234 - Tokens.Space.x2 * 2)
+    }
+
     @Test func returnConfirmsAFormThatCanBeConfirmed() {
         #expect(action(36) == .confirm)
         #expect(action(76) == .confirm)

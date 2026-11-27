@@ -2074,12 +2074,13 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         var source = anchor?.window != nil && anchor?.window === host.window ? anchor : nil
         if source == nil, let header = EdgeSidebar.shared.headerView, header.window === host.window { source = header }
         let place = source.map { $0.convert($0.bounds, to: host) }
-        // Low in the panel (the +, a space dot) it rises from there; higher up it hangs from it.
+        // Low in the panel (the +, a space dot) it stands above it, as the +'s menu does; higher up it hangs below it.
+        // Either way what opened it stays in sight.
         let rises = place.map { Self.rises(from: $0, in: host.bounds.height) } ?? true
         anchoredBelow = !rises
         fitWheel(in: host.bounds.height)
         let height = contentHeight
-        var top = place.map { rises ? $0.maxY - height : $0.minY - Tokens.Space.x2 } ?? (host.bounds.height - height) / 2
+        var top = place.map { rises ? $0.minY - Tokens.Space.x2 - height : $0.maxY + Tokens.Space.x2 } ?? (host.bounds.height - height) / 2
         top = Self.clampedTop(top, height: height, in: host.bounds.height)
         frame = NSRect(x: (host.bounds.width - width) / 2, y: top, width: width, height: height)
         host.addSubview(self)
