@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Security
 import WebKit
 
@@ -170,6 +171,9 @@ enum Passkeys {
     /// script's own beside the site's, and aborted before any other passkey request starts, in the same turn, and
     /// when the page is left. A waiting request asked for while a passkey sheet is up starts when the sheet is done:
     /// started over it, the sheet could no longer be closed by the page. Nothing here waits on the page.
+    ///
+    /// A passkey picked in Zigzag's fill menu (`PasskeySuggestions`) ends the waiting request and asks for that one
+    /// passkey with the site's own options; its answer is the waiting request's. Cancelled, the request waits again.
     static let requests = WKUserScript(source: """
     \(requestsMarker)
     (() => {
@@ -178,21 +182,59 @@ enum Passkeys {
       // This frame's waiting request, and its passkey sheets (a sheet asked for twice is still one on screen).
       let waiting = null;
       const sheets = new Set();
+      // What the waiting request asks for, and how to sign in with one passkey in its place (`choose`).
+      let offer = null;
       const end = () => {
         const controller = waiting;
         if (!controller) return false;
         waiting = null;
+        offer = null;
         controller.abort();
         return true;
       };
+      // Page globals captured before its scripts run, so redefinitions aren't called.
+      const encode = window.btoa, decode = window.atob, fromCode = String.fromCharCode, Bytes = Uint8Array, Buffer = ArrayBuffer;
+      const base64url = (source) => {
+        try {
+          const bytes = source instanceof Buffer ? new Bytes(source) : new Bytes(source.buffer, source.byteOffset, source.byteLength);
+          let text = '';
+          for (const byte of bytes) text += fromCode(byte);
+          return encode(text).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+        } catch (_) { return null; }
+      };
+      // For Zigzag's fill menu: the site the waiting request is for, and the passkeys it allows (none: any).
+      const offered = () => {
+        if (!offer) return null;
+        try {
+          const key = offer.options.publicKey;
+          const rpId = typeof key.rpId === 'string' ? key.rpId : null;
+          const allow = [...(key.allowCredentials || [])].map((credential) => base64url(credential.id)).filter((id) => id);
+          return { rpId, allow };
+        } catch (_) { return null; }
+      };
+      // The passkey picked in Zigzag's menu: the waiting request makes way for a request for that one alone, which
+      // answers the site's waiting one.
+      const choose = (id) => {
+        const current = offer;
+        if (!current || typeof id !== 'string') return false;
+        const allowed = offered();
+        if (!allowed || (allowed.allow.length && !allowed.allow.includes(id))) return false;
+        let bytes;
+        try {
+          const text = decode(id.replace(/-/g, '+').replace(/_/g, '/'));
+          bytes = new Bytes(text.length);
+          for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+        } catch (_) { return false; }
+        current.pick(bytes);
+        return true;
+      };
       // In every frame, before anything can return: a frame without passkeys still answers, and can't bring its own.
-      try { Object.defineProperty(window, KEY, { value: Object.freeze({ end }) }); } catch (_) { return; }
+      try { Object.defineProperty(window, KEY, { value: Object.freeze({ end, offered, choose }) }); } catch (_) { return; }
       const Container = window.CredentialsContainer;
       if (!Container || !Container.prototype) return;
-      // Page globals captured before its scripts run, so redefinitions aren't called.
       const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.\(messageName);
       const post = handler && handler.postMessage.bind(handler);
-      const Controller = window.AbortController, Signal = window.AbortSignal;
+      const Controller = window.AbortController, Signal = window.AbortSignal, Waiting = Promise, assign = Object.assign;
       const any = Signal.any.bind(Signal), settled = Promise.allSettled.bind(Promise);
       const apply = Reflect.apply, read = Reflect.get, then = Promise.prototype.then;
       // No frames above or below: nothing else shares this page's request, so there is nobody to ask.
@@ -222,23 +264,65 @@ enum Passkeys {
         }
         // Only a waiting `get` is kept track of. A signal WebKit would refuse anyway is left for it to refuse.
         if (name !== 'get' || (site !== undefined && (!(site instanceof Signal) || site.aborted))) return apply(target, self, args);
-        const controller = new Controller();
-        const signal = site ? any([site, controller.signal]) : controller.signal;
-        // The site's own options, read by WebKit as they are, with the one signal in place of the site's.
-        const forwarded = new Proxy(options, {
-          get: (object, key) => (key === 'signal' ? signal : key === 'mediation' ? 'conditional' : read(object, key, object)),
+        const rest = args.slice(1);
+        return new Waiting((resolve, reject) => {
+          const ask = () => {
+            const controller = new Controller();
+            const signal = site ? any([site, controller.signal]) : controller.signal;
+            // The site's own options, read by WebKit as they are, with the one signal in place of the site's.
+            const forwarded = new Proxy(options, {
+              get: (object, key) => (key === 'signal' ? signal : key === 'mediation' ? 'conditional' : read(object, key, object)),
+            });
+            let picked = false;
+            const entry = { options };
+            const closed = () => {
+              if (waiting === controller) waiting = null;
+              if (offer === entry) offer = null;
+            };
+            // A sheet for the one passkey, with the site's options and signal. Cancelled, the request waits again.
+            entry.pick = (id) => {
+              picked = true;
+              closed();
+              controller.abort();
+              let one;
+              try {
+                const publicKey = assign({}, options.publicKey, { allowCredentials: [{ type: 'public-key', id }] });
+                one = assign({}, options, { publicKey });
+                delete one.mediation;
+                delete one.signal;
+                if (site) one.signal = site;
+              } catch (error) { reject(error); return; }
+              const sheet = begin(name, target, self, [one, ...rest]);
+              const again = (error) => {
+                if ((site && site.aborted) || waiting) { reject(error); return; }
+                if (sheets.size) { apply(then, settled([...sheets]), [ask, ask]); return; }
+                ask();
+              };
+              apply(then, sheet, [resolve, again]);
+            };
+            waiting = controller;
+            offer = entry;
+            let request;
+            try {
+              request = apply(target, self, [forwarded, ...rest]);
+            } catch (error) {
+              closed();
+              reject(error);
+              return;
+            }
+            apply(then, request, [(value) => { closed(); if (!picked) resolve(value); }, (error) => { closed(); if (!picked) reject(error); }]);
+          };
+          ask();
         });
-        const closed = () => { if (waiting === controller) waiting = null; };
-        waiting = controller;
-        let request;
-        try {
-          request = apply(target, self, [forwarded, ...args.slice(1)]);
-        } catch (error) {
-          closed();
-          throw error;
-        }
-        apply(then, request, [closed, closed]);
-        return request;
+      };
+
+      // A passkey request, once the waiting requests of the page's other frames are ended.
+      const begin = (name, target, self, args) => {
+        const go = () => start(name, target, self, args);
+        if (!post || alone()) return go();
+        let asked;
+        try { asked = post(null); } catch (_) { return go(); }
+        return apply(then, asked, [go, go]);
       };
 
       for (const name of ['get', 'create']) {
@@ -250,11 +334,7 @@ enum Passkeys {
             let passkey = false;
             try { passkey = args[0] != null && args[0].publicKey != null; } catch (_) {}
             if (!passkey) return apply(target, self, args);
-            const go = () => start(name, target, self, args);
-            if (!post || alone()) return go();
-            let asked;
-            try { asked = post(null); } catch (_) { return go(); }
-            return apply(then, asked, [go, go]);
+            return begin(name, target, self, args);
           },
         });
         Object.defineProperty(Container.prototype, name, described);
@@ -262,4 +342,157 @@ enum Passkeys {
       window.addEventListener('pagehide', end, true);
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+}
+
+// MARK: - Suggesting saved passkeys
+
+/// Whether macOS lets Zigzag see the passkeys saved on this Mac (System Settings › Privacy & Security › Access web
+/// browser passkeys). Asking is what puts Zigzag in that list.
+nonisolated enum PasskeyAccess: Equatable, Sendable {
+    case allowed, denied, notAsked
+}
+
+/// A passkey saved on this Mac, in the Passwords app or a password manager app, as macOS lists it to a browser.
+nonisolated struct SavedPasskey: Equatable, Sendable {
+    let name: String
+    let relyingParty: String
+    let credentialID: Data
+
+    /// Base64url, as the page script writes credential IDs.
+    var id: String {
+        credentialID.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+/// The Mac's side, behind a protocol so tests can stand in for it: the real one needs the entitlement.
+protocol SystemPasskeys: AnyObject {
+    var access: PasskeyAccess { get }
+    func requestAccess() async -> PasskeyAccess
+    func passkeys(for relyingParty: String) async -> [SavedPasskey]
+}
+
+/// Apple's web browser passkey access (`ASAuthorizationWebBrowserPublicKeyCredentialManager`).
+final class MacPasskeys: SystemPasskeys {
+    private let manager = ASAuthorizationWebBrowserPublicKeyCredentialManager()
+
+    var access: PasskeyAccess { Self.access(manager.authorizationStateForPlatformCredentials) }
+
+    func requestAccess() async -> PasskeyAccess { Self.access(await manager.requestAuthorizationForPublicKeyCredentials()) }
+
+    func passkeys(for relyingParty: String) async -> [SavedPasskey] {
+        await manager.platformCredentials(forRelyingParty: relyingParty).map {
+            SavedPasskey(name: $0.name, relyingParty: $0.relyingParty, credentialID: $0.credentialID)
+        }
+    }
+
+    private static func access(_ state: ASAuthorizationWebBrowserPublicKeyCredentialManager.AuthorizationState) -> PasskeyAccess {
+        switch state {
+        case .authorized: .allowed
+        case .denied: .denied
+        case .notDetermined: .notAsked
+        @unknown default: .denied
+        }
+    }
+}
+
+/// Saved passkeys in Zigzag's fill menu, where a page waits for one (WebAuthn's conditional mediation), as Safari
+/// lists them under a sign-in field. macOS is asked for access only when you pick Use a Saved Passkey there or
+/// Allow in Settings › Passwords, never by itself. Denied or never asked, passkeys work as before: a site that asks
+/// for one gets the Mac's own sheet.
+final class PasskeySuggestions {
+    static let shared = PasskeySuggestions(system: Passkeys.available ? MacPasskeys() : nil)
+    /// Access was asked for and answered.
+    static let changed = Signal<Void>()
+
+    private let system: SystemPasskeys?
+
+    init(system: SystemPasskeys?) { self.system = system }
+
+    /// Without the entitlement there's nothing to ask for, and nothing is suggested.
+    var isAvailable: Bool { system != nil }
+
+    var access: PasskeyAccess { system?.access ?? .denied }
+
+    func requestAccess() async -> PasskeyAccess {
+        guard let system else { return .denied }
+        let answer = await system.requestAccess()
+        Self.changed.send()
+        return answer
+    }
+
+    /// What the page's waiting request asks for: its site (the page's own when it names none) and the passkeys it
+    /// allows, none meaning any.
+    nonisolated struct Offer: Equatable, Sendable {
+        let relyingParty: String
+        let allow: [String]
+    }
+
+    /// The page script's answer (`offered()`), for a page on `host`. A site the page may not ask for is no offer.
+    nonisolated static func offer(from value: Any?, host: String) -> Offer? {
+        guard let body = value as? [String: Any] else { return nil }
+        let host = host.lowercased()
+        let relyingParty = (body["rpId"] as? String)?.lowercased() ?? host
+        guard fits(relyingParty, on: host) else { return nil }
+        return Offer(relyingParty: relyingParty, allow: body["allow"] as? [String] ?? [])
+    }
+
+    /// A page may ask for its own host's passkeys or a parent domain's, never a public suffix's or another site's.
+    nonisolated static func fits(_ relyingParty: String, on host: String) -> Bool {
+        guard !relyingParty.isEmpty, !host.isEmpty else { return false }
+        if relyingParty == host { return true }
+        return host.hasSuffix("." + relyingParty) && PublicSuffix.registrableDomain(relyingParty) != nil
+    }
+
+    /// Where the menu may list passkeys: a copy with the entitlement, a profile given your data, the page's own
+    /// field (not a frame's) marked for passkeys (autocomplete "webauthn") and not for a new password, on a secure
+    /// page, with no password manager extension that brings its own passkeys.
+    nonisolated static func mayOffer(available: Bool, getsYourData: Bool, managerOn: Bool, isMainFrame: Bool, passkeyField: Bool,
+                                     newPassword: Bool, scheme: String, host: String) -> Bool {
+        available && getsYourData && !managerOn && isMainFrame && passkeyField && !newPassword
+            && (scheme == "https" || host == "localhost")
+    }
+
+    /// A password manager extension that brings its own passkeys is on in the profile. iCloud Passwords' doesn't.
+    static func managerOn(in profile: Profile) -> Bool {
+        guard let manager = PasswordManagers.active(in: profile) else { return false }
+        return manager != PasswordManagers.known[PasswordFiller.iCloudExtensionID]
+    }
+
+    /// The rows for an offer: the passkeys saved for its site that it allows, by name; Use a Saved Passkey until
+    /// macOS has been asked; nothing once it said no.
+    func items(for offer: Offer) async -> [AutofillMenu.Item] {
+        guard let system else { return [] }
+        switch system.access {
+        case .denied: return []
+        case .notAsked: return [.allowPasskeys]
+        case .allowed: return Self.listed(await system.passkeys(for: offer.relyingParty), for: offer).map { .passkey($0) }
+        }
+    }
+
+    nonisolated static func listed(_ saved: [SavedPasskey], for offer: Offer) -> [SavedPasskey] {
+        saved.filter { $0.relyingParty.lowercased() == offer.relyingParty && (offer.allow.isEmpty || offer.allow.contains($0.id)) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// The page's waiting request, asked without a user gesture, in the page's world where the request is.
+    func offer(in webView: WKWebView, origin: Origin) async -> Offer? {
+        let value = try? await webView.runOwnScript("window[Symbol.for('zigzag.passkeys')]?.offered?.() ?? null", world: .page)
+        return Self.offer(from: value, host: origin.host)
+    }
+
+    /// The rows for the page's focused field, if the page waits for a passkey.
+    func items(in webView: WKWebView, origin: Origin) async -> [AutofillMenu.Item] {
+        guard isAvailable, access != .denied, let offer = await offer(in: webView, origin: origin) else { return [] }
+        return await items(for: offer)
+    }
+
+    /// Signs in with `passkey`: the page's waiting request makes way for one for it alone, and the Mac's sheet asks
+    /// for Touch ID. Run with the click's user gesture, which WebKit wants for a passkey sheet. False when the page
+    /// no longer waits for it.
+    func use(_ passkey: SavedPasskey, in webView: WKWebView) async -> Bool {
+        let chosen = try? await webView.callAsyncJavaScript("return window[Symbol.for('zigzag.passkeys')]?.choose?.(id) ?? false",
+                                                            arguments: ["id": passkey.id], in: nil, contentWorld: .page)
+        return chosen as? Bool == true
+    }
 }

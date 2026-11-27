@@ -36,6 +36,7 @@ struct PasskeyRequestsTests {
           note('start ' + name);
           return new Promise((resolve, reject) => {
             call.resolve = resolve;
+            call.reject = reject;
             const signal = options && options.signal;
             call.signal = signal;
             call.mediation = options && options.mediation;
@@ -296,5 +297,271 @@ struct PasskeyRequestsTests {
         Passkeys.attachRequests(to: controller)
         Passkeys.attachRequests(to: controller)
         #expect(controller.userScripts.filter(Passkeys.isRequests).count == 1)
+    }
+
+    // MARK: A passkey picked in the fill menu
+
+    private static let key = "const key = window[Symbol.for('zigzag.passkeys')];\n"
+
+    @Test func theWaitingRequestSaysWhatItAsksFor() async throws {
+        let webView = await page()
+        let body = Self.key + """
+        const none = JSON.stringify(key.offered());
+        waiting({ publicKey: { rpId: 'example.com', allowCredentials: [{ type: 'public-key', id: new Uint8Array([1, 2, 3]) }, { type: 'public-key', id: new Uint8Array([251, 255]).buffer }] } });
+        return none + ' ' + JSON.stringify(key.offered());
+        """
+        #expect(try await run(body, in: webView) == #"null {"rpId":"example.com","allow":["AQID","-_8"]}"#)
+    }
+
+    @Test func aPickedPasskeyAnswersTheWaitingRequest() async throws {
+        let webView = await page()
+        let body = Self.key + """
+        const site = new AbortController();
+        const request = waiting({ signal: site.signal, publicKey: { challenge: new Uint8Array([9]), userVerification: 'required' } });
+        const chosen = key.choose('AQID');
+        await soon();
+        const one = __calls[1];
+        const allowed = one.options.publicKey.allowCredentials;
+        const asked = [String(one.mediation), one.signal === site.signal, one.options.publicKey.userVerification,
+                       allowed.length, allowed[0].type, [...allowed[0].id].join('.'), String(key.offered())].join(' ');
+        one.resolve('signed in');
+        return [chosen, log(), asked, await request].join(' | ');
+        """
+        #expect(try await run(body, in: webView)
+            == "true | top start get, top abort get, top start get | undefined true required 1 public-key 1.2.3 null | signed in")
+    }
+
+    /// Closed without signing in, the request waits again as it did, and the site's request is still open.
+    @Test func aCancelledSheetWaitsAgain() async throws {
+        let webView = await page()
+        let body = Self.key + """
+        let settled = 'open';
+        waiting().then(() => { settled = 'answered'; }, () => { settled = 'refused'; });
+        key.choose('AQID');
+        await soon();
+        __calls[1].reject(new DOMException('Cancelled', 'NotAllowedError'));
+        await soon();
+        return [log(), settled, __calls[2].mediation, String(key.offered() !== null)].join(' | ');
+        """
+        #expect(try await run(body, in: webView) == "top start get, top abort get, top start get, top start get | open | conditional | true")
+    }
+
+    @Test func theSiteEndingItsRequestEndsTheSheetsAnswerToo() async throws {
+        let webView = await page()
+        let body = Self.key + """
+        const site = new AbortController();
+        const request = waiting({ signal: site.signal });
+        key.choose('AQID');
+        await soon();
+        __calls[1].reject(new Error('the site left'));
+        site.abort();
+        return await request.then(() => 'answered', (error) => error.message + ' ' + String(__calls.length));
+        """
+        #expect(try await run(body, in: webView) == "the site left 2")
+    }
+
+    /// Only a passkey the request allows, and only while one waits.
+    @Test func onlyAnAllowedPasskeyCanBeChosen() async throws {
+        let webView = await page()
+        let body = Self.key + """
+        const before = key.choose('AQID');
+        waiting({ publicKey: { allowCredentials: [{ type: 'public-key', id: new Uint8Array([1, 2, 3]) }] } });
+        return [before, key.choose('AQIE'), key.choose(5), String(__calls.length), key.choose('AQID')].join(' ');
+        """
+        #expect(try await run(body, in: webView) == "false false false 1 true")
+    }
+
+    @Test func aModalRequestStillPassesStraightThrough() async throws {
+        let webView = await page()
+        let body = Self.key + """
+        const options = { publicKey: {} };
+        navigator.credentials.get(options).catch(() => {});
+        return [String(__calls[0].options === options), String(key.offered())].join(' ');
+        """
+        #expect(try await run(body, in: webView) == "true null")
+    }
+
+    /// The fill menu's rows and the pick, through the page's own script.
+    @Test func theMenuListsTheSitesPasskeysAndSignsInWithOne() async throws {
+        let webView = await page(at: "https://www.example.com/")
+        _ = try await run("waiting({ publicKey: { rpId: 'example.com' } }); return ''", in: webView)
+        let mine = SavedPasskey(name: "sam", relyingParty: "example.com", credentialID: Data([1, 2, 3]))
+        let other = SavedPasskey(name: "alex", relyingParty: "other.com", credentialID: Data([4]))
+        let system = FakePasskeys(access: .allowed, saved: [mine, other])
+        let suggestions = PasskeySuggestions(system: system)
+        let origin = try #require(Origin(URL(string: "https://www.example.com")))
+        let items = await suggestions.items(in: webView, origin: origin)
+        #expect(items.count == 1)
+        guard case .passkey(let listed) = items.first else { Issue.record("no passkey row"); return }
+        #expect(listed == mine)
+        #expect(system.askedFor == ["example.com"])
+        #expect(await suggestions.use(listed, in: webView))
+        #expect(try await run("await soon(); return [...__calls[1].options.publicKey.allowCredentials[0].id].join('.')", in: webView) == "1.2.3")
+    }
+
+    /// A page asking for another site's passkeys is shown none, and macOS isn't asked.
+    @Test func aPageCantListAnotherSitesPasskeys() async throws {
+        let webView = await page(at: "https://example.com/")
+        _ = try await run("waiting({ publicKey: { rpId: 'bank.com' } }); return ''", in: webView)
+        let system = FakePasskeys(access: .allowed, saved: [SavedPasskey(name: "sam", relyingParty: "bank.com", credentialID: Data([1]))])
+        let items = await PasskeySuggestions(system: system).items(in: webView, origin: try #require(Origin(URL(string: "https://example.com"))))
+        #expect(items.isEmpty)
+        #expect(system.askedFor.isEmpty)
+    }
+}
+
+/// Stands in for the Mac's passkey access, which needs the entitlement: answers as set, and notes what it was asked.
+@MainActor
+final class FakePasskeys: SystemPasskeys {
+    var access: PasskeyAccess
+    var answer: PasskeyAccess
+    var saved: [SavedPasskey]
+    private(set) var requests = 0
+    private(set) var askedFor: [String] = []
+
+    init(access: PasskeyAccess, answer: PasskeyAccess = .allowed, saved: [SavedPasskey] = []) {
+        self.access = access
+        self.answer = answer
+        self.saved = saved
+    }
+
+    func requestAccess() async -> PasskeyAccess {
+        requests += 1
+        access = answer
+        return answer
+    }
+
+    func passkeys(for relyingParty: String) async -> [SavedPasskey] {
+        askedFor.append(relyingParty)
+        return access == .allowed ? saved : []
+    }
+}
+
+/// When Zigzag asks macOS for its saved passkeys, what it does with each answer, and which sites get them.
+@MainActor
+struct PasskeySuggestionsTests {
+    private let offer = PasskeySuggestions.Offer(relyingParty: "example.com", allow: [])
+
+    private func names(_ items: [AutofillMenu.Item]) -> [String] {
+        items.map { item in
+            switch item {
+            case .passkey(let passkey): "passkey " + passkey.name
+            case .allowPasskeys: "allow"
+            case .login(let login): login.username
+            case .systemPasswords: "system"
+            default: "other"
+            }
+        }
+    }
+
+    /// Never asked by itself: until you pick the row, the menu offers to ask, and macOS hears nothing.
+    @Test func notAskedOffersToAskAndAsksNothing() async {
+        let system = FakePasskeys(access: .notAsked)
+        let items = await PasskeySuggestions(system: system).items(for: offer)
+        #expect(names(items) == ["allow"])
+        #expect(system.requests == 0)
+        #expect(system.askedFor.isEmpty)
+    }
+
+    @Test func allowedListsThisSitesPasskeysByName() async {
+        let saved = [SavedPasskey(name: "zoe", relyingParty: "example.com", credentialID: Data([1])),
+                     SavedPasskey(name: "Ann", relyingParty: "Example.com", credentialID: Data([2])),
+                     SavedPasskey(name: "max", relyingParty: "other.com", credentialID: Data([3]))]
+        let items = await PasskeySuggestions(system: FakePasskeys(access: .allowed, saved: saved)).items(for: offer)
+        #expect(names(items) == ["passkey Ann", "passkey zoe"])
+    }
+
+    /// Denied: nothing is listed and nothing asked again; passkeys a site asks for still go through the Mac's sheet.
+    @Test func deniedListsNothing() async {
+        let system = FakePasskeys(access: .denied, saved: [SavedPasskey(name: "sam", relyingParty: "example.com", credentialID: Data([1]))])
+        #expect(await PasskeySuggestions(system: system).items(for: offer).isEmpty)
+        #expect(system.askedFor.isEmpty)
+        #expect(system.requests == 0)
+    }
+
+    /// Without the entitlement (the dev build) there's nothing to ask.
+    @Test func withoutTheEntitlementNothingIsOffered() async {
+        let suggestions = PasskeySuggestions(system: nil)
+        #expect(!suggestions.isAvailable)
+        #expect(suggestions.access == .denied)
+        #expect(await suggestions.items(for: offer).isEmpty)
+        #expect(await suggestions.requestAccess() == .denied)
+    }
+
+    @Test func eachAnswerIsKept() async {
+        for answer in [PasskeyAccess.allowed, .denied] {
+            let system = FakePasskeys(access: .notAsked, answer: answer)
+            let suggestions = PasskeySuggestions(system: system)
+            var heard = 0
+            let token = PasskeySuggestions.changed.observe { heard += 1 }
+            #expect(await suggestions.requestAccess() == answer)
+            #expect(suggestions.access == answer)
+            #expect(system.requests == 1)
+            #expect(heard == 1)
+            token.cancel()
+        }
+    }
+
+    @Test func onlyThePasskeysTheRequestAllows() {
+        let one = SavedPasskey(name: "one", relyingParty: "example.com", credentialID: Data([1, 2, 3]))
+        let two = SavedPasskey(name: "two", relyingParty: "example.com", credentialID: Data([4]))
+        #expect(PasskeySuggestions.listed([one, two], for: .init(relyingParty: "example.com", allow: ["AQID"])) == [one])
+        #expect(PasskeySuggestions.listed([one, two], for: .init(relyingParty: "example.com", allow: [])) == [one, two])
+    }
+
+    @Test func credentialIDsAreBase64URL() {
+        #expect(SavedPasskey(name: "", relyingParty: "", credentialID: Data([251, 255])).id == "-_8")
+        #expect(SavedPasskey(name: "", relyingParty: "", credentialID: Data([1, 2, 3])).id == "AQID")
+    }
+
+    /// A page lists its own host's passkeys or a parent domain's, never a public suffix's or another site's.
+    @Test func whichSitesAPageMayAskFor() {
+        #expect(PasskeySuggestions.fits("example.com", on: "example.com"))
+        #expect(PasskeySuggestions.fits("example.com", on: "www.example.com"))
+        #expect(PasskeySuggestions.fits("login.example.com", on: "login.example.com"))
+        #expect(!PasskeySuggestions.fits("www.example.com", on: "example.com"))
+        #expect(!PasskeySuggestions.fits("ample.com", on: "example.com"))
+        #expect(!PasskeySuggestions.fits("other.com", on: "example.com"))
+        #expect(!PasskeySuggestions.fits("co.uk", on: "bbc.co.uk"))
+        #expect(!PasskeySuggestions.fits("github.io", on: "alice.github.io"))
+        #expect(!PasskeySuggestions.fits("", on: "example.com"))
+    }
+
+    @Test func thePagesAnswerIsReadForItsOwnHost() {
+        #expect(PasskeySuggestions.offer(from: nil, host: "example.com") == nil)
+        #expect(PasskeySuggestions.offer(from: ["rpId": NSNull(), "allow": []], host: "WWW.example.com")
+            == .init(relyingParty: "www.example.com", allow: []))
+        #expect(PasskeySuggestions.offer(from: ["rpId": "Example.com", "allow": ["AQID"]], host: "www.example.com")
+            == .init(relyingParty: "example.com", allow: ["AQID"]))
+        #expect(PasskeySuggestions.offer(from: ["rpId": "bank.com"], host: "example.com") == nil)
+    }
+
+    @Test func whereTheMenuMayListPasskeys() {
+        func may(available: Bool = true, getsYourData: Bool = true, managerOn: Bool = false, isMainFrame: Bool = true,
+                 passkeyField: Bool = true, newPassword: Bool = false, scheme: String = "https", host: String = "example.com") -> Bool {
+            PasskeySuggestions.mayOffer(available: available, getsYourData: getsYourData, managerOn: managerOn, isMainFrame: isMainFrame,
+                                        passkeyField: passkeyField, newPassword: newPassword, scheme: scheme, host: host)
+        }
+        #expect(may())
+        #expect(may(scheme: "http", host: "localhost"))
+        #expect(!may(available: false))
+        #expect(!may(getsYourData: false))
+        // A password manager extension that brings its own passkeys keeps them.
+        #expect(!may(managerOn: true))
+        #expect(!may(isMainFrame: false))
+        #expect(!may(passkeyField: false))
+        #expect(!may(newPassword: true))
+        #expect(!may(scheme: "http"))
+    }
+
+    @Test func passkeysComeFirstThenLoginsThenPasswords() throws {
+        let here = try #require(Origin(URL(string: "https://example.com")))
+        let login = Credential(id: UUID(), origin: here, username: "sam", title: "", notes: "", otpAuth: "", created: Date(), modified: Date(), lastUsed: nil)
+        let passkey = AutofillMenu.Item.passkey(SavedPasskey(name: "sam", relyingParty: "example.com", credentialID: Data([1])))
+        #expect(names(Autofill.menuItems([login], on: here, passkeys: [passkey])) == ["passkey sam", "sam", "system"])
+        #expect(names(Autofill.menuItems([], on: here, passkeys: [.allowPasskeys])) == ["allow", "system"])
+        let many = Array(repeating: passkey, count: 12)
+        #expect(Autofill.menuItems([login], on: here, passkeys: many).count <= AutofillMenu.maxRows)
+        #expect(names(Autofill.menuItems([login], on: here, passkeys: many)).suffix(2) == ["sam", "system"])
     }
 }

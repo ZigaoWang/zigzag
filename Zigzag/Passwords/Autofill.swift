@@ -77,12 +77,19 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         switch kind {
         case "focus":
             generation += 1
-            debugLog("autofill focus main=\(message.frameInfo.isMainFrame) on=\(Self.isOn(in: Profiles.shared.profile(ofPage: webView))) form=\(body["isForm"] ?? "-") new=\(body["isNew"] ?? "-")")
-            // Fields inside frames are positioned relative to the frame, which the page can't tell us reliably.
-            guard message.frameInfo.isMainFrame, Self.isOn(in: Profiles.shared.profile(ofPage: webView)),
-                  let field = Self.fieldRect(body, in: webView) else { hide(); return }
+            let profile = Profiles.shared.profile(ofPage: webView)
+            let fills = Self.isOn(in: profile)
+            debugLog("autofill focus main=\(message.frameInfo.isMainFrame) on=\(fills) form=\(body["isForm"] ?? "-") new=\(body["isNew"] ?? "-")")
             let security = message.frameInfo.securityOrigin
             let origin = Origin(scheme: security.protocol, host: security.host.lowercased(), port: security.port == 0 ? nil : security.port)
+            // Saved passkeys, where the page waits for one: also while Zigzag doesn't fill passwords.
+            let passkeysHere = PasskeySuggestions.mayOffer(available: PasskeySuggestions.shared.isAvailable, getsYourData: profile.getsYourData,
+                                                           managerOn: PasskeySuggestions.managerOn(in: profile), isMainFrame: message.frameInfo.isMainFrame,
+                                                           passkeyField: body["passkeys"] as? Bool == true, newPassword: body["isNew"] as? Bool == true,
+                                                           scheme: origin.scheme, host: origin.host)
+            // Fields inside frames are positioned relative to the frame, which the page can't tell us reliably.
+            guard message.frameInfo.isMainFrame, fills || passkeysHere,
+                  let field = Self.fieldRect(body, in: webView) else { hide(); return }
             // Only visible fields; never open the menu for one scrolled away or offscreen.
             guard Self.isInView(field, viewport: webView.bounds.size) else { hide(); return }
             // A click in the field its menu is open for leaves the menu as it is (#378).
@@ -95,7 +102,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let current = generation
             // A name, email, phone or address field: offer your card from Contacts. Read only once you pick it.
             if body["isForm"] as? Bool == true {
-                guard Self.fillsForms(in: webView.owner) else { hide(); return }
+                guard fills, Self.fillsForms(in: webView.owner) else { hide(); return }
                 show([.contact], under: field, in: webView, frame: frame, origin: origin)
                 return
             }
@@ -106,6 +113,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                                                 maxLength: body["maxLength"] as? Int ?? -1)
             }
             Task {
+                let passkeys = passkeysHere ? await PasskeySuggestions.shared.items(in: webView, origin: origin) : []
+                guard current == self.generation else { return }
+                // Zigzag doesn't fill passwords here: the passkeys alone, or no menu.
+                guard fills else {
+                    if passkeys.isEmpty { self.hide() } else { self.show(passkeys, under: field, in: webView, frame: frame, origin: origin) }
+                    return
+                }
                 let all: [Credential]
                 var readable = true
                 do { all = try await PasswordStore.shared.all() } catch { debugLog("autofill vault error \(error)"); all = []; readable = false }
@@ -121,15 +135,16 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 // Nothing saved here: Passwords… is what's left, with a word on why above it when there's one.
                 if logins.isEmpty {
                     var hint: [AutofillMenu.Item] = []
-                    if !all.isEmpty, self.shouldSayMissing(on: origin) {
+                    // With a passkey to sign in with, nothing is missing.
+                    if passkeys.isEmpty, !all.isEmpty, self.shouldSayMissing(on: origin) {
                         hint = [.missing]
-                    } else if readable, all.isEmpty, let browser = self.browserToImport() {
+                    } else if passkeys.isEmpty, readable, all.isEmpty, let browser = self.browserToImport() {
                         hint = [.importFrom(browser)]
                     }
-                    self.show(hint + Self.menuItems([], on: origin), under: field, in: webView, frame: frame, origin: origin)
+                    self.show(hint + Self.menuItems([], on: origin, passkeys: passkeys), under: field, in: webView, frame: frame, origin: origin)
                     return
                 }
-                self.show(Self.menuItems(logins, on: origin), under: field, in: webView, frame: frame, origin: origin)
+                self.show(Self.menuItems(logins, on: origin, passkeys: passkeys), under: field, in: webView, frame: frame, origin: origin)
             }
         case "blur":
             generation += 1
@@ -174,9 +189,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     ///
     /// Passwords… (the Mac's own list: the Passwords app and password manager apps) is always last, in private
     /// windows too: what it fills is never saved anywhere.
+    ///
+    /// `passkeys`: the saved passkeys the page waits for, first, as Safari lists them.
     static func menuItems(_ logins: [Credential], on origin: Origin, newPassword: Bool = false, isPrivate: Bool = false,
-                          systemPasswords: Bool = true) -> [AutofillMenu.Item] {
-        let lead: [AutofillMenu.Item] = newPassword ? [isPrivate ? .note(.privateWindow) : .generate] : []
+                          systemPasswords: Bool = true, passkeys: [AutofillMenu.Item] = []) -> [AutofillMenu.Item] {
+        let lead: [AutofillMenu.Item] = (newPassword ? [isPrivate ? .note(.privateWindow) : .generate] : []) + passkeys.prefix(AutofillMenu.maxRows - 3)
         let tail: [AutofillMenu.Item] = systemPasswords ? [.systemPasswords] : []
         let newest: (Credential, Credential) -> Bool = { a, b in
             if a.origin.isExact(for: origin) != b.origin.isExact(for: origin) { return a.origin.isExact(for: origin) }
@@ -457,6 +474,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         case .generate: fillGenerated()
         case .contact: fillContact()
         case .systemPasswords: openSystemPasswords()
+        case .passkey(let passkey): usePasskey(passkey)
+        case .allowPasskeys: allowPasskeys()
         // Says why something isn't offered; nothing to do.
         case .note: break
         case .importFrom:
@@ -467,6 +486,32 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             hide()
             // "google.com" finds logins saved under any part of it.
             PasswordsWindowController.show(searching: site.split(separator: ".").first.map(String.init) ?? site)
+        }
+    }
+
+    /// Signs in with a saved passkey: the page's waiting request asks the Mac for that one, which shows its sheet.
+    private func usePasskey(_ passkey: SavedPasskey) {
+        guard let target else { hide(); return }
+        hide()
+        guard Origin(target.webView.url) == target.origin, Self.isInFront(target.webView) else { Self.tell(Self.pageMovedOn, about: target.webView); return }
+        Task {
+            if await !PasskeySuggestions.shared.use(passkey, in: target.webView) { Self.tell(Self.pageMovedOn, about: target.webView) }
+        }
+    }
+
+    /// Asks macOS whether Zigzag may list the passkeys saved on this Mac. Allowed, the field's menu comes back with
+    /// this site's.
+    private func allowPasskeys() {
+        guard let target else { hide(); return }
+        let field = self.field
+        hide()
+        Task {
+            guard await PasskeySuggestions.shared.requestAccess() == .allowed,
+                  Origin(target.webView.url) == target.origin, Self.isInFront(target.webView) else { return }
+            let passkeys = await PasskeySuggestions.shared.items(in: target.webView, origin: target.origin)
+            guard !passkeys.isEmpty, self.menu == nil, Origin(target.webView.url) == target.origin, Self.isInFront(target.webView),
+                  Self.isInView(field, viewport: target.webView.bounds.size) else { return }
+            self.show(passkeys, under: field, in: target.webView, frame: target.frame, origin: target.origin)
         }
     }
 
@@ -739,6 +784,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         const hint = (el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '');
         return /first.?name|last.?name|full.?name|your.?name|^name$|e-?mail|phone|mobile|address|street|city|zip|postal|postcode|company|organi[sz]ation/i.test(hint.trim());
       };
+      // A field the site marks for passkeys (autocomplete "username webauthn"), where a waiting request's passkeys are offered.
+      const passkeyField = (el) => !!el && el.tagName === 'INPUT' && !el.disabled && !el.readOnly
+        && /(^|\\s)webauthn(\\s|$)/i.test(el.getAttribute('autocomplete') || '');
       // Zoom changes the field's size on screen, not in CSS pixels, so it's kept with the rect.
       const place = (r) => ({ x: r.left, y: r.top, w: r.width, h: r.height, zoom: devicePixelRatio, scale: window.visualViewport ? visualViewport.scale : 1 });
       // The part of the page in view, when pinched in.
@@ -771,9 +819,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         reported = place(r);
         follow(el);
         post({ kind: 'focus', isForm: formField(el), isNew: isNew(el) && !el.value, rules: el.getAttribute('passwordrules') || '',
-               minLength: el.minLength, maxLength: el.maxLength, rect: reported, view: view(), byUser: !!byUser });
+               minLength: el.minLength, maxLength: el.maxLength, rect: reported, view: view(), byUser: !!byUser, passkeys: passkeyField(el) });
       };
-      const wanted = (el) => signIn(el) || isNew(el) || formField(el);
+      const wanted = (el) => signIn(el) || isNew(el) || formField(el) || passkeyField(el);
       // The menu opens only for something you did: a click on the field, or Tab to it. A page can put the cursor in a
       // field by itself, and mustn't get the menu up under a click you were about to make elsewhere.
       let pressed = null, pressedAt = -Infinity, pressX = 0, pressY = 0;
@@ -1119,6 +1167,10 @@ final class AutofillMenu: FloatingPanelView {
         case note(Note)
         /// The Mac's own list of passwords: the Passwords app and password manager apps.
         case systemPasswords
+        /// A passkey saved on this Mac for the site, which the page waits for.
+        case passkey(SavedPasskey)
+        /// The page waits for a passkey and macOS hasn't been asked whether Zigzag may list them: asks it.
+        case allowPasskeys
     }
 
     enum Note {
@@ -1311,6 +1363,16 @@ final class AutofillRow: InteractiveView {
             name = Label(String(localized: "Passwords…", comment: "A row at the bottom of the fill-password menu: opens the Mac’s own list of passwords to pick one from, as Edit › AutoFill › Passwords… does in other apps."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
             detail = Label(String(localized: "From your password apps", comment: "Under Passwords… in the fill-password menu: Apple’s Passwords app, and password manager apps like 1Password or Dashlane."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = Tokens.Symbol.image("key")
+            icon.contentTintColor = Tokens.Color.accent
+        case .passkey(let passkey):
+            name = Label(passkey.name, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label(String(localized: "Passkey for \(passkey.relyingParty)", comment: "Under a saved passkey in the menu that fills a password into a page. The placeholder is a site, like github.com."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("person.badge.key")
+            icon.contentTintColor = Tokens.Color.textSecondary
+        case .allowPasskeys:
+            name = Label(String(localized: "Use a Saved Passkey", comment: "A row in the fill-password menu on a site that takes passkeys, before macOS has been asked whether Zigzag may list the passkeys saved on this Mac. Picking it asks."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label(String(localized: "macOS asks once whether Zigzag may list them", comment: "Under Use a Saved Passkey in the fill-password menu: picking it shows macOS's prompt about passkey access."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("person.badge.key")
             icon.contentTintColor = Tokens.Color.accent
         case .note(.privateWindow):
             name = Label(String(localized: "No strong password in a private window", comment: "A dimmed row in the fill-password menu on a sign-up form in a private window, in place of Use Strong Password."), font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
