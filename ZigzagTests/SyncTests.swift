@@ -209,6 +209,7 @@ import Testing
 
     func send() {
         let names = saves, gone = deletes
+        let sentAt = realTime ? Date() : clock
         saves = []
         deletes = []
         var saved: [SyncRemote] = []
@@ -220,7 +221,7 @@ import Testing
             case .failed(let failure): session.saveFailed(name, failure)
             }
         }
-        session.saved(saved)
+        session.saved(saved, sentAt: sentAt)
         var removed: [String] = []
         for name in gone {
             if cloud.delete(name) { removed.append(name) } else { session.deleteFailed(name, .gone) }
@@ -702,6 +703,35 @@ extension SyncLibrary {
         a.sync(); b.sync(); a.sync()
         #expect(a.library.settings["ReaderSize"] == .int(22))
         #expect(b.library.settings["ReaderSize"] == .int(22))
+    }
+
+    @Test func aStallAfterASaveIsntTakenForAFastClock() throws {
+        let (cloud, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        // A's send goes up, then the Mac sleeps 8 hours before it hears back.
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "before the lid closed" } }
+        let sentAt = a.clock
+        let page = try #require(pageName(a, "a"))
+        guard let upload = a.session.upload(page), case .saved(let record) = cloud.save(upload, at: sentAt) else { Issue.record("not saved"); return }
+        a.clock += 8 * 3600
+        a.session.saved([record], sentAt: sentAt)
+        #expect(a.session.state.clockAhead == nil)
+        // Its next edit is dated as it was made.
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "after waking" } }
+        #expect(a.session.state.base[page]?.modified == a.clock)
+        // A clock that really runs an hour ahead is still found, from when the send started.
+        a.clock += 60
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "an hour ahead" } }
+        let ahead = a.clock
+        guard let again = a.session.upload(page), case .saved(let fast) = cloud.save(again, at: ahead - 3600) else { Issue.record("not saved"); return }
+        a.session.saved([fast], sentAt: ahead)
+        #expect(a.session.state.clockAhead.map { abs($0 - 3600) < 1 } == true)
+        // One that would be months ahead is no guide, and a correction never dates an edit before iCloud's last save.
+        a.session.updateState { $0.clockAhead = 90 * 86400 }
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "months ahead" } }
+        #expect(a.session.state.base[page]?.modified == a.clock)
+        a.session.updateState { $0.clockAhead = 10 * 3600 }
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "corrected too far" } }
+        #expect(a.session.state.base[page]?.modified == fast.serverModified)
     }
 
     @Test func aMoveAndAnInsertAtOnceBothKeepTheirPlaces() {

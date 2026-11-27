@@ -1097,6 +1097,8 @@ final class CloudEngine: SyncEngine, CKSyncEngineDelegate {
     private(set) var serialization: Data?
     /// When the engine's current fetch started.
     private var fetchStarted: Date?
+    /// When the engine's current send started, by this Mac's clock.
+    private var sendStarted: Date?
     /// While `zoneDeletion` asks, the zone's deletion the database's changes bring, kept for it to decide.
     private var askingWhy = false
     private var deletion: CKDatabase.DatabaseChange.Deletion.Reason?
@@ -1252,7 +1254,7 @@ final class CloudEngine: SyncEngine, CKSyncEngineDelegate {
             session.fetched(records, deleted: changes.deletions.filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(\.recordID.recordName),
                             startedAt: fetchStarted)
         case .sentRecordZoneChanges(let sent):
-            session.saved(sent.savedRecords.map(Self.remote))
+            session.saved(sent.savedRecords.map(Self.remote), sentAt: sendStarted)
             session.deleted(sent.deletedRecordIDs.map(\.recordName))
             var full = false
             defer { if full { owner?.iCloudFull() } }
@@ -1300,6 +1302,7 @@ final class CloudEngine: SyncEngine, CKSyncEngineDelegate {
             fetchStarted = session.now()
             owner?.engineEvent(.syncing)
         case .willSendChanges:
+            if sendStarted == nil { sendStarted = session.now() }
             if hasPending(syncEngine) { owner?.engineEvent(.syncing) }
         case .didFetchChanges:
             fetchStarted = nil
@@ -1308,6 +1311,7 @@ final class CloudEngine: SyncEngine, CKSyncEngineDelegate {
             owner?.retry.succeeded()
             owner?.engineEvent(.synced(session.state.lastSynced))
         case .didSendChanges:
+            sendStarted = nil
             owner?.sent()
         default:
             break
