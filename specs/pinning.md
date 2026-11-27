@@ -89,6 +89,12 @@
   No test yet.
 - Unpin a page of a pinned group → the whole group comes back as a group of tabs.
   Test: PinnedGroupTests.pinningAGroupOfTabsKeepsItWholeAsOneFolder
+- The pinned section folded with the chevron by the space's name → only the pinned pages that are open and the page you're on show, each under the folders on its way.
+  Test: PinnedGroupTests.foldedPinsShowOpenPagesUnderTheirFolders
+- ⌘W or the × on a pinned page in a folded section → its row stays, unloaded, under its folders; a click opens it in place. It goes once you switch to another space, fold the section again or relaunch.
+  Test: PinnedGroupTests.aClosedPinStaysInAFoldedSectionUntilYouLeaveTheSpace
+  Test: PinnedGroupTests.aClosedPinInAFoldedSectionGoesWhenItsFoldedAgain
+  Test: PinnedGroupTests.aClosedPinInAFolderStaysUnderItInAFoldedSection
 
 ## Private windows
 - Pin from a private window, any way in → nothing is pinned; Pin Link isn't in a link's menu there.
