@@ -359,12 +359,14 @@
   Test: SwipeGestureTests.aPlainPageGoesBackAndEndsClean
   Test: SwipeGestureTests.aFlickGoesShortOfTheDistance
   Test: SwipeGestureTests.aShortSwipeSpringsBackAndEndsClean
-- While the fingers are down, the arrow's ring follows how far they've gone, and the arrow fills the moment letting go would go back or forward: at the full distance, or with a flick going fast enough a third of the way. Filled, it stays filled while the fingers rest or slow down, and empties only when they come back a little from the furthest they got. Letting go goes exactly when it's filled, so a flick, a rest, then letting go still goes.
-  Test: BookmarkFolderTests.aFlickArmsAndRestingFingersKeepTheArrowAsItIs
+- While the fingers are down, the arrow's ring follows how far they've gone, and the arrow fills the moment letting go would go back or forward: at the full distance, or while a flick is going fast enough a third of the way. Filled at the full distance, it stays filled while the fingers rest, and empties only when they come back a little from the furthest they got. Filled by a flick, it stays filled while the flick keeps going and empties as soon as the fingers slow right down or stop, so a swipe short of the distance, a pause, then letting go springs back, as in Safari. Letting go goes exactly when it's filled.
+  Test: BookmarkFolderTests.aFlickFillsOnlyWhileTheFingersKeepGoing
   Test: BookmarkFolderTests.aFlickDisarmsOnlyPastTheMarginBack
   Test: SwipeGestureTests.aFlickArmsWithOneTapBeforeLettingGo
+  Test: SwipeGestureTests.aPauseShortOfTheDistanceSpringsBack
   Test: SwipeGestureTests.movingBackPastTheMarginDisarmsWithNoTap
-- The trackpad taps once as the arrow fills, by distance or by a flick, and again only if it empties and fills again; fingers on the screen never tap.
+- The trackpad taps once as the arrow fills, by distance or by a flick, and again only if it empties and fills again; fingers on the screen never tap. While the page may still keep the swipe for itself, the arrow neither fills nor taps.
+  Test: SwipeGestureTests.noTapWhileThePageMayStillKeepTheSwipe
   Test: BookmarkFolderTests.swipeTapsOnceAsItArms
   Test: BookmarkFolderTests.aFlickHoveringAtTheCutoffTapsOnce
   Test: SwipeGestureTests.aSlowSwipeTapsOnceAtTheFullDistance
