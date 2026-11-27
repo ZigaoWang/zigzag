@@ -386,6 +386,74 @@ import Testing
         #expect(shown.depth[.folder(outer.id)] == 0 && shown.depth[.folder(inner.id)] == 1 && shown.depth[.bookmark(page)] == 2)
     }
 
+    /// The row of a pinned page the folded list shows, if it shows one.
+    private func pinRow(_ controller: BrowserWindowController, _ id: UUID) -> TabRowView? {
+        guard pinnedItems(controller).contains(.bookmark(id)) else { return nil }
+        controller.sidebar.layoutSubtreeIfNeeded()
+        return controller.sidebar.list.row(forBookmark: id) as? TabRowView
+    }
+
+    /// Folded, a pinned page closed with ⌘W or its row's × stays listed, unloaded, until you switch spaces and back.
+    @Test func aClosedPinStaysInAFoldedSectionUntilYouLeaveTheSpace() throws {
+        for byButton in [false, true] {
+            try inFoldedWindow(["Tab"]) { controller, _, space in
+                let manager = controller.tabManager
+                let other = Library.shared.addSpace(name: "Other").id
+                let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/folded/kept")!, title: "Kept", to: space))
+                #expect(pinRow(controller, pin.id) == nil)
+                manager.openBookmark(pin)
+                let page = try #require(manager.bookmarkTab(for: pin.id))
+                #expect(pinRow(controller, pin.id) != nil)
+                if byButton { try #require(pinRow(controller, pin.id)).onClose?() } else { controller.closeTab(nil) }
+                #expect(page.isClosed)
+                let row = try #require(pinRow(controller, pin.id), "byButton=\(byButton)")
+                #expect(row.isUnloaded)
+                manager.switchToSpace(other)
+                manager.switchToSpace(space)
+                #expect(pinRow(controller, pin.id) == nil)
+            }
+        }
+    }
+
+    /// Folded, a closed pin kept listed goes once the section is unfolded and folded again.
+    @Test func aClosedPinInAFoldedSectionGoesWhenItsFoldedAgain() throws {
+        try inFoldedWindow(["Tab"]) { controller, _, space in
+            let manager = controller.tabManager
+            let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/folded/refold")!, title: "Refold", to: space))
+            manager.openBookmark(pin)
+            controller.closeTab(nil)
+            #expect(pinRow(controller, pin.id) != nil)
+            controller.sidebar.list.debugToggleFold()
+            #expect(!SidebarListView.isCollapsed(space))
+            #expect(pinRow(controller, pin.id) != nil)
+            controller.sidebar.list.debugToggleFold()
+            #expect(SidebarListView.isCollapsed(space))
+            #expect(pinRow(controller, pin.id) == nil)
+        }
+    }
+
+    /// Folded, a page in a folder closed with ⌘W stays listed under its folder; clicking it opens it in place.
+    @Test func aClosedPinInAFolderStaysUnderItInAFoldedSection() throws {
+        try inFoldedWindow(["Tab"]) { controller, _, space in
+            let manager = controller.tabManager
+            let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/folded/filed")!, title: "Filed", to: space))
+            let folder = try #require(Library.shared.addFolder(named: "Folder", with: [pin.id], in: space))
+            manager.openBookmark(pin)
+            controller.closeTab(nil)
+            let rows = pinnedItems(controller)
+            let head = try #require(rows.firstIndex(of: .folder(folder.id)))
+            #expect(rows.firstIndex(of: .bookmark(pin.id)) == head + 1)
+            let row = try #require(pinRow(controller, pin.id))
+            #expect(row.isUnloaded)
+            let point = row.convert(NSPoint(x: 20, y: row.bounds.midY), to: nil)
+            row.onClick?(try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: point, modifierFlags: [], timestamp: 0,
+                                                         windowNumber: controller.window?.windowNumber ?? 0, context: nil,
+                                                         eventNumber: 0, clickCount: 1, pressure: 1)))
+            #expect(manager.selectedTab === manager.bookmarkTab(for: pin.id))
+            #expect(pinnedItems(controller).filter { $0 == .bookmark(pin.id) }.count == 1)
+        }
+    }
+
     /// ⌘D on a tab of a group, with the section folded: one folder row with its pages, still folded; ⌘Z undoes it.
     @Test func commandDWithPinsFoldedPinsOneFolder() throws {
         try inFoldedWindow(["0", "1", "2", "3"]) { controller, tabs, space in

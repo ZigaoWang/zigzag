@@ -26,7 +26,10 @@ final class TabManager {
         _modify { yield &store.bookmarkTabs; store.listsChanged() }
     }
     private var selectedBySpace: [UUID: UUID] = [:]
-    private(set) var currentSpaceID: UUID { didSet { extensionLists.removeAll() } }
+    private(set) var currentSpaceID: UUID { didSet { extensionLists.removeAll(); if currentSpaceID != oldValue { closedPins.removeAll() } } }
+    /// Pinned pages closed since you came to the space on show: a folded section keeps their rows.
+    private(set) var closedPins: Set<UUID> = []
+    func forgetClosedPins() { closedPins.removeAll() }
     /// MRU order in this window, for Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
     /// Tabs opened from another since you last switched tabs: closing one goes back toward its opener, as in Chrome.
@@ -1574,6 +1577,7 @@ final class TabManager {
             // Closing a pinned page closes it, wherever it had got to: one ⌘W, never two. The pin stays, and
             // opens fresh at its own address next time.
             bookmarkTabs[bookmarkID] = nil
+            closedPins.insert(bookmarkID)
             recentTabIDs.removeAll { $0 == tab.id }
             store.unwatch(tab.id)
             tab.close()
@@ -1621,6 +1625,7 @@ final class TabManager {
     private func closeKeepingSelection(_ tab: Tab, split pair: SplitPair? = nil, heir: Tab? = nil) {
         if let bookmarkID = tab.bookmarkID {
             bookmarkTabs[bookmarkID] = nil
+            closedPins.insert(bookmarkID)
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
             closedTabs.append(closedRecord(of: tab, at: index, split: pair))
             liftChildren(of: tab)
