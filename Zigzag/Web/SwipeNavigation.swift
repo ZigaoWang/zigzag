@@ -905,7 +905,9 @@ enum SwipeDecision: Equatable {
         guard sideways, canGo, !pageTakes else { return .ignore }
         if page == .unknown, waited < (overFrame || pageScrolls == nil ? frameWait : answerWait) {
             // Known to have nothing sideways here and not a frame: the arrow needn't wait for the page to say so.
-            return leans && pageScrolls != nil && !overFrame ? .lean(wanted) : .undecided
+            // A page too busy to say what's under the pointer within a frame leans too, rather than hold the
+            // fingers back; it still has the scroll, and takes it back if it answers that it scrolls there.
+            return leans && !overFrame && (pageScrolls != nil || waited >= probeWait) ? .lean(wanted) : .undecided
         }
         return .track(wanted)
     }
