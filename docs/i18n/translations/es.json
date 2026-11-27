@@ -145,6 +145,12 @@
         "value": "Pull requests abiertas en repositorios públicos de %@, con la actividad más reciente primero."
       }
     },
+    "Password, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Contraseña, si el servicio la pide"
+      }
+    },
     "Pinned tabs as tiles": {
       "stringUnit": {
         "state": "translated",
@@ -187,10 +193,28 @@
         "value": "La descarga no terminó."
       }
     },
-    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff.": {
+    "The saved file couldn’t be read.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} y {file_url} necesitan el envío de archivo."
+        "value": "No se ha podido leer el archivo guardado."
+      }
+    },
+    "This file is too large to send that way (%@).": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Este archivo es demasiado grande para enviarlo así (%@)."
+      }
+    },
+    "This rule sends the file itself, but there was no file to send. Set Hand off to File, and let the download finish first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Esta regla envía el propio archivo, pero no había ningún archivo que enviar. Ajusta Enviar en Archivo y deja que la descarga termine primero."
+      }
+    },
+    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s bytes, for a service’s parameters.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} y {file_raw} necesitan el envío de archivo; {file_raw} es el contenido del archivo, para los parámetros de un servicio."
       }
     },
     "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
@@ -215,6 +239,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Actualizando…"
+      }
+    },
+    "Username, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nombre de usuario, si el servicio lo pide"
       }
     },
     "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {

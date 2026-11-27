@@ -256,8 +256,8 @@ enum DownloadRuleSheet {
                                             view: stack(folder, chooseFolder)))
         }
 
-        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s own bytes, base64.",
-                                             comment: "The tokens a download rule's fields may use, listed in its sheet. File and file_url are only filled in when the rule hands off a saved file."))
+        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s bytes, for a service’s parameters.",
+                                             comment: "The tokens a download rule's fields may use, listed in its sheet. File, file_url and file_raw are only filled in when the rule hands off a saved file; file_raw, the file's contents in base64, only in a JSON-RPC or XML-RPC rule's parameters."))
         let handoffNote = FormSheet.Row.note(String(localized: "File saves the download in Zigzag first, using the page’s session, then hands off the saved file; links still hand off their address.",
                                                     comment: "Under the Hand off choice in a download rule's sheet: what File does, and that links are unaffected."))
         // Destinations only ask for file types; they drop the address rule rows (applies to, match, case, page

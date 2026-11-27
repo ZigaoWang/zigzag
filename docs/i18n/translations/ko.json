@@ -145,6 +145,12 @@
         "value": "%@이(가) 소유한 공개 저장소의 열린 풀 리퀘스트를 최근 활동순으로 표시합니다."
       }
     },
+    "Password, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "서비스에서 요구하는 경우 암호 입력"
+      }
+    },
     "Pinned tabs as tiles": {
       "stringUnit": {
         "state": "translated",
@@ -187,10 +193,28 @@
         "value": "다운로드가 완료되지 않았습니다."
       }
     },
-    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff.": {
+    "The saved file couldn’t be read.": {
       "stringUnit": {
         "state": "translated",
-        "value": "토큰: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} 및 {file_url}은 파일 전달이 필요합니다."
+        "value": "저장된 파일을 읽을 수 없습니다."
+      }
+    },
+    "This file is too large to send that way (%@).": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "이 파일은 너무 커서 이 방법으로 보낼 수 없습니다(%@)."
+      }
+    },
+    "This rule sends the file itself, but there was no file to send. Set Hand off to File, and let the download finish first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "이 규칙은 파일 자체를 보내지만 보낼 파일이 없었습니다. 전달을 파일로 설정하고 먼저 다운로드가 완료될 때까지 기다리세요."
+      }
+    },
+    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s bytes, for a service’s parameters.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "토큰: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} 및 {file_raw}은 파일 전달이 필요합니다. {file_raw}은 파일의 내용이며 서비스 매개변수에 사용합니다."
       }
     },
     "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
@@ -215,6 +239,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "업데이트 중…"
+      }
+    },
+    "Username, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "서비스에서 요구하는 경우 사용자 이름 입력"
       }
     },
     "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {

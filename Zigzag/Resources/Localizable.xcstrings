@@ -3879,89 +3879,6 @@
         }
       }
     },
-    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff." : {
-      "comment" : "The tokens a download rule's fields may use, listed in its sheet. File and file_url are only filled in when the rule hands off a saved file.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} und {file_url} erfordern eine Dateiübergabe."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} y {file_url} necesitan el envío de archivo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jetons : {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} et {file_url} nécessitent un transfert de fichier."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Token: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} e {file_url} richiedono il trasferimento del file."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使えるトークン：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}、{file}、{file_url}。{file}と{file_url}はファイルを渡すときだけ使えます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "토큰: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} 및 {file_url}은 파일 전달이 필요합니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} en {file_url} vereisen dat een bestand wordt doorgegeven."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tokeny: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. Tokeny {file} i {file_url} wymagają przekazania pliku."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} e {file_url} exigem entrega de arquivo."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Токены: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. Для {file} и {file_url} нужна передача файла."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Belirteçler: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} ve {file_url} için Dosya devri gerekir."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "令牌：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}、{file}、{file_url}。{file} 和 {file_url} 需要选择“文件”转交。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "權杖：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}、{file}、{file_url}。{file} 和 {file_url} 需要選擇「檔案」轉交。"
-          }
-        }
-      }
-    },
     "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off." : {
       "comment" : "Tooltip of the Compatibility mode row in the site panel.",
       "localizations" : {
@@ -123741,7 +123658,7 @@
       }
     },
     "Password" : {
-      "comment" : "Name of a field of a saved login in the Passwords window.\nPlaceholder of the password field in a site's HTTP sign-in sheet.",
+      "comment" : "Label of the password field in a JSON-RPC download rule's sheet.\nName of a field of a saved login in the Passwords window.\nPlaceholder of the password field in a site's HTTP sign-in sheet.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -178874,7 +178791,7 @@
       }
     },
     "Username" : {
-      "comment" : "Name of a field of a saved login in the Passwords window.\nPlaceholder of the name field in a site's HTTP sign-in sheet.\nPlaceholder of the username field in the save-password prompt.",
+      "comment" : "Label of the username field in a JSON-RPC download rule's sheet.\nName of a field of a saved login in the Passwords window.\nPlaceholder of the name field in a site's HTTP sign-in sheet.\nPlaceholder of the username field in the save-password prompt.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -211105,6 +211022,504 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法先儲存一份備份，所以同步仍是關閉的。"
+          }
+        }
+      }
+    },
+    "Username, if the service asks" : {
+      "comment" : "Placeholder of the username field in a JSON-RPC download rule's sheet. It's kept in the Keychain.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benutzername, falls der Dienst einen verlangt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre de usuario, si el servicio lo pide"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom d’utilisateur, si le service en demande un"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome utente, se il servizio lo richiede"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービスで必要な場合はユーザ名"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서비스에서 요구하는 경우 사용자 이름 입력"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gebruikersnaam, als de service erom vraagt"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nazwa użytkownika, jeśli usługa jej wymaga"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome de usuário, se o serviço pedir"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Имя пользователя, если сервис его запрашивает"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hizmet istiyorsa kullanıcı adı"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务需要时填写的用户名"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服務需要時填寫的使用者名稱"
+          }
+        }
+      }
+    },
+    "Password, if the service asks" : {
+      "comment" : "Placeholder of the password field in a JSON-RPC download rule's sheet. It's kept in the Keychain.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passwort, falls der Dienst eines verlangt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contraseña, si el servicio la pide"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mot de passe, si le service en demande un"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password, se il servizio la richiede"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービスで必要な場合はパスワード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서비스에서 요구하는 경우 암호 입력"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wachtwoord, als de service erom vraagt"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hasło, jeśli usługa go wymaga"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senha, se o serviço pedir"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароль, если сервис его запрашивает"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hizmet istiyorsa parola"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务需要时填写的密码"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服務需要時填寫的密碼"
+          }
+        }
+      }
+    },
+    "This rule sends the file itself, but there was no file to send. Set Hand off to File, and let the download finish first." : {
+      "comment" : "Why a download rule failed: its parameters use {file_raw}, which needs the saved file, but no file was handed off.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Regel sendet die Datei selbst, aber es gab keine Datei zum Senden. Stelle „Übergeben“ auf „Datei“ und lass den Download zuerst fertig werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta regla envía el propio archivo, pero no había ningún archivo que enviar. Ajusta Enviar en Archivo y deja que la descarga termine primero."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette règle envoie le fichier lui-même, mais il n’y avait aucun fichier à envoyer. Réglez « Transférer » sur « Fichier » et laissez d’abord le téléchargement se terminer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa regola invia il file stesso, ma non c’era nessun file da inviare. Imposta Trasferisci su File e lascia prima terminare il download."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このルールはファイルそのものを送りますが、送るファイルがありませんでした。「渡すもの」を「ファイル」にして、ダウンロードが完了するまで待ってください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 규칙은 파일 자체를 보내지만 보낼 파일이 없었습니다. 전달을 파일로 설정하고 먼저 다운로드가 완료될 때까지 기다리세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze regel stuurt het bestand zelf, maar er was geen bestand om te sturen. Zet Doorgeven op Bestand en laat de download eerst voltooien."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta reguła wysyła sam plik, ale nie było pliku do wysłania. Ustaw opcję Przekaż na Plik i najpierw poczekaj na ukończenie pobierania."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta regra envia o próprio arquivo, mas não havia arquivo para enviar. Defina Entregar como Arquivo e deixe o download terminar primeiro."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это правило отправляет сам файл, но отправлять было нечего. Выберите «Файл» в поле «Передача» и дождитесь окончания загрузки."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu kural dosyanın kendisini gönderir, ancak gönderilecek dosya yoktu. Devret’i Dosya olarak ayarlayın ve önce indirmenin bitmesini bekleyin."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这条规则会发送文件本身，但没有可发送的文件。请把“转交”设为“文件”，并等下载完成。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這條規則會傳送檔案本身，但沒有可傳送的檔案。請把「轉交」設為「檔案」，並等下載完成。"
+          }
+        }
+      }
+    },
+    "This file is too large to send that way (%@)." : {
+      "comment" : "Why a download rule failed: the file is bigger than a rule can send as {file_raw}. The placeholder is a size, like 40 MB.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Datei ist zu groß, um sie so zu senden (%@)."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este archivo es demasiado grande para enviarlo así (%@)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier est trop volumineux pour être envoyé ainsi (%@)."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo file è troppo grande per inviarlo così (%@)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このファイルは大きすぎるため、この方法では送れません（%@）。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 파일은 너무 커서 이 방법으로 보낼 수 없습니다(%@)."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit bestand is te groot om zo te sturen (%@)."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ten plik jest za duży, aby wysłać go w ten sposób (%@)."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este arquivo é grande demais para enviar assim (%@)."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Этот файл слишком большой, чтобы отправить его так (%@)."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu dosya bu şekilde gönderilemeyecek kadar büyük (%@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个文件太大，无法这样发送（%@）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個檔案太大，無法這樣傳送（%@）。"
+          }
+        }
+      }
+    },
+    "The saved file couldn’t be read." : {
+      "comment" : "Why a download rule failed: its {file_raw} couldn't be read from disk.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die gesicherte Datei konnte nicht gelesen werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido leer el archivo guardado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier enregistré n’a pas pu être lu."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile leggere il file salvato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存したファイルを読み込めませんでした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 파일을 읽을 수 없습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het bewaarde bestand kan niet worden gelezen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie można odczytać zachowanego pliku."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível ler o arquivo salvo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось прочитать сохранённый файл."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaydedilen dosya okunamadı."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取保存的文件。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法讀取儲存的檔案。"
+          }
+        }
+      }
+    },
+    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s bytes, for a service’s parameters." : {
+      "comment" : "The tokens a download rule's fields may use, listed in its sheet. File, file_url and file_raw are only filled in when the rule hands off a saved file; file_raw, the file's contents in base64, only in a JSON-RPC or XML-RPC rule's parameters.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} und {file_raw} erfordern eine Dateiübergabe; {file_raw} ist der Inhalt der Datei, für die Parameter eines Dienstes."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} y {file_raw} necesitan el envío de archivo; {file_raw} es el contenido del archivo, para los parámetros de un servicio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jetons : {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} et {file_raw} nécessitent un transfert de fichier. {file_raw} est le contenu du fichier, pour les paramètres d’un service."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} e {file_raw} richiedono il trasferimento del file; {file_raw} è il contenuto del file, per i parametri di un servizio."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使えるトークン：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}、{file}、{file_url}、{file_raw}。{file}、{file_url}、{file_raw}はファイルを渡すときだけ使えます。{file_raw}はファイルの中身で、サービスのパラメータに使います。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "토큰: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} 및 {file_raw}은 파일 전달이 필요합니다. {file_raw}은 파일의 내용이며 서비스 매개변수에 사용합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} en {file_raw} vereisen dat een bestand wordt doorgegeven; {file_raw} is de inhoud van het bestand, voor de parameters van een service."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokeny: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. Tokeny {file}, {file_url} i {file_raw} wymagają przekazania pliku; {file_raw} to zawartość pliku, do parametrów usługi."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} e {file_raw} exigem entrega de arquivo; {file_raw} é o conteúdo do arquivo, para os parâmetros de um serviço."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Токены: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. Для {file}, {file_url} и {file_raw} нужна передача файла; {file_raw} — содержимое файла, для параметров сервиса."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Belirteçler: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} ve {file_raw} için Dosya devri gerekir; {file_raw}, dosyanın içeriğidir ve bir hizmetin parametrelerinde kullanılır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "令牌：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}、{file}、{file_url}、{file_raw}。{file}、{file_url} 和 {file_raw} 需要选择“文件”转交；{file_raw} 是文件的内容，用在服务的参数里。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "權杖：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}、{file}、{file_url}、{file_raw}。{file}、{file_url} 和 {file_raw} 需要選擇「檔案」轉交；{file_raw} 是檔案的內容，用在服務的引數裡。"
           }
         }
       }
