@@ -431,15 +431,22 @@ final class BrowserRootView: SpaceFrameView {
     var onInPageMiniSlide: ((Bool, TimeInterval) -> Void)?
     /// With no tab open, the page card stays, empty, its own color apart from the sidebar's, with the wordmark on
     /// it (#210): the window still reads as a sidebar and a page, as it does with a page open.
+    ///
+    /// The wordmark is a page Zigzag serves (`ViewportPage`, `zigzag://blank`), shown in the card the one way every
+    /// other page is. The native mark and ground below stay for the moment before the page has drawn, which is also
+    /// what a swipe shows while it paints the empty card partway between two spaces' looks.
     let emptyHint = EmptySpaceMark()
     /// Behind the wordmark: the space's tint or picture (`EmptyPage`). Only read while empty.
     let emptyBackdrop = EmptyPageBackdrop()
+    /// The empty card's page, made the first time the card is empty and never for a window that opens one.
+    private var blankPage: BlankPageView?
     var isEmpty = false {
         didSet {
             guard oldValue != isEmpty else { return }
             // The bar above the page takes the page's color, and there's none now.
             refreshGlassFrame()
             emptyBackdrop.isActive = isEmpty
+            showBlankPage(isEmpty)
             // Animate in-place changes; a new or restored window shows it immediately.
             guard window?.isVisible == true else {
                 emptyHint.alphaValue = isEmpty ? 1 : 0
@@ -459,6 +466,7 @@ final class BrowserRootView: SpaceFrameView {
         let kept = Library.shared.space(space.id) ?? space
         emptyBackdrop.show(ground: EmptyPage.ground(for: space, isPrivate: isPrivate),
                            picture: EmptyPage.picture(for: kept, isPrivate: isPrivate), animated: animated && window?.isVisible == true)
+        blankPage?.request(space: kept, isPrivate: isPrivate)
     }
 
     /// Partway through a swipe: the empty page's wash `share` of the way to `next`'s. Its picture changes on landing.
@@ -466,6 +474,38 @@ final class BrowserRootView: SpaceFrameView {
         let kept = Library.shared.space(space.id) ?? space
         let ground = SpaceInfo.mix(EmptyPage.ground(for: space, isPrivate: false), EmptyPage.ground(for: next, isPrivate: false), by: share)
         emptyBackdrop.show(ground: ground, picture: EmptyPage.picture(for: kept, isPrivate: false), animated: false)
+        // A served page has one ground, not a share of two: the native wash shows while the fingers are down, and the
+        // page comes back on landing as the space arrived at is drawn.
+        blankPage?.showWash()
+        emptyHint.alphaValue = 1
+    }
+
+    /// The empty card's page, made once and reused: a window that never sits empty never makes one.
+    private func showBlankPage(_ on: Bool) {
+        guard on else {
+            blankPage?.setActive(false)
+            return
+        }
+        let page: BlankPageView
+        if let kept = blankPage {
+            page = kept
+        } else {
+            let made = BlankPageView()
+            made.onCover = { [weak self] covered in
+                // The page draws the same mark on the same ground: the native one goes so the two never double.
+                guard let self, self.isEmpty else { return }
+                self.emptyHint.alphaValue = covered ? 0 : 1
+            }
+            // In the page card, where a page sits: the card's shape, its moves and its place in the layout are the
+            // page's, and a pane's strip still covers it as it covers any page.
+            card.setBlankPage(made)
+            blankPage = made
+            page = made
+        }
+        page.setActive(true)
+        if let controller = window?.windowController as? BrowserWindowController {
+            page.request(space: controller.tabManager.currentSpace, isPrivate: controller.tabManager.isPrivate)
+        }
     }
 
     /// Desk view hides the pages while their picture flies into or out of a card, so the two never show at once.
