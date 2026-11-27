@@ -63,6 +63,8 @@ final class SwipeNavigator {
     private var lastStep: TimeInterval = 0
     /// Counts the watchdog's timers, so one run early (`debugRest`) doesn't run again when its time comes.
     private var restChecks = 0
+    /// While a flick has the arrow filled, the look again that empties it once the fingers stop.
+    private var flickCheck: DispatchWorkItem?
     /// How fast the page was moving as the fingers lifted, points a second, for the spring back or the carry on.
     private var letGoSpeed: CGFloat = 0
     /// While the fingers rest mid-swipe no events come at all, which looks the same as a lost end. A rest keeps the
@@ -642,14 +644,29 @@ final class SwipeNavigator {
         let page = overlay.convert(webView.bounds, from: webView)
         let frame = SwipeArrowView.frame(in: page, offset: offset, back: direction < 0)
         if arrow.frame != frame { arrow.frame = frame }
-        // The ring follows the distance; the fill shows letting go would go, by distance or a flick, and holds through a rest (#377).
-        let flicks = time.map { SwipeDecision.going(samples, direction: direction) && (byTouch
-            ? SwipeDecision.commits(progress: progress, touchSpeed: speed(at: $0))
-            : SwipeDecision.commits(progress: progress, speed: speed(at: $0))) } ?? false
-        // One tap as it arms, on the trackpad only: a display has nothing to tap.
-        if arming.step(progress: progress, flicks: flicks), !byTouch { tap() }
+        // The ring follows the distance; the fill shows letting go would go, by distance or a flick (#377).
+        do {
+            let fingers = time.map(speed(at:)) ?? 0
+            let going = time != nil && SwipeDecision.going(samples, direction: direction)
+            // One tap as it arms, on the trackpad only: a display has nothing to tap.
+            if arming.step(progress: progress, speed: fingers, going: going, touch: byTouch), !byTouch { tap() }
+            watchFlick()
+        }
         arrow.progress = min(progress, 1)
         if arrow.isArmed != arming.armed { arrow.isArmed = arming.armed }
+    }
+
+    /// Filled by a flick: no events come once the fingers stop, so it looks again a moment later, and empties then.
+    private func watchFlick() {
+        guard flickCheck == nil, arming.armed, !arming.byDistance else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.flickCheck = nil
+            guard self.state == .tracking, self.arming.armed else { return }
+            self.update(at: ProcessInfo.processInfo.systemUptime)
+        }
+        flickCheck = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + SwipeDecision.flickWindow / 2, execute: work)
     }
 
     /// Let go too soon: the page springs back into place.
@@ -798,32 +815,43 @@ enum SwipeExit {
     }
 }
 
-/// Whether the arrow is filled, step by step while the fingers are down: it fills at the full distance or with a flick
-/// that letting go would take, and stays filled until `holds` no longer does, so a rest or a speed hovering at the
-/// flick's cutoff never empties it (#377). Letting go goes exactly when it's filled.
+/// Whether the arrow is filled, step by step while the fingers are down: it fills at the full distance or while a
+/// flick is going fast enough that letting go would take it. Filled at the distance, it stays filled until `holds` no
+/// longer does, so resting fingers keep it (#377). Filled by a flick, it stays while the flick keeps going, a speed
+/// hovering at the cutoff included, and empties once the fingers slow right down or stop: a pause short of the
+/// distance springs back, as in Safari. Letting go goes exactly when it's filled.
 struct SwipeArming {
     private(set) var armed = false
+    /// Filled because the fingers went the whole distance, which a rest keeps; otherwise a flick filled it.
+    private(set) var byDistance = false
     /// The furthest the fingers got since it armed.
     private var furthest: CGFloat = 0
 
-    /// Returns true when this step armed it, the one moment for a tap. `flicks`: the fingers are going fast enough
-    /// that letting go now would navigate.
-    mutating func step(progress: CGFloat, flicks: Bool = false) -> Bool {
+    /// Returns true when this step armed it, the one moment for a tap. `speed`: how fast the fingers are going the
+    /// swipe's way now, points a second (0 once they've stopped); `going`: this step moved them that way; `touch`:
+    /// fingers on the screen, whose flick is slower in points than a trackpad's scroll.
+    mutating func step(progress: CGFloat, speed: CGFloat = 0, going: Bool = false, touch: Bool = false) -> Bool {
         let was = armed
-        armed = (was && SwipeDecision.holds(progress: progress, furthest: furthest)) || progress >= 1 || flicks
+        let holds = was && SwipeDecision.holds(progress: progress, furthest: furthest)
+        let distance = progress >= 1 || (byDistance && holds)
+        let flicks = going && (touch ? SwipeDecision.commits(progress: progress, touchSpeed: speed)
+                                     : SwipeDecision.commits(progress: progress, speed: speed))
+        let keeps = was && !byDistance && holds && SwipeDecision.keepsFlick(speed: speed, touch: touch)
+        armed = distance || flicks || keeps
+        byDistance = distance
         furthest = armed ? max(was ? furthest : 0, progress) : 0
         return armed && !was
     }
 
     /// Whether letting go now navigates: filled, or a flick still going as the fingers lift.
     mutating func release(progress: CGFloat, speed: CGFloat) -> Bool {
-        _ = step(progress: progress, flicks: SwipeDecision.commits(progress: progress, speed: speed))
+        _ = step(progress: progress, speed: speed, going: speed > 0)
         return armed
     }
 
-    /// The same, for fingers on the screen, whose flick is slower in points than a trackpad's scroll.
+    /// The same, for fingers on the screen.
     mutating func release(progress: CGFloat, touchSpeed speed: CGFloat) -> Bool {
-        _ = step(progress: progress, flicks: SwipeDecision.commits(progress: progress, touchSpeed: speed))
+        _ = step(progress: progress, speed: speed, going: speed > 0, touch: true)
         return armed
     }
 }
@@ -852,6 +880,15 @@ enum SwipeDecision: Equatable {
     /// the swipe's way: all the way, or a flick that got started. Pulled back, it doesn't.
     static func commits(progress: CGFloat, speed: CGFloat) -> Bool {
         progress >= 1 || (progress >= 0.3 && speed > 450)
+    }
+
+    /// A flick that filled the arrow keeps it filled while it goes on at more than this share of the speed that filled
+    /// it, so a speed hovering at the cutoff doesn't flicker it (#377), and no longer once the fingers slow right down.
+    static let flickKeeps: CGFloat = 0.55
+
+    /// Whether fingers going `speed` points a second keep a flick's fill.
+    static func keepsFlick(speed: CGFloat, touch: Bool = false) -> Bool {
+        speed > (touch ? 300 : 450) * flickKeeps
     }
 
     /// How far fingers on the screen travel before letting go navigates: about the 2 cm the trackpad's distance
