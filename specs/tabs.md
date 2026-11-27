@@ -151,6 +151,8 @@
   Test: SidebarRowMenuTests.theTabYoureOnGoesOutOfSightAsItSleeps
 - A tab goes to sleep → its page is let go, not paused, so WebKit can end its process.
   Test: PageReleaseTests.aSleepingTabLetsGoOfItsPage
+- A tab closes or sleeps and macOS's Screen Time fails as its page goes → Zigzag keeps running, the pages closing after it still go, and Help › Report a Problem notes it.
+  Test: PageRetirementTests.aThrowWhileStoppingScreenTimeIsCaughtAndNoted
 - A sleeping tab in the tab list → its icon wears a dashed ring.
   Test: UnloadedTabTests.inTheTabsListATabNotRunningWearsTheRing
 - Click a sleeping tab → it loads again where it was.

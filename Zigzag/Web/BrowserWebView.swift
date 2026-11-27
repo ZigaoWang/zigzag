@@ -622,11 +622,25 @@ enum PictureInPicture {
 @MainActor
 enum PageRetirement {
     private static var retiring: [WKWebView] = []
+    private static var releasing: [WKWebView] = []
 
     /// `endingPasskeys`: a waiting passkey request is ended before the page closes, in case closing leaves it with macOS (#348).
     static func retire(_ webView: WKWebView, endingPasskeys: Bool = Passkeys.available) {
         guard endingPasskeys else { queue(webView); return }
         Passkeys.endRequests(in: webView) { queue(webView) }
+    }
+
+    /// Lets go of a web view without closing it, on the next main-loop turn, Screen Time stopped first.
+    static func release(_ webView: WKWebView) {
+        releasing.append(webView)
+        guard releasing.count == 1 else { return }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                let going = releasing
+                releasing = []
+                going.forEach(stopScreenTime)
+            }
+        }
     }
 
     private static func queue(_ webView: WKWebView) {
@@ -638,14 +652,27 @@ enum PageRetirement {
     private static func closeRetired() {
         let going = retiring
         retiring = []
-        going.forEach(close)
+        for webView in going {
+            call(closeSelector, on: webView)
+            stopScreenTime(webView)
+        }
+    }
+
+    /// WebKit stops it only as the view is freed, wherever that happens, and macOS's Screen Time can throw then
+    /// (NSInternalInconsistencyException from its KVO). Here the throw is caught and noted; WebKit starts it again if
+    /// the view goes back in a window.
+    private static func stopScreenTime(_ webView: WKWebView) {
+        guard let exception = catchingException({ call(stopScreenTimeSelector, on: webView) }) else { return }
+        Diagnostics.note("Screen Time failed as a page closed", "\(exception.name.rawValue): \(exception.reason ?? "")")
     }
 
     private static let closeSelector = NSSelectorFromString("_close")
+    private static let stopScreenTimeSelector = NSSelectorFromString("_uninstallScreenTimeWebpageController")
 
-    private static func close(_ webView: WKWebView) {
-        guard webView.responds(to: closeSelector) else { return }
-        typealias Close = @convention(c) (AnyObject, Selector) -> Void
-        unsafeBitCast(webView.method(for: closeSelector), to: Close.self)(webView, closeSelector)
+    private static func call(_ selector: Selector, on webView: WKWebView) {
+        guard webView.responds(to: selector) else { return }
+        // Unretained: a throw skips the release that would follow.
+        typealias Call = @convention(c) (UnsafeRawPointer, Selector) -> Void
+        unsafeBitCast(webView.method(for: selector), to: Call.self)(Unmanaged.passUnretained(webView).toOpaque(), selector)
     }
 }

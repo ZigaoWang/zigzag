@@ -275,4 +275,79 @@ struct PageRetirementTests {
         }
         #expect(first == nil && second == nil)
     }
+
+    /// Records where WebKit's Screen Time teardown runs; `throws`: raises there once, as macOS's Screen Time can.
+    private final class ScreenTimePage: WKWebView {
+        var stoppedAt: [String]?
+        var throwsOnce = false
+
+        @objc(_uninstallScreenTimeWebpageController) func stopScreenTime() {
+            if stoppedAt == nil { stoppedAt = Thread.callStackSymbols }
+            if throwsOnce {
+                throwsOnce = false
+                NSException(name: .internalInconsistencyException, reason: "Cannot remove an observer", userInfo: nil).raise()
+            }
+            let selector = #selector(stopScreenTime)
+            typealias Call = @convention(c) (AnyObject, Selector) -> Void
+            unsafeBitCast(class_getMethodImplementation(WKWebView.self, selector), to: Call.self)(self, selector)
+        }
+
+        var screenTimeObserver: AnyObject? {
+            guard let ivar = class_getInstanceVariable(WKWebView.self, "_screenTimeConfigurationObserver") else { return nil }
+            let base = Unmanaged.passUnretained(self).toOpaque()
+            return base.load(fromByteOffset: ivar_getOffset(ivar), as: AnyObject?.self)
+        }
+    }
+
+    private func shownPage() async throws -> (ScreenTimePage, NSWindow) {
+        let webView = ScreenTimePage(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        let window = NSWindow(contentRect: webView.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = webView
+        webView.loadHTMLString("<p>page", baseURL: URL(string: "https://example.com/"))
+        for _ in 0..<150 where webView.screenTimeObserver == nil {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return (webView, window)
+    }
+
+    @Test func aRetiredPageStopsScreenTimeOutsideASwiftJobBeforeItGoes() async throws {
+        let (webView, window) = try await shownPage()
+        defer { window.close() }
+        #expect(webView.screenTimeObserver != nil, "WebKit didn't start Screen Time for a page in a window")
+        window.contentView = nil
+        PageRetirement.retire(webView)
+        for _ in 0..<50 where webView.stoppedAt == nil {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        // Still held here, so this was PageRetirement, not WebKit's dealloc.
+        let stack = try #require(webView.stoppedAt)
+        #expect(webView.screenTimeObserver == nil)
+        #expect(!stack.contains { $0.contains("swift_job_run") })
+    }
+
+    @Test func aThrowWhileStoppingScreenTimeIsCaughtAndNoted() async throws {
+        let started = Date()
+        defer { Diagnostics.forget(since: started) }
+        weak var next: WKWebView?
+        let window: NSWindow
+        do {
+            let (page, shown) = try await shownPage()
+            window = shown
+            page.throwsOnce = true
+            window.contentView = nil
+            let other = WKWebView(frame: .zero)
+            next = other
+            PageRetirement.retire(page)
+            PageRetirement.retire(other)
+        }
+        defer { window.close() }
+        for _ in 0..<50 where next != nil {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        // The thrower itself stays held: its throw here unwinds this file's Swift override.
+        #expect(next == nil, "a throw kept the web views retired after it")
+        let note = Diagnostics.events.last { $0.kind == "Screen Time failed as a page closed" && $0.date >= started }
+        #expect(note?.detail?.hasPrefix("NSInternalInconsistencyException: Cannot remove an observer") == true)
+    }
 }

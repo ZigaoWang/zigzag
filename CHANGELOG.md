@@ -5,6 +5,26 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
+- Unlocking your Mac shows Zigzag's window at once, as it was. In full screen the screen no longer stays black for a moment first, and in a window the one behind it no longer shows through for a moment.
+- Press and hold to open a menu, slide onto an item and let go to choose it, as in other Mac apps: right-press or hold a two-finger click on a tab, favorite, folder, space or the sidebar, or press a menu button like the sidebar's +, a … button or a dropdown, which now opens as the press goes down. Right-clicking the sidebar's Back or Forward in the title bar opens its list again.
+- ⌘T then ⌘W from a pinned page or a favorite goes back to it, as it does from a regular tab, instead of to a tab in the list.
+- Web pages no longer find a `browser` name on the window, as in Chrome and Safari, so a site that checks for it no longer takes Zigzag for an extension's page. ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- ⇧⌘T on a pinned page you've unpinned since closing it brings it back where a new tab opens, instead of at the top of your tabs.
+- The sidebar from the screen edge no longer comes out with the AI Apps window's tabs after you showed that window; it's always one of your own windows'.
+- A page you're looking at beside the screen edge's sidebar, or in Zigzag Mini, no longer goes to sleep and leaves an empty page; one that sleeps anyway shows its name card.
+- Exporting from a web app that hands the file over through a hidden frame, like Feishu Docs' Download as Word, PDF or Markdown, saves the file again instead of doing nothing. A second export after another click goes through too, and a download Zigzag holds back always says so. With Ask before a site downloads files on, it asks first, as the page's own downloads do. ([#535](https://github.com/ZigaoWang/zigzag/issues/535))
+- An extension that sets a proxy auto-config script, as Hotspot Shield does to connect, is now told Zigzag refused it, instead of taking the proxy for set while your pages go out without it. ([#475](https://github.com/ZigaoWang/zigzag/issues/475))
+- A quick swipe back or forward taps the trackpad again. The arrow fills, with one tap, the moment letting go would go back or forward, a quick flick included, and stays filled while your fingers rest, so a flick, a pause, then letting go now goes as the arrow shows. Coming back a little empties it. Swipes with fingers on a touch screen don't tap.
+- A quick swipe back or forward taps the trackpad again. The arrow fills, with one tap, the moment letting go would go back or forward, a quick flick included. If your fingers stop before the full distance it empties again, and letting go then springs back, as in Safari. Swipes with fingers on a touch screen don't tap, and nothing taps while the page may still keep the swipe for itself.
+- With the sidebar hidden and slid out over the page, opening a menu from it no longer sends the sidebar away and leaves the menu alone over the page. It stays out until the menu closes, then slides back if the pointer isn't on it.
+- Zigzag no longer freezes for a second or more while you type in the tab overview's search, or when you come back to a window showing Settings on a busy Mac.
+- Swiping back and forward follows your fingers more smoothly, even on busy pages, and Zigzag no longer pauses for a moment once a minute when many tabs are open.
+
+### Changed
+- Help › Report a Problem now notes a page whose server doesn't answer within 10 seconds, or that shows nothing after 30, with the site and how long each step took, so a dead site can be told from a slow one. Private windows note nothing. ([#548](https://github.com/ZigaoWang/zigzag/issues/548))
+
 ## [0.10.0] - 2026-11-25
 
 Sync with iCloud keeps your spaces, pinned tabs, favorites and settings the same on every Mac, and the sidebar from the screen edge previews pages beside it. Zigzag is also in eleven more languages, Compatibility mode turns off what might break a site with one switch, and download rules can hand off the saved file.
