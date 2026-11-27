@@ -32,6 +32,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - With the sidebar hidden and slid out over the page, opening a menu from it no longer sends the sidebar away and leaves the menu alone over the page. It stays out until the menu closes, then slides back if the pointer isn't on it.
 - Zigzag no longer freezes for a second or more while you type in the tab overview's search, or when you come back to a window showing Settings on a busy Mac.
 - Swiping back and forward follows your fingers more smoothly, even on busy pages, and Zigzag no longer pauses for a moment once a minute when many tabs are open.
+- Zigzag's picture and PDF helpers now end with Zigzag when it quits or crashes, instead of sometimes staying behind.
 
 ### Changed
 - Help › Report a Problem now notes a page whose server doesn't answer within 10 seconds, or that shows nothing after 30, with the site and how long each step took, so a dead site can be told from a slow one. Private windows note nothing. ([#548](https://github.com/ZigaoWang/zigzag/issues/548))

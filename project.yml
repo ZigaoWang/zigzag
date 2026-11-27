@@ -218,6 +218,8 @@ targets:
     sources:
       - path: ZigzagPDFRenderer
         excludes: ["*.entitlements"]
+      # When a helper ends, shared with the picture helper.
+      - path: ZigzagImageDecoder/HelperLifetime.swift
     info:
       path: ZigzagPDFRenderer/Info.plist
       properties:

@@ -404,33 +404,21 @@ final class Flag: @unchecked Sendable {
     func set() { lock.withLock { value = true } }
 }
 
-/// Accepts Zigzag's connections. A per-PDF helper (told by `ownInstance`) exits when its connection closes, since the
-/// system keeps an XPC service alive after its last connection. The shared helper isn't told and stays for the next
-/// PDF.
+/// Accepts Zigzag's connections. A per-PDF helper (told by `ownInstance`) ends when its connection closes; the shared
+/// helper stays for the next PDF while Zigzag runs (`HelperLifetime`).
 final class Listener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
     static let shared = Listener()
-    private let lock = NSLock()
-    private var open = 0
-    private var own = false
+    let lifetime = HelperLifetime()
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         connection.exportedInterface = PDFService.interface()
         connection.exportedObject = Renderer()
-        lock.withLock { open += 1 }
-        connection.invalidationHandler = { [weak self] in self?.closed() }
+        lifetime.opened(connection)
         connection.resume()
         return true
     }
 
-    func isOwnInstance() { lock.withLock { own = true } }
-
-    private func closed() {
-        let ends = lock.withLock {
-            open -= 1
-            return own && open == 0
-        }
-        if ends { exit(0) }
-    }
+    func isOwnInstance() { lifetime.endWithLastConnection() }
 }
 
 let listener = NSXPCListener.service()
