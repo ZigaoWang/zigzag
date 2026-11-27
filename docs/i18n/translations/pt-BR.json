@@ -8282,6 +8282,12 @@
         "value": "Contornar todos os elementos"
       }
     },
+    "Password, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Senha, se o serviço pedir"
+      }
+    },
     "PDF": {
       "stringUnit": {
         "state": "translated",
@@ -11496,6 +11502,12 @@
         "value": "A página"
       }
     },
+    "The saved file couldn’t be read.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Não foi possível ler o arquivo salvo."
+      }
+    },
     "The URL isn’t valid.": {
       "stringUnit": {
         "state": "translated",
@@ -11862,10 +11874,22 @@
         "value": "Elas são esquecidas neste Mac. Abas, abas fixadas e senhas permanecem."
       }
     },
+    "This file is too large to send that way (%@).": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Este arquivo é grande demais para enviar assim (%@)."
+      }
+    },
     "This Mac isn’t on a network a phone can reach": {
       "stringUnit": {
         "state": "translated",
         "value": "Este Mac não está em uma rede que um celular alcance"
+      }
+    },
+    "This rule sends the file itself, but there was no file to send. Set Hand off to File, and let the download finish first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Esta regra envia o próprio arquivo, mas não havia arquivo para enviar. Defina Entregar como Arquivo e deixe o download terminar primeiro."
       }
     },
     "This Site": {
@@ -12210,10 +12234,10 @@
         "value": "Token, se o serviço pedir um"
       }
     },
-    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff.": {
+    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s bytes, for a service’s parameters.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} e {file_url} exigem entrega de arquivo."
+        "value": "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} e {file_raw} exigem entrega de arquivo; {file_raw} é o conteúdo do arquivo, para os parâmetros de um serviço."
       }
     },
     "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.": {
@@ -12944,6 +12968,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Nome de usuário copiado"
+      }
+    },
+    "Username, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nome de usuário, se o serviço pedir"
       }
     },
     "Uses Autoconsent, by DuckDuckGo.": {

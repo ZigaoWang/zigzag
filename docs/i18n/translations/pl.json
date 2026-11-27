@@ -145,6 +145,12 @@
         "value": "Otwarte pull requesty w repozytoriach publicznych należących do %@, od ostatnio aktywnych."
       }
     },
+    "Password, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Hasło, jeśli usługa go wymaga"
+      }
+    },
     "Pinned tabs as tiles": {
       "stringUnit": {
         "state": "translated",
@@ -187,10 +193,28 @@
         "value": "Pobieranie nie zostało ukończone."
       }
     },
-    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff.": {
+    "The saved file couldn’t be read.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Tokeny: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. Tokeny {file} i {file_url} wymagają przekazania pliku."
+        "value": "Nie można odczytać zachowanego pliku."
+      }
+    },
+    "This file is too large to send that way (%@).": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ten plik jest za duży, aby wysłać go w ten sposób (%@)."
+      }
+    },
+    "This rule sends the file itself, but there was no file to send. Set Hand off to File, and let the download finish first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ta reguła wysyła sam plik, ale nie było pliku do wysłania. Ustaw opcję Przekaż na Plik i najpierw poczekaj na ukończenie pobierania."
+      }
+    },
+    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s bytes, for a service’s parameters.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Tokeny: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. Tokeny {file}, {file_url} i {file_raw} wymagają przekazania pliku; {file_raw} to zawartość pliku, do parametrów usługi."
       }
     },
     "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
@@ -215,6 +239,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Aktualizowanie…"
+      }
+    },
+    "Username, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nazwa użytkownika, jeśli usługa jej wymaga"
       }
     },
     "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {

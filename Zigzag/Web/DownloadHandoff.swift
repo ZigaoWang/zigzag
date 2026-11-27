@@ -287,7 +287,7 @@ enum DownloadHandoff {
             outcome = await openURL(rule.action, values: values, secret: secret, request: request, rule: rule)
             if let cookieFile { removeWhenTheOtherAppHasRead(cookieFile) }
         case .jsonRPC:
-            outcome = await callService(rule.action, values: values, secret: secret)
+            outcome = await callService(rule.action, values: values, secret: secret, ruleID: rule.id)
             if let cookieFile { HandoffCookies.removeFile(cookieFile) }
         case .saveToFolder, .openFile:
             // Destinations are applied when the download is made and never cancel it.
@@ -546,24 +546,36 @@ enum DownloadHandoff {
 
     // MARK: JSON-RPC and XML-RPC
 
-    private static func callService(_ action: DownloadRuleAction, values: HandoffValues, secret: String) async -> Outcome {
+    private static func callService(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
+                                    ruleID: UUID) async -> Outcome {
         // Endpoint and method are literal; a page fills parameters only.
         guard let endpoint = URL(string: action.rpcEndpoint) else {
             return .failed(String(localized: "The service’s address isn’t valid.", comment: "Why a download rule failed: the JSON-RPC endpoint can't be made into a URL."))
         }
         let method = action.rpcMethod
-        guard let parameters = parameters(action.rpcParameters, values: values, secret: secret) else {
+        // Up to 16 MB, read off the main thread. A rule that sends the file but has none says so rather than send
+        // nothing, which the service would refuse with something far less clear.
+        let template = action.rpcParameters
+        let fileRaw = await Task.detached { Self.fileRaw(for: template, values: values) }.value
+        if let problem = fileRaw?.problem { return .failed(message(for: problem)) }
+        guard let parameters = parameters(action.rpcParameters, values: values, secret: secret, fileRaw: fileRaw) else {
             return .failed(String(localized: "The parameters aren’t valid JSON.", comment: "Why a download rule failed: the JSON-RPC parameters don't parse."))
         }
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 30
+        // An endpoint that used to carry `user:pass@` sends it as a header now, out of the rules file.
+        if let authorization = HandoffSecrets.endpointAuthorization(for: ruleID, endpoint: action.rpcEndpoint) {
+            request.setValue(authorization, forHTTPHeaderField: "Authorization")
+        }
         if action.rpcStyle == .xmlrpc {
             request.setValue("text/xml", forHTTPHeaderField: "Content-Type")
             request.httpBody = Data(xmlRPC(method: method, parameters: parameters).utf8)
         } else {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            var call: [String: Any] = ["jsonrpc": "2.0", "id": "zigzag", "method": method, "params": jsonParameters(parameters, method: method, secret: secret)]
+            let ready = jsonReady(parameters) as? [Any] ?? parameters
+            var call: [String: Any] = ["jsonrpc": "2.0", "id": "zigzag", "method": method,
+                                       "params": jsonParameters(ready, method: method, secret: secret)]
             if call["params"] == nil { call["params"] = [] }
             guard let body = try? JSONSerialization.data(withJSONObject: call) else {
                 return .failed(String(localized: "The request couldn’t be built.", comment: "Why a download rule failed: its JSON-RPC body can't be made."))
@@ -582,14 +594,55 @@ enum DownloadHandoff {
         }
     }
 
-    /// Parsed from the rule's JSON. aria2 and rTorrent want the token first; added only when a secret is kept and the
-    /// template hasn't placed it.
-    static func parameters(_ template: String, values: HandoffValues, secret: String) -> [Any]? {
-        let text = DownloadTokens.expand(template, with: values, secret: secret, json: true)
-        let data = Data(text.utf8)
-        guard let parsed = try? JSONSerialization.jsonObject(with: data) as? [Any] else { return nil }
-        return parsed
+    /// The saved file's bytes, read once and only when the parameters use `{file_raw}`.
+    nonisolated static func fileRaw(for template: String, values: HandoffValues) -> FileRaw? {
+        template.contains("{file_raw}") ? FileRaw(values.file) : nil
     }
+
+    /// What to tell someone whose rule asked for bytes it doesn't have.
+    private static func message(for problem: FileRaw.Problem) -> String {
+        switch problem {
+        case .noFile:
+            String(localized: "This rule sends the file itself, but there was no file to send. Set Hand off to File, and let the download finish first.",
+                   comment: "Why a download rule failed: its parameters use {file_raw}, which needs the saved file, but no file was handed off.")
+        case .tooLarge(let size):
+            String(localized: "This file is too large to send that way (\(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))).",
+                   comment: "Why a download rule failed: the file is bigger than a rule can send as {file_raw}. The placeholder is a size, like 40 MB.")
+        case .unreadable:
+            String(localized: "The saved file couldn’t be read.", comment: "Why a download rule failed: its {file_raw} couldn't be read from disk.")
+        }
+    }
+
+    /// Parameters with every `FileRaw` as text, for a body that has no binary type of its own.
+    static func jsonReady(_ node: Any) -> Any {
+        if let raw = node as? FileRaw { return raw.base64 ?? "" }
+        if let list = node as? [Any] { return list.map(jsonReady) }
+        if let map = node as? [String: Any] { return map.mapValues(jsonReady) }
+        return node
+    }
+
+    /// The rule's JSON, parsed first and then filled in string by string, so no value has to be escaped for the body
+    /// and `{file_raw}` on its own stays `FileRaw`. `fileRaw` is read here when not given.
+    static func parameters(_ template: String, values: HandoffValues, secret: String, fileRaw: FileRaw? = nil) -> [Any]? {
+        guard let parsed = try? JSONSerialization.jsonObject(with: Data(template.utf8)) else { return nil }
+        let raw = fileRaw ?? self.fileRaw(for: template, values: values)
+        return filled(parsed, values: values, secret: secret, fileRaw: raw) as? [Any]
+    }
+
+    private static func filled(_ node: Any, values: HandoffValues, secret: String, fileRaw: FileRaw?) -> Any {
+        if let text = node as? String {
+            return DownloadTokens.substitute(text, with: values, secret: secret, fileRaw: fileRaw)
+        }
+        if let list = node as? [Any] {
+            return list.map { filled($0, values: values, secret: secret, fileRaw: fileRaw) }
+        }
+        if let map = node as? [String: Any] {
+            return map.mapValues { filled($0, values: values, secret: secret, fileRaw: fileRaw) }
+        }
+        return node
+    }
+
+    /// aria2 and rTorrent want the token first; added only when a secret is kept and the template hasn't placed it.
 
     static func jsonParameters(_ parameters: [Any], method: String, secret: String) -> [Any] {
         guard !secret.isEmpty, method.hasPrefix("aria2.") || method.hasPrefix("system.") || method.hasPrefix("torrent.") else { return parameters }
@@ -608,7 +661,10 @@ enum DownloadHandoff {
         let params = parameters.map { parameter -> String in
             let value: String
             // JSONSerialization returns booleans as NSNumber too; send them as <boolean>, not <int>1.
-            if let number = parameter as? NSNumber {
+            if let raw = parameter as? FileRaw {
+                // rTorrent reads these as the XML-RPC binary type; as a string it would be a path it can't open.
+                value = "<base64>\(raw.base64 ?? "")</base64>"
+            } else if let number = parameter as? NSNumber {
                 value = CFGetTypeID(number) == CFBooleanGetTypeID()
                     ? "<boolean>\(number.boolValue ? 1 : 0)</boolean>"
                     : "<int>\(number.intValue)</int>"

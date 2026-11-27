@@ -145,6 +145,12 @@
         "value": "Open pull requests in openbare repositories van %@, met de nieuwste activiteit bovenaan."
       }
     },
+    "Password, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Wachtwoord, als de service erom vraagt"
+      }
+    },
     "Pinned tabs as tiles": {
       "stringUnit": {
         "state": "translated",
@@ -187,10 +193,28 @@
         "value": "De download is niet voltooid."
       }
     },
-    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff.": {
+    "The saved file couldn’t be read.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} en {file_url} vereisen dat een bestand wordt doorgegeven."
+        "value": "Het bewaarde bestand kan niet worden gelezen."
+      }
+    },
+    "This file is too large to send that way (%@).": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Dit bestand is te groot om zo te sturen (%@)."
+      }
+    },
+    "This rule sends the file itself, but there was no file to send. Set Hand off to File, and let the download finish first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Deze regel stuurt het bestand zelf, maar er was geen bestand om te sturen. Zet Doorgeven op Bestand en laat de download eerst voltooien."
+      }
+    },
+    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s bytes, for a service’s parameters.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} en {file_raw} vereisen dat een bestand wordt doorgegeven; {file_raw} is de inhoud van het bestand, voor de parameters van een service."
       }
     },
     "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
@@ -215,6 +239,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Bezig met bijwerken…"
+      }
+    },
+    "Username, if the service asks": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Gebruikersnaam, als de service erom vraagt"
       }
     },
     "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {

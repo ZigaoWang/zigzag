@@ -18,6 +18,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - In the screen edge's page preview, a click on a sleeping tab's card opens that tab in the window as a click on its row does, a menu from the panel is no longer drawn under the page, and Esc or moving back to the sidebar after clicking into the page leaves the keyboard with the panel instead of bringing the browser window forward. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
 ### New
+- A download rule can send the saved file itself to a service with {file_raw}, so Send to rTorrent now hands over the .torrent file and works with private trackers. A service's username and password are kept in the Keychain instead of in its address. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
 - On a touch display or a Sidecar iPad, menus a finger opens have taller rows, a tap just beside a small button presses it, touch and hold on one of several picked tabs carries them all, and the sidebar's edge is easier to take with a finger.
 
 ## [0.10.0] - 2026-11-25

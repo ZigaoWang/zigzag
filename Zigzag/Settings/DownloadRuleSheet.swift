@@ -71,6 +71,8 @@ enum DownloadRuleSheet {
         var methodField: FilledField?
         var parametersView: MultilineField?
         var secretField: FilledField?
+        var userField: FilledField?
+        var passwordField: FilledField?
         var stylePicker: DropdownButton?
         /// A destination's kind and save folder.
         var destinationField: DropdownButton?
@@ -186,6 +188,18 @@ enum DownloadRuleSheet {
             endpoint.stringValue = action.rpcEndpoint
             endpointField = endpoint
             actionRows.append(FormSheet.Row(label: String(localized: "Endpoint", comment: "Label of the endpoint field in a JSON-RPC download rule's sheet."), view: endpoint))
+            // Optional sign-in, kept in the Keychain: an endpoint that needs one says who it is with a header, so the
+            // address itself never carries a password.
+            let savedUser = existing.flatMap { HandoffSecrets.endpointCredentials(for: $0.id, endpoint: $0.action.rpcEndpoint) }
+            let user = FilledField(placeholder: String(localized: "Username, if the service asks", comment: "Placeholder of the username field in a JSON-RPC download rule's sheet. It's kept in the Keychain."))
+            user.stringValue = savedUser?.user ?? ""
+            userField = user
+            actionRows.append(FormSheet.Row(label: String(localized: "Username", comment: "Label of the username field in a JSON-RPC download rule's sheet."), view: user))
+            let password = FilledField(placeholder: String(localized: "Password, if the service asks", comment: "Placeholder of the password field in a JSON-RPC download rule's sheet. It's kept in the Keychain."), secure: true)
+            password.stringValue = savedUser?.password ?? ""
+            password.toolTip = String(localized: "Kept in the Keychain", comment: "Tooltip on the token field of a JSON-RPC download rule's sheet.")
+            passwordField = password
+            actionRows.append(FormSheet.Row(label: String(localized: "Password", comment: "Label of the password field in a JSON-RPC download rule's sheet."), view: password))
             let method = FilledField(placeholder: "aria2.addUri")
             method.stringValue = action.rpcMethod
             methodField = method
@@ -242,8 +256,8 @@ enum DownloadRuleSheet {
                                             view: stack(folder, chooseFolder)))
         }
 
-        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff.",
-                                             comment: "The tokens a download rule's fields may use, listed in its sheet. File and file_url are only filled in when the rule hands off a saved file."))
+        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}, {file_raw}. {file}, {file_url} and {file_raw} need File handoff; {file_raw} is the file’s bytes, for a service’s parameters.",
+                                             comment: "The tokens a download rule's fields may use, listed in its sheet. File, file_url and file_raw are only filled in when the rule hands off a saved file; file_raw, the file's contents in base64, only in a JSON-RPC or XML-RPC rule's parameters."))
         let handoffNote = FormSheet.Row.note(String(localized: "File saves the download in Zigzag first, using the page’s session, then hands off the saved file; links still hand off their address.",
                                                     comment: "Under the Hand off choice in a download rule's sheet: what File does, and that links are unaffected."))
         // Destinations only ask for file types; they drop the address rule rows (applies to, match, case, page
@@ -396,7 +410,18 @@ enum DownloadRuleSheet {
                                    canConfirm: valid) { confirmed in
             // Done either way; fields are read below.
             sheetRef = nil
-            guard confirmed, let rule = ruleFromFields(), isValid(rule) else { return }
+            guard confirmed, var rule = ruleFromFields(), isValid(rule) else { return }
+            // Sign-in goes to the Keychain, never the rules file: from the fields, or from an address typed with
+            // `user:pass@`, which older rules and habit both produce.
+            var credentials = (user: userField?.stringValue ?? "", password: passwordField?.stringValue ?? "")
+            if let (clean, user, password) = HandoffSecrets.endpointWithoutCredentials(rule.action.rpcEndpoint) {
+                rule.action.rpcEndpoint = clean
+                // The fields win when both are filled in.
+                if credentials.user.isEmpty, credentials.password.isEmpty { credentials = (user, password) }
+            }
+            if rule.action.kind == .jsonRPC {
+                HandoffSecrets.setEndpointCredentials(credentials, for: rule.id, endpoint: rule.action.rpcEndpoint)
+            }
             let save = {
                 if let secret = secretField?.stringValue, action.kind == .jsonRPC { HandoffSecrets.setSecret(secret, for: rule.id) }
                 if existing == nil {
