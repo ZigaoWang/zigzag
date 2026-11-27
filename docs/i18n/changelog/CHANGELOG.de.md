@@ -7,6 +7,7 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 ### Neu
 - Der Mini-Player zeigt „Vorheriges Video“ und „Nächstes Video“, wenn die Website sie anbietet, wie YouTube in einer Playlist. So kannst du weitergehen, ohne zur Seite zurückzukehren. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Markdown-Dateien öffnen sich formatiert in einem Tab, wie eine Seite: eine .md-Datei auf deinem Mac oder eine, die eine Website als Markdown oder als reinen Text unter einer .md-Adresse sendet. Tabellen, Aufgabenlisten und Code erscheinen wie auf GitHub, Links und Bilder neben der Datei funktionieren, und „Quelltext“ oben zeigt den reinen Text. Das klappt in Split View, mit Suchen, Zoomen, Drucken und Reader, und nichts in der Datei kann ausgeführt werden. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+- Auf deinem Mac gesicherte Passkeys erscheinen wie in Safari unter Anmeldefeldern auf Websites, die sie anbieten: Wähle einen aus und melde dich mit Touch ID an. Zigzag fragt macOS erst nach Zugriff, wenn du dort „Gesicherten Passkey verwenden“ oder unter „Einstellungen“ › „Passwörter“ „Erlauben“ wählst, und erscheint dann unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“, wo du das ändern kannst. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Behoben
 - Zigzag beendet sich nicht mehr gelegentlich, wenn du einen Tab schließt oder einer in den Ruhezustand geht und die Bildschirmzeit von macOS beim Freigeben der Seite auf ein Problem stößt.

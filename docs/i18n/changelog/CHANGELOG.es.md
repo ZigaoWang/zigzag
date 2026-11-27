@@ -7,6 +7,7 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 ### Nuevo
 - El minirreproductor muestra Vídeo anterior y Vídeo siguiente cuando el sitio los ofrece, como YouTube en una lista de reproducción, para que puedas seguir sin volver a la página. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Los archivos Markdown se abren con formato en una pestaña, como una página: un archivo .md de tu Mac, o uno que un sitio envía como Markdown o como texto sin formato en una dirección .md. Las tablas, las listas de tareas y el código se ven como en GitHub, los enlaces y las imágenes junto al archivo funcionan, y Código fuente, arriba, muestra el texto sin formato. Funciona en Split View, con la búsqueda, el zoom, la impresión y el Lector, y nada del archivo puede ejecutarse. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+- Las llaves de acceso guardadas en tu Mac aparecen bajo los campos de inicio de sesión en los sitios que las admiten, como en Safari: elige una e inicia sesión con Touch ID. Zigzag solo pide acceso a macOS cuando eliges Usar una llave de acceso guardada ahí o Permitir en Ajustes › Contraseñas, y después aparece en Ajustes del Sistema › Privacidad y seguridad, donde puedes cambiarlo. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Correcciones
 - Zigzag ya no se cierra de vez en cuando al cerrar una pestaña o cuando una se suspende, si Tiempo de uso de macOS tiene un problema al soltar la página.

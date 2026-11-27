@@ -7,6 +7,7 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 ### Novità
 - Il mini player mostra Video precedente e Video successivo quando il sito li offre, come fa YouTube in una playlist, così puoi andare avanti senza tornare alla pagina. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - I file Markdown si aprono formattati in un pannello, come una pagina: un file .md sul Mac, o uno che un sito invia come Markdown o come testo semplice a un indirizzo .md. Tabelle, elenchi di attività e codice appaiono come su GitHub, i link e le immagini accanto al file funzionano, e Sorgente in alto mostra il testo semplice. Funziona in vista divisa, con la ricerca, lo zoom, la stampa e Lettore, e nulla nel file può essere eseguito. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+- Le passkey salvate sul Mac appaiono sotto i campi di accesso dei siti che le supportano, come in Safari: scegline una e accedi con Touch ID. Zigzag chiede l’accesso a macOS solo quando scegli Usa una passkey salvata lì o Consenti in Impostazioni › Password, e poi compare in Impostazioni di Sistema › Privacy e sicurezza, dove puoi cambiarlo. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Correzioni
 - Zigzag non si chiude più di tanto in tanto quando chiudi un pannello o uno va in sospensione, se Tempo di utilizzo di macOS ha un problema nel rilasciare la pagina.

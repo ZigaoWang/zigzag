@@ -7,6 +7,7 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 ### Nieuw
 - De minispeler toont Vorige video en Volgende video als de website die aanbiedt, zoals YouTube in een afspeellijst, zodat je verder kunt zonder terug te gaan naar de pagina. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Markdown-bestanden openen opgemaakt in een tabblad, zoals een pagina: een .md-bestand op je Mac, of een bestand dat een website als Markdown of als platte tekst op een .md-adres stuurt. Tabellen, takenlijsten en code zien eruit zoals op GitHub, links en afbeeldingen naast het bestand werken, en Bron bovenaan toont de platte tekst. Het werkt in Split View, met zoeken, zoomen, afdrukken en Reader, en niets in het bestand kan worden uitgevoerd. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+- Passkeys die op je Mac zijn bewaard, verschijnen zoals in Safari onder aanmeldvelden op websites die ze aanbieden: kies er een en meld je aan met Touch ID. Zigzag vraagt macOS pas om toegang als je daar Gebruik bewaarde passkey kiest of Sta toe in Instellingen › Wachtwoorden, en staat daarna in Systeeminstellingen › Privacy en beveiliging, waar je het kunt wijzigen. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Opgelost
 - Zigzag stopt niet meer af en toe als je een tabblad sluit of er een in de slaapstand gaat, wanneer Schermtijd van macOS een probleem heeft met het loslaten van de pagina.

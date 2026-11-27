@@ -7,6 +7,7 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 ### Yeni Özellikler
 - Mini oynatıcı, site sunduğunda “Önceki Video” ve “Sonraki Video” düğmelerini gösterir; YouTube’un bir oynatma listesinde yaptığı gibi. Böylece sayfaya geri dönmeden devam edebilirsiniz. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Markdown dosyaları bir sekmede, bir sayfa gibi biçimlendirilmiş olarak açılır: Mac’inizdeki bir .md dosyası ya da bir sitenin Markdown olarak veya bir .md adresinde düz metin olarak gönderdiği bir dosya. Tablolar, görev listeleri ve kod GitHub’daki gibi görünür, dosyanın yanındaki bağlantılar ve resimler çalışır ve üstteki “Kaynak” düz metni gösterir. Bölünmüş Görünüm’de, bulma, yakınlaştırma, yazdırma ve Okuyucu ile çalışır ve dosyadaki hiçbir şey çalıştırılamaz. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+- Mac’inizde kayıtlı geçiş anahtarları, Safari’de olduğu gibi bunları sunan sitelerde giriş alanlarının altında görünür: birini seçin ve Touch ID ile giriş yapın. Zigzag, macOS’ten yalnızca orada “Kayıtlı Geçiş Anahtarı Kullan”ı ya da Ayarlar › Parolalar’da “İzin Ver”i seçtiğinizde erişim ister ve ardından Sistem Ayarları › Gizlilik ve Güvenlik’te listelenir; bunu orada değiştirebilirsiniz. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Düzeltmeler
 - Bir sekmeyi kapattığınızda veya bir sekme uykuya geçtiğinde, macOS’in Ekran Süresi sayfayı bırakırken bir sorunla karşılaşırsa Zigzag artık ara sıra kapanmaz.

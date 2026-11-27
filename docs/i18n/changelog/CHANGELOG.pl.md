@@ -7,6 +7,7 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 ### Nowe
 - Miniodtwarzacz pokazuje przyciski „Poprzednie wideo” i „Następne wideo”, gdy witryna je udostępnia, tak jak YouTube na playliście, więc możesz przejść dalej bez wracania do strony. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Pliki Markdown otwierają się sformatowane w karcie, tak jak strona: plik .md z twojego Maca albo plik, który witryna wysyła jako Markdown lub jako zwykły tekst pod adresem .md. Tabele, listy zadań i kod wyglądają jak w GitHubie, linki i obrazki obok pliku działają, a „Źródło” na górze pokazuje zwykły tekst. Działa to w Split View, z wyszukiwaniem, powiększeniem, drukowaniem i Czytnikiem, a nic w pliku nie może zostać uruchomione. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+- Klucze dostępu zachowane na Macu pojawiają się pod polami logowania w witrynach, które je obsługują, tak jak w Safari: wybierz jeden i zaloguj się za pomocą Touch ID. Zigzag prosi macOS o dostęp dopiero wtedy, gdy wybierzesz tam „Użyj zachowanego klucza dostępu” lub „Zezwól” w „Ustawienia” › „Hasła”, a potem pojawia się w „Ustawienia systemowe” › „Prywatność i ochrona”, gdzie możesz to zmienić. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Naprawiono
 - Zigzag nie kończy już czasem działania, gdy zamykasz kartę lub karta usypia, a Czas przed ekranem w macOS napotka problem przy zwalnianiu strony.

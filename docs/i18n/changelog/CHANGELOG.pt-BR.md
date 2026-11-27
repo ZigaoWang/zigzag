@@ -7,6 +7,7 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 ### Novo
 - O mini player mostra Vídeo anterior e Próximo vídeo quando o site os oferece, como o YouTube faz em uma playlist, para você seguir em frente sem voltar à página. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Arquivos Markdown abrem formatados em uma aba, como uma página: um arquivo .md no seu Mac, ou um que um site envia como Markdown ou como texto simples em um endereço .md. Tabelas, listas de tarefas e código aparecem como no GitHub, links e imagens ao lado do arquivo funcionam, e Código-fonte, no topo, mostra o texto simples. Funciona no Split View, com a busca, o zoom, a impressão e o Leitor, e nada no arquivo pode ser executado. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
+- As chaves de acesso salvas no seu Mac aparecem abaixo dos campos de login nos sites que as oferecem, como no Safari: escolha uma e faça login com o Touch ID. O Zigzag só pede acesso ao macOS quando você escolhe Usar uma chave de acesso salva ali ou Permitir em Ajustes › Senhas, e depois aparece em Ajustes do Sistema › Privacidade e segurança, onde você pode alterar isso. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Corrigido
 - O Zigzag não fecha mais de vez em quando ao fechar uma aba ou quando uma é suspensa, se o Tempo de Uso do macOS tiver um problema ao liberar a página.
