@@ -1637,7 +1637,7 @@ final class TabManager {
             bookmarkTabs[bookmarkID] = nil
             closedPins.insert(bookmarkID)
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
-            closedTabs.append(closedRecord(of: tab, at: index, split: pair))
+            remember(closedRecord(of: tab, at: index, split: pair))
             liftChildren(of: tab)
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list

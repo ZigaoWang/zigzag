@@ -41,6 +41,8 @@
   Test: EverydayFlowsTests.shiftCommandTBringsBackAClosedPinnedTabInItsRow
 - ⇧⌘T for a pinned page or favorite removed since it closed → back as a tab where a new tab opens, as Settings › Tabs says.
   Test: TabCloseSelectionTests.aClosedPinUnpinnedSinceReopensWhereANewTabWould
+- Closed tabs kept for ⇧⌘T → the last 50, however each was closed, a split's half you were in included.
+  Test: TabCloseSelectionTests.closingASplitsHalfKeepsToTheClosedTabLimit
 - ⇧⌘T in an everyday window → never a private tab; private windows reopen only their own.
   Test: ReopenLastClosedTests.aPrivateTabNeverComesBackInAnEverydayWindow
 

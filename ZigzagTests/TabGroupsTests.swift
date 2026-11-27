@@ -288,6 +288,20 @@ struct TabGroupRulesTests {
         }
     }
 
+    /// Closing the half of a split you're in keeps only as many closed tabs as closing any other tab does.
+    @Test func closingASplitsHalfKeepsToTheClosedTabLimit() {
+        window { manager, t in
+            for _ in 0..<60 {
+                let half = manager.newTab(url: nil, spaceID: space, select: false)
+                manager.makeSplit(t[0], with: half)
+                manager.select(half)
+                manager.close(half)
+                #expect(manager.selectedTab === t[0])
+            }
+            #expect(manager.closedTabRecords.count == 50)
+        }
+    }
+
     @Test func aLinkOpenedInFrontClosesBackToItsPage() {
         window { manager, t in
             manager.select(t[1])
