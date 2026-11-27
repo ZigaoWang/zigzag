@@ -416,7 +416,13 @@ final class EdgeSidebar {
             if previous == nil { narrowPanel() }
             return
         }
-        if !live { mini.showAsleepCard() }
+        if !live {
+            // A click on the card is a click on its row.
+            mini.showAsleepCard { [weak controller, weak tab] in
+                guard let controller, let tab else { return }
+                DispatchQueue.main.async { controller.listSelect(tab) }
+            }
+        }
         mini.onInPageMiniClosed = { [weak self, weak mini] in self?.previewClosed(mini) }
         mini.onInPageMiniDetached = { [weak self, weak mini] in self?.previewDetached(mini) }
         preview = mini
@@ -781,6 +787,7 @@ final class EdgeAsleepPageView: NSView {
     /// What the card says, for tests.
     private(set) var shownTitle = ""
     private(set) var shownNote = ""
+    var onClick: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -801,6 +808,19 @@ final class EdgeAsleepPageView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+
+    /// The page is behind another app when it's clicked: the first click counts, anywhere on the card.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { onClick != nil }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        return hit != nil && onClick != nil ? self : hit
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let onClick else { return super.mouseDown(with: event) }
+        onClick()
+    }
 
     /// The row's name and why its page isn't running. Reads the tab only; never wakes it.
     func show(tab: Tab) {

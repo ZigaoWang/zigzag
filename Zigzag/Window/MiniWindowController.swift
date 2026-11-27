@@ -1228,11 +1228,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// The card over the preview's room while the row's page isn't running.
     private var asleepCard: EdgeAsleepPageView?
 
-    /// Puts the card over the previewed page; the page is never loaded for it.
-    func showAsleepCard() {
+    /// Puts the card over the previewed page; the page is never loaded for it. `onClick`: a click on the card.
+    func showAsleepCard(onClick: (() -> Void)? = nil) {
         let card = asleepCard ?? EdgeAsleepPageView(frame: root.overlay.bounds)
         card.autoresizingMask = [.width, .height]
         card.frame = root.overlay.bounds
+        card.onClick = onClick
         card.show(tab: tab)
         if card.superview !== root.overlay { root.overlay.addSubview(card) }
         asleepCard = card

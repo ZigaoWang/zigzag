@@ -314,6 +314,31 @@ struct EdgeSidebarTests {
         #expect(!tabs[1].isLoaded)
     }
 
+    /// A click on a sleeping row's card does what a click on its row does: the panel goes and the window comes forward
+    /// with that tab, its page woken there.
+    @Test func clickingAnAsleepCardOpensItsTabInTheWindow() async throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/first", "https://example.test/second"])
+        defer { done() }
+        tabs[1].ensureWebView()
+        tabs[1].suspend(because: "test", chosen: true)
+        #expect(await until { tabs[1].isAsleep && !tabs[1].isLoaded })
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        let window = try #require(mini.window)
+        let content = try #require(window.contentView)
+        window.layoutIfNeeded()
+        // The window behind another app, as the panel's page is: the click is its first.
+        let center = NSPoint(x: content.bounds.midX, y: content.bounds.midY)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            window.sendEvent(try #require(NSEvent.mouseEvent(with: type, location: center, modifierFlags: [], timestamp: 0,
+                                                             windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                             clickCount: 1, pressure: 1)))
+        }
+        #expect(await until(3) { !EdgeSidebar.shared.isShowing })
+        #expect(manager.selectedTab === tabs[1])
+        #expect(await until(3) { tabs[1].host === controller && !tabs[1].isAsleep })
+    }
+
     /// Expand in the preview's strip takes the page out of the row into a Mini of its own; the panel goes.
     @Test func expandingTheEdgePreviewLeavesAnIndependentMini() async throws {
         let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/expand"])

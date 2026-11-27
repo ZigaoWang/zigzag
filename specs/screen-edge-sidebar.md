@@ -41,6 +41,8 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.aCrossingBetweenRowsKeepsThePage
 - A row whose page is asleep or not loaded yet → a card with its name and why it isn't running, in the page's place. Resting on it never wakes the page.
   Test: EdgeSidebarTests.anAsleepRowShowsItsCardAndStaysAsleep
+- Click that card → the same as a click on its row: the panel goes and the browser window comes forward with that tab, its page woken there.
+  Test: EdgeSidebarTests.clickingAnAsleepCardOpensItsTabInTheWindow
 - A row of Zigzag's own pages, like History or Settings → nothing comes out beside the sidebar; a click opens it in the browser window.
   Test: EdgeSidebarTests.zigzagsOwnPagesOpenInTheWindow
   Test: EdgeSidebarTests.anOwnPagesRowPutsThePageAway
