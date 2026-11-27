@@ -766,8 +766,12 @@ import WebKit
         try handle.close()
         let start = Date()
         #expect(await PDFViewerView.load(file, from: WKWebView(), userAgent: nil) == nil)
-        #expect(Date().timeIntervalSince(start) < 1)
+        let refused = Date().timeIntervalSince(start)
+        let readStart = Date()
         #expect(await PDFViewerView.load(file, from: WKWebView(), userAgent: nil, limit: Int.max) != nil)
+        let read = Date().timeIntervalSince(readStart)
+        // Compared with reading it on the same Mac at the same moment, so a busy machine doesn't fail it.
+        #expect(refused < read / 4)
     }
 
     /// The viewer's own download: as the browser, never CFNetwork's default; and given up past the limit, whether the
