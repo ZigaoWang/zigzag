@@ -26,7 +26,7 @@ enum EdgePreviewHoverPolicy {
     static let dwell: TimeInterval = 0.2
     static let check: TimeInterval = 0.05
     static let movement: CGFloat = 2
-    /// Off the rows and the page this long, the page folds back.
+    /// Off the panel this long, the page folds back.
     static let leave: TimeInterval = 0.18
 
     static func rests(now: TimeInterval, since: TimeInterval, moved: Bool) -> Bool {
@@ -340,7 +340,6 @@ final class EdgeSidebar {
         // The panel gets no mouse moves with another app in front, so the preview's strip follows from here.
         let point = pointer
         preview?.pointerMoved(toScreen: point)
-        followPreviewPointer()
         if held || EdgeSidebarLayout.keeps(at: point, panel: frame) {
             leftAt = nil
             return
@@ -473,43 +472,30 @@ final class EdgeSidebar {
         }
     }
 
-    /// The page folds back after a moment unless the pointer is on it, or still among the rows: a crossing from one row
-    /// to the next is not leaving them. `evenOnRows`: the row under the pointer has no page to show, so the pointer
-    /// being on a row is not a reason to keep one out.
+    /// The page folds back a moment after the pointer leaves the panel, and only then: a page outlives the rows, not the
+    /// panel. `evenOnRows`: the row under the pointer has no page to show, so the pointer being on a row is not a reason
+    /// to keep one out.
     private func schedulePreviewClose(evenOnRows: Bool = false) {
         closeWork?.cancel()
         closeWork = nil
         guard preview != nil else { return }
-        let start = pointer
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.closeWork = nil
                 let point = self.pointer
-                // A pointer still on its way somewhere, from the page to a row say, hasn't left: the page goes once it
-                // stops off the rows and the page.
-                let moving = abs(point.x - start.x) > EdgePreviewHoverPolicy.movement
-                    || abs(point.y - start.y) > EdgePreviewHoverPolicy.movement
+                // The panel's own leave rule has the last word: the page stays out while the pointer is anywhere on the
+                // panel, and goes with it. A gap between rows, a slow crossing, a hand reaching for Downloads — none of
+                // them is leaving.
+                let kept = !evenOnRows && (self.panel.map { EdgeSidebarLayout.keeps(at: point, panel: $0.frame) } ?? false)
                 guard EdgeHoverRouting.closesAfterNilHover(pointerOverRows: !evenOnRows && self.rowNear(point) != nil,
                                                            pointerOverPreview: self.pointerIsOnPage(point),
-                                                           stillMoving: !evenOnRows && moving) else { return }
+                                                           pointerOnPanel: kept) else { return }
                 self.closePreview()
             }
         }
         closeWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + EdgePreviewHoverPolicy.leave, execute: work)
-    }
-
-    /// Leaving the page for the gutter or the sidebar's empty part, no row reports it: the pointer is watched.
-    private func followPreviewPointer() {
-        #if DEBUG
-        if Self.debugHoldsOpen, Self.debugPointer == nil { return }
-        #endif
-        guard preview != nil, closeWork == nil, previewWork == nil, MenuPanel.current == nil,
-              NSEvent.pressedMouseButtons == 0, let panel else { return }
-        let point = pointer
-        guard panel.frame.contains(point), !pointerIsOnPage(point), rowNear(point) == nil else { return }
-        schedulePreviewClose()
     }
 
     /// Whether the point is on the page beside the sidebar.

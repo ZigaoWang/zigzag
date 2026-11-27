@@ -441,8 +441,9 @@ struct EdgeSidebarTests {
         #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[2] })
     }
 
-    /// Off the rows and the page, even with no row saying so, the page folds back and the sidebar stays out.
-    @Test func leavingTheRowsAndThePageFoldsItBack() async throws {
+    /// The page outlives the rows, not the panel: it stays while the pointer is anywhere on the panel — crossing it
+    /// slowly, resting below the list, reaching for its buttons — and folds once the pointer leaves the panel.
+    @Test func thePageStaysWhileThePointerIsOnThePanel() async throws {
         let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
         defer { done() }
         let (panel, host) = try panelParts()
@@ -452,27 +453,9 @@ struct EdgeSidebarTests {
         let pill = panel.convertToScreen(host.convert(host.pageFrame, to: nil))
         // On the page it stays.
         EdgeSidebar.debugPointer = NSPoint(x: pill.midX, y: pill.midY)
-        try? await Task.sleep(for: .milliseconds(400))
-        #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
-        // From the page to the sidebar's empty part, below the rows.
-        EdgeSidebar.debugPointer = NSPoint(x: card.midX, y: min(b.minY - 120, card.midY))
-        #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
-        #expect(EdgeSidebar.shared.isShowing)
-    }
-
-    /// On its way from the page to a row the pointer crosses the gap and the sidebar's empty part: the page stays
-    /// out while it moves, and folds back once it stops off the rows.
-    @Test func aPointerOnItsWayToARowKeepsThePage() async throws {
-        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
-        defer { done() }
-        let (panel, host) = try panelParts()
-        let b = try rowOnScreen(tabs[1], in: controller)
-        let card = panel.convertToScreen(host.convert(host.cardFrame, to: nil))
-        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
-        let pill = panel.convertToScreen(host.convert(host.pageFrame, to: nil))
-        EdgeSidebar.debugPointer = NSPoint(x: pill.midX, y: pill.midY)
         try? await Task.sleep(for: .milliseconds(200))
-        // Slowly across the sidebar's empty part, below the rows, a few points every tick.
+        #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
+        // Slowly across the sidebar's empty part, below the rows, a few points every tick: still the panel.
         let y = min(b.minY - 120, card.midY)
         var x = controller.edgeSidebarOnRight ? card.minX + 4 : card.maxX - 4
         for _ in 0..<16 {
@@ -481,7 +464,12 @@ struct EdgeSidebarTests {
             try? await Task.sleep(for: .milliseconds(50))
             #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
         }
-        // Stopped there, off the rows: the page goes.
+        // Stopped there, still on the panel, where the + and Downloads are: the page stays.
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
+        // Off the panel entirely, the page folds.
+        EdgeSidebar.debugPointer = offScreen
+        EdgeSidebar.shared.hover(nil, in: controller)
         #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
         #expect(EdgeSidebar.shared.isShowing)
     }
