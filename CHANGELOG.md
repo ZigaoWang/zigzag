@@ -10,6 +10,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A quick swipe back or forward taps the trackpad again. The arrow fills, with one tap, the moment letting go would go back or forward, a quick flick included, and stays filled while your fingers rest, so a flick, a pause, then letting go now goes as the arrow shows. Coming back a little empties it. Swipes with fingers on a touch screen don't tap.
 - With the sidebar hidden and slid out over the page, opening a menu from it no longer sends the sidebar away and leaves the menu alone over the page. It stays out until the menu closes, then slides back if the pointer isn't on it.
 
+### Changed
+- Help › Report a Problem now notes a page whose server doesn't answer within 10 seconds, or that shows nothing after 30, with the site and how long each step took, so a dead site can be told from a slow one. Private windows note nothing. ([#548](https://github.com/ZigaoWang/zigzag/issues/548))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
