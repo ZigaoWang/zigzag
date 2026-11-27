@@ -225,18 +225,29 @@ struct EdgeSidebarTests {
         #expect(MiniWindowController.all.allSatisfy { $0.tab !== tabs[1] })
     }
 
-    /// Zigzag's own pages are pages: the scheme handler serves them into a web view, so resting on a row brings one
-    /// out beside the panel like any other, and a click still opens it in the window.
+    /// Zigzag's own pages are pages: resting on a row of Settings, History or Archive brings it out beside the panel
+    /// like any other, Settings with its own view, and a click still opens it in the window.
     @Test func zigzagsOwnPagesPreviewLikeAnyPage() async throws {
-        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/first", "zigzag://history"])
+        let (controller, manager, tabs, done) = panelWithTabs(["zigzag://settings", "zigzag://history",
+                                                               "zigzag://archive", "https://example.test/first"])
         defer { done() }
-        EdgeSidebar.shared.hover(tabs[1], in: controller)
-        #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[1] })
-        // A page the panel is told not to preview still gets its card instead.
-        #expect(EdgeLensPolicy.previews(url: URL(string: "zigzag://history")))
-
+        #expect(EdgeLensPolicy.previews(url: SettingsPage.url))
+        #expect(EdgeLensPolicy.previews(url: HistoryPage.url))
+        #expect(EdgeLensPolicy.previews(url: ArchivePage.url))
+        #expect(await until { tabs[0].settingsView != nil })
         EdgeSidebar.shared.hover(tabs[0], in: controller)
         #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[0] })
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(tabs[0].settingsView?.window === mini.window)
+        // Folded back, Settings is in its window's tab again.
+        #expect(EdgeSidebar.shared.dismissPreview())
+        #expect(await until(3) { tabs[0].host === controller })
+        #expect(tabs[0].settingsView?.window === controller.window)
+
+        tabs[1].ensureWebView()
+        EdgeSidebar.shared.hover(tabs[1], in: controller)
+        #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[1] })
+        #expect(tabs[1].webView?.window === EdgeSidebar.shared.pagePreview?.window)
 
         controller.listSelect(tabs[1])
         #expect(!EdgeSidebar.shared.isShowing)
