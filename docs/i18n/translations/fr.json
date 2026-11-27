@@ -15124,12 +15124,6 @@
         "value": "Cette action est irréversible."
       }
     },
-    "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "La bibliothèque de ce Mac était plus ancienne que lors de sa dernière synchronisation : la version d’iCloud a été restaurée."
-      }
-    },
     "%lld folders": {
       "variations": {
         "plural": {
@@ -15200,6 +15194,18 @@
       "stringUnit": {
         "state": "translated",
         "value": "Ce qui ne tient pas dans iCloud reste seulement sur ce Mac : %@. Tout le reste est synchronisé."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "La bibliothèque de ce Mac était une copie plus ancienne, alors Zigzag l’a mise à jour depuis iCloud."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "La bibliothèque de ce Mac était une copie plus ancienne, alors Zigzag l’a mise à jour depuis iCloud. La copie plus ancienne est enregistrée dans le dossier « Backups » de Zigzag."
       }
     }
   },

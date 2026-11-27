@@ -15075,12 +15075,6 @@
         "value": "Bu işlem geri alınamaz."
       }
     },
-    "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Bu Mac’in kitaplığı son eşzamanlanandan daha eskiydi, bu yüzden iCloud’daki sürüm geri getirildi."
-      }
-    },
     "%lld folders": {
       "variations": {
         "plural": {
@@ -15151,6 +15145,18 @@
       "stringUnit": {
         "state": "translated",
         "value": "iCloud için çok büyük olduğundan yalnızca bu Mac’te kalanlar: %@. Geri kalan her şey eşzamanlanır."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi. Eski kopya, Zigzag’in “Backups” klasöründe saklanıyor."
       }
     }
   },

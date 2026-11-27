@@ -139,13 +139,31 @@ final class ICloudSync {
         }
     }
 
-    /// A Library.json older than what was last synced: iCloud's version put back, said in a toast.
+    /// What the toast says when an older Library.json was brought up to date from iCloud, and its button when the
+    /// older copy was backed up first.
+    static func tookICloudToast(backup: URL?) -> (text: String, action: String?) {
+        guard backup != nil else {
+            return (String(localized: "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud.",
+                           comment: "Toast at launch when Library.json was an older copy (put back from Time Machine, say), so Sync with iCloud brought its spaces, pinned tabs and settings up to date from iCloud; what was only on this Mac stays."), nil)
+        }
+        return (String(localized: "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder.",
+                       comment: "Toast at launch when Library.json was an older copy (put back from Time Machine, say), so Sync with iCloud brought its spaces, pinned tabs and settings up to date from iCloud; what was only on this Mac stays. The older copy was saved first as a Zigzag backup; Backups is a folder's name on disk."),
+                String(localized: "Show in Finder", comment: "Button in the toast after Sync with iCloud brought an older library up to date: shows the backup of the older copy in Finder."))
+    }
+
+    /// The older copy, backed up just before iCloud's version was laid out over it.
+    private var backupBeforeICloud: URL?
+
+    /// A Library.json older than what was last synced: brought up to date from iCloud, said in a toast, with the
+    /// backup of the older copy.
     private func tellTookICloud() {
+        let backup = backupBeforeICloud
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
-            controller.promptToast(String(localized: "This Mac’s library was older than what it last synced, so iCloud’s version was put back.",
-                                          comment: "Toast at launch when Library.json was put back from an older copy (Time Machine, say), so Sync with iCloud laid out iCloud's version instead."),
-                                   symbol: "icloud", duration: 8)
+            let toast = Self.tookICloudToast(backup: backup)
+            var action: (title: String, run: () -> Void)?
+            if let title = toast.action, let backup { action = (title, { NSWorkspace.shared.activateFileViewerSelecting([backup]) }) }
+            controller.promptToast(toast.text, symbol: "icloud", duration: 12, action: action)
         }
     }
 
@@ -307,6 +325,7 @@ final class ICloudSync {
             self?.noteLastSynced()
         }
         session.onTookICloud = { [weak self] in self?.tellTookICloud() }
+        session.onTakingICloud = { [weak self] in self?.backupBeforeICloud = self?.backUp() }
         session.onTooBig = { [weak self] in self?.changed.send() }
         session.onHeld = { [weak self] in
             self?.changed.send()

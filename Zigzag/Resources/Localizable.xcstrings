@@ -3879,85 +3879,168 @@
         }
       }
     },
-    "This Mac’s library was older than what it last synced, so iCloud’s version was put back." : {
-      "comment" : "Toast at launch when Library.json was put back from an older copy (Time Machine, say), so Sync with iCloud laid out iCloud's version instead.",
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud." : {
+      "comment" : "Toast at launch when Library.json was an older copy (put back from Time Machine, say), so Sync with iCloud brought its spaces, pinned tabs and settings up to date from iCloud; what was only on this Mac stays.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Bibliothek dieses Macs war älter als beim letzten Synchronisieren, daher wurde die Version aus iCloud wiederhergestellt."
+            "value" : "Die Bibliothek dieses Macs war eine ältere Kopie, daher hat Zigzag sie aus iCloud auf den neuesten Stand gebracht."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La biblioteca de este Mac era más antigua que la última que sincronizó, así que se restauró la versión de iCloud."
+            "value" : "La biblioteca de este Mac era una copia antigua, así que Zigzag la actualizó desde iCloud."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La bibliothèque de ce Mac était plus ancienne que lors de sa dernière synchronisation : la version d’iCloud a été restaurée."
+            "value" : "La bibliothèque de ce Mac était une copie plus ancienne, alors Zigzag l’a mise à jour depuis iCloud."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La libreria di questo Mac era più vecchia di quella sincronizzata l’ultima volta, quindi è stata ripristinata la versione di iCloud."
+            "value" : "La libreria di questo Mac era una copia meno recente, quindi Zigzag l’ha aggiornata da iCloud."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacのライブラリが最後に同期した時点より古かったため、iCloudの内容に戻しました。"
+            "value" : "このMacのライブラリが古いコピーだったため、ZigzagがiCloudから最新の状態にしました。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 Mac의 라이브러리가 마지막으로 동기화한 것보다 오래되어 iCloud의 버전으로 되돌렸습니다."
+            "value" : "이 Mac의 라이브러리가 이전 사본이어서 Zigzag가 iCloud에서 최신 상태로 업데이트했습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "De bibliotheek van deze Mac was ouder dan bij de laatste synchronisatie, dus de versie uit iCloud is teruggezet."
+            "value" : "De bibliotheek van deze Mac was een oudere kopie, dus Zigzag heeft hem bijgewerkt vanuit iCloud."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Biblioteka tego Maca była starsza niż przy ostatniej synchronizacji, więc przywrócono wersję z iCloud."
+            "value" : "Biblioteka tego Maca była starszą kopią, więc Zigzag zaktualizował ją z iCloud."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A biblioteca deste Mac era mais antiga do que a última sincronizada, então a versão do iCloud foi restaurada."
+            "value" : "A biblioteca deste Mac era uma cópia mais antiga, então o Zigzag a atualizou a partir do iCloud."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Библиотека этого Mac оказалась старше, чем при последней синхронизации, поэтому восстановлена версия из iCloud."
+            "value" : "Библиотека этого Mac оказалась старой копией, поэтому Zigzag обновил её из iCloud."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu Mac’in kitaplığı son eşzamanlanandan daha eskiydi, bu yüzden iCloud’daki sürüm geri getirildi."
+            "value" : "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 上的资料库比上次同步时的旧，因此已恢复为 iCloud 中的版本。"
+            "value" : "这台 Mac 上的资料库是较旧的副本，因此 Zigzag 已从 iCloud 将其更新。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台 Mac 上的資料庫比上次同步時的舊，因此已還原為 iCloud 中的版本。"
+            "value" : "這台 Mac 上的資料庫是較舊的副本，因此 Zigzag 已從 iCloud 將其更新。"
+          }
+        }
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder." : {
+      "comment" : "Toast at launch when Library.json was an older copy (put back from Time Machine, say), so Sync with iCloud brought its spaces, pinned tabs and settings up to date from iCloud; what was only on this Mac stays. The older copy was saved first as a Zigzag backup; Backups is a folder's name on disk.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Bibliothek dieses Macs war eine ältere Kopie, daher hat Zigzag sie aus iCloud auf den neuesten Stand gebracht. Die ältere Kopie ist in Zigzags Ordner „Backups“ gesichert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La biblioteca de este Mac era una copia antigua, así que Zigzag la actualizó desde iCloud. La copia antigua está guardada en la carpeta “Backups” de Zigzag."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La bibliothèque de ce Mac était une copie plus ancienne, alors Zigzag l’a mise à jour depuis iCloud. La copie plus ancienne est enregistrée dans le dossier « Backups » de Zigzag."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La libreria di questo Mac era una copia meno recente, quindi Zigzag l’ha aggiornata da iCloud. La copia meno recente è salvata nella cartella “Backups” di Zigzag."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacのライブラリが古いコピーだったため、ZigzagがiCloudから最新の状態にしました。古いコピーはZigzagの「Backups」フォルダに保存されています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Mac의 라이브러리가 이전 사본이어서 Zigzag가 iCloud에서 최신 상태로 업데이트했습니다. 이전 사본은 Zigzag의 ‘Backups’ 폴더에 저장되어 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De bibliotheek van deze Mac was een oudere kopie, dus Zigzag heeft hem bijgewerkt vanuit iCloud. De oudere kopie staat in de map “Backups” van Zigzag."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biblioteka tego Maca była starszą kopią, więc Zigzag zaktualizował ją z iCloud. Starsza kopia jest zapisana w folderze „Backups” Zigzaga."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A biblioteca deste Mac era uma cópia mais antiga, então o Zigzag a atualizou a partir do iCloud. A cópia mais antiga está salva na pasta “Backups” do Zigzag."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Библиотека этого Mac оказалась старой копией, поэтому Zigzag обновил её из iCloud. Старая копия сохранена в папке «Backups» Zigzag."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi. Eski kopya, Zigzag’in “Backups” klasöründe saklanıyor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上的资料库是较旧的副本，因此 Zigzag 已从 iCloud 将其更新。较旧的副本已保存在 Zigzag 的“Backups”文件夹中。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台 Mac 上的資料庫是較舊的副本，因此 Zigzag 已從 iCloud 將其更新。較舊的副本已儲存在 Zigzag 的「Backups」資料夾中。"
           }
         }
       }
@@ -151157,7 +151240,7 @@
       }
     },
     "Show in Finder" : {
-      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Export Your Data: shows the saved files in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
+      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Export Your Data: shows the saved files in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton in the toast after Sync with iCloud brought an older library up to date: shows the backup of the older copy in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
       "localizations" : {
         "de" : {
           "stringUnit" : {

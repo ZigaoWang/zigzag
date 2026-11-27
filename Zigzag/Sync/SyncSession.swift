@@ -215,6 +215,8 @@ final class SyncSession {
     var onHeld: (() -> Void)?
     /// Called when a Library.json older than what was last synced was laid out from iCloud again, and that changed it.
     var onTookICloud: (() -> Void)?
+    /// Called just before iCloud's version is laid out over what's here, when that changes something: a backup first.
+    var onTakingICloud: (() -> Void)?
     /// Called when a save or a removal finds the zone gone after the first sync: removed from iCloud on another Mac,
     /// or iCloud's copy reset. Never made again from here meanwhile.
     var onZoneGone: (() -> Void)?
@@ -375,6 +377,7 @@ final class SyncSession {
         let shown = state.base.filter { !state.heldNames.contains($0.key) && SyncName.id($0.key) != nil }
         let differs = export.items.contains { name, item in new[name] == nil && SyncName.id(name) != nil && shown[name].map { !$0.sameContent(as: item) } ?? true }
             || shown.keys.contains { export.items[$0] == nil }
+        if differs { onTakingICloud?() }
         queue(diff(new, deletes: false, stamp: stamp))
         layOut()
         return differs

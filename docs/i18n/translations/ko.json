@@ -14763,12 +14763,6 @@
         "value": "이 동작은 실행 취소할 수 없습니다."
       }
     },
-    "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "이 Mac의 라이브러리가 마지막으로 동기화한 것보다 오래되어 iCloud의 버전으로 되돌렸습니다."
-      }
-    },
     "%lld folders": {
       "variations": {
         "plural": {
@@ -14821,6 +14815,18 @@
       "stringUnit": {
         "state": "translated",
         "value": "iCloud에 비해 너무 커서 이 Mac에만 남는 항목: %@. 나머지는 모두 동기화됩니다."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "이 Mac의 라이브러리가 이전 사본이어서 Zigzag가 iCloud에서 최신 상태로 업데이트했습니다."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "이 Mac의 라이브러리가 이전 사본이어서 Zigzag가 iCloud에서 최신 상태로 업데이트했습니다. 이전 사본은 Zigzag의 ‘Backups’ 폴더에 저장되어 있습니다."
       }
     }
   },

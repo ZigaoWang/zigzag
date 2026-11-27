@@ -15748,12 +15748,6 @@
         "value": "Это действие нельзя отменить."
       }
     },
-    "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Библиотека этого Mac оказалась старше, чем при последней синхронизации, поэтому восстановлена версия из iCloud."
-      }
-    },
     "%lld folders": {
       "variations": {
         "plural": {
@@ -15860,6 +15854,18 @@
       "stringUnit": {
         "state": "translated",
         "value": "Хранится только на этом Mac, так как слишком велико для iCloud: %@. Всё остальное синхронизируется."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Библиотека этого Mac оказалась старой копией, поэтому Zigzag обновил её из iCloud."
+      }
+    },
+    "This Mac’s library was an older copy, so Zigzag brought it up to date from iCloud. The older copy is saved in Zigzag’s Backups folder.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Библиотека этого Mac оказалась старой копией, поэтому Zigzag обновил её из iCloud. Старая копия сохранена в папке «Backups» Zigzag."
       }
     }
   },

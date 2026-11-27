@@ -1423,6 +1423,31 @@ extension SyncLibrary {
         #expect(a.library.titles(in: "Personal") == ["Since", "b", "c"])
     }
 
+    @Test func anOlderLibraryIsBackedUpBeforeICloudsVersionIsLaidOut() {
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        let old = a.library
+        a.host.libraryStamp = Date(timeIntervalSince1970: 2_000)
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "Since" } }
+        a.sync(); b.sync()
+        // Library.json put back from an older copy: what it holds is backed up before iCloud's version is laid out.
+        a.host.libraryStamp = Date(timeIntervalSince1970: 1_500)
+        var backedUp: [String]?
+        a.session.onTakingICloud = { backedUp = a.library.titles(in: "Personal") }
+        relaunch(a, with: old)
+        #expect(backedUp == ["a", "b"])
+        #expect(a.library.titles(in: "Personal") == ["Since", "b"])
+        // Nothing to bring up to date: no backup.
+        backedUp = nil
+        relaunch(a, with: a.library)
+        #expect(backedUp == nil)
+        // The toast says it plainly, and where the older copy is when there's one.
+        let backup = URL(fileURLWithPath: "/tmp/Zigzag Backup.zigzag")
+        #expect(ICloudSync.tookICloudToast(backup: backup).action != nil)
+        #expect(ICloudSync.tookICloudToast(backup: nil).action == nil)
+        #expect(ICloudSync.tookICloudToast(backup: backup).text != ICloudSync.tookICloudToast(backup: nil).text)
+        #expect(!ICloudSync.tookICloudToast(backup: nil).text.contains("put back"))
+    }
+
     @Test func aMissingProfilesFileIsUnreadableNotEveryProfileRemoved() {
         var directory = ProfileDirectory()
         let work = directory.add(name: "Work")
