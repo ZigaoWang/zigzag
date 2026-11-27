@@ -162,7 +162,7 @@ are) stays. While a dialog is open, only the dialog is listed, as the rest of th
 A snapshot only has what shows on the page. Text a page hides from people (off the screen, a pixel high, see-through,
 shrunk or clipped to nothing, inside a closed "more details", hidden from screen readers) is left out, so a page
 can't slip instructions to an app that you'd never see. It's a filter for the ways pages are known to hide text,
-not a guarantee: text the colour of its background, or under a picture, still gets through. Names are
+not a guarantee: text the color of its background, or under a picture, still gets through. Names are
 what you see: a button that shows Save but tells screen readers something else is listed as Save, marked
 `[label differs]`. One that shows only a sign (×, +) goes by what it tells screen readers. A link to another site says `[other site]`, and a word mixing alphabets (a Cyrillic а in
 Wаlmart) says `[mixed scripts]`. Everything the page wrote is in quotes, so it can't pass for Zigzag's own words.
