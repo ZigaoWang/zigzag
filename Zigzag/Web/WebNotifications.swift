@@ -319,6 +319,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
       // A frame written with document.open() (Cloudflare's Turnstile does) gets a new document in the same window,
       // and WebKit runs this again there: what's set up already stays, since setting it up again throws.
       if (window.__zigzagNotification) return;
+      // True in a private tab and in a profile that keeps nothing: nothing may ask there, whatever the page does.
       const denied = __DENIED__;
       const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
       let sameSite = window === window.top;
@@ -393,7 +394,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         static get permission() { return permission; }
         static get maxActions() { return 0; }
         static requestPermission(callback) {
-          const ask = permission === 'default' && usable && !isPrivate
+          const ask = permission === 'default' && usable
             ? send({ kind: 'request', gesture: gesture() }).then((answer) => { if (answer === 'granted' || answer === 'denied' || answer === 'default') permission = answer; return permission; })
             : Promise.resolve(permission);
           return ask.then((answer) => { if (typeof callback === 'function') { try { callback(answer); } catch (e) { setTimeout(() => { throw e; }); } } return answer; });
@@ -427,7 +428,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         ServiceWorkerRegistration.prototype.getNotifications = function () { return Promise.resolve([]); };
       }
       // The answer may have changed since this window opened (allowed in another tab): ask for the current one.
-      if (usable && !isPrivate) send({ kind: 'state' }).then((state) => { if (state === 'granted' || state === 'denied' || state === 'default') permission = state; });
+      if (usable && !denied) send({ kind: 'state' }).then((state) => { if (state === 'granted' || state === 'denied' || state === 'default') permission = state; });
     })();
     """
 }
