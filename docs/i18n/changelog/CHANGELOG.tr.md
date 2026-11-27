@@ -4,6 +4,22 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 
 ## [Unreleased]
 
+### Düzeltmeler
+- Space’in sabitlenmiş sekmeleri katlanmışken ⌘W ile bir sabitlenmiş sekmeyi ya da kapalı bir klasörün altında görünen birini kapatmak artık satırını kenar çubuğundan çıkarmaz: siz Space’i değiştirene ya da sabitlenmiş sekmeleri veya o klasörü yeniden açıp kapatana kadar bellekten kaldırılmış olarak kalır.
+- Zoom’un app.zoom.us adresindeki web uygulaması artık boş kalmıyor: bildirim gösterip gösteremeyeceğini soran bir site yanıt yerine hata alıyordu. Web siteleri artık Chrome’un onlara asla vermediği bir uzantı nesnesi olan `window.browser`’ı da görmüyor. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- Zigzag’i kapatıp son oturumunuzla yeniden açmak, Azure DevOps ve Microsoft 365 gibi sitelerde yeniden oturumunuzu açık tutuyor: Zigzag bu sitelerin oturum çerezlerini kaydetmeyi atlayabiliyor, sonra bir sonraki açılışta tuttuklarını da kaybediyordu. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- ⇧⌘T, ⌘W ile kapattığınız sabitlenmiş bir sekmeyi geri getirir: sekme satırında, sahip olduğu sayfa ve geçmişle yeniden yüklenir. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#549](https://github.com/ZigaoWang/zigzag/issues/549))
+- Ayarlar, artık listelenmeyen birçok profilin verisiyle Profiller’de açılırken donmuyor: üçten fazlası, kaç tane olduğunu söyleyen tek bir kutuda katlanıyor.
+- Çevrilmiş bir sayfa değişirken çevrilmiş kalır: kaydırdıkça yüklenen gönderiler ve yorumlar, sayfanın güncellediği metin ve Reddit gibi yeniden yüklenmeyen bir sitenin başka bir sayfası geldikçe çevrilir, uzun bir sayfa da yarıda kesilmek yerine en alta kadar çevrilir.
+- Hareketsiz duran bir pencere artık grafik işlemciyi ara ara meşgul etmez: kitaplığınızda Space’i olduğu gibi bırakan bir değişiklik, örneğin eşitlemeden gelen ya da pilin şarjını bildirmesi, tüm pencereyi rengiyle aynı renge soldurup duruyordu.
+- ⌘T ile az önce açtığınız bir sekmeyi kapatmak, Safari ve Chrome’daki gibi, alttaki sekmeye değil bulunduğunuz sekmeye geri götürür.
+- Ekranın kenarından açılan kenar çubuğunun sayfa önizlemesi artık bir sekmeden diğerine geçerken kapanıp geri gelmez, imleç sekmeleri ve sayfayı bırakıp kenar çubuğunun boş kısmına geçince katlanır ve uzantılara artık ayrı bir pencere olarak görünmez. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- Ekranın kenarından açılan kenar çubuğunun sayfa önizlemesinde, uykuya alınmış bir sekmenin kartına tıklamak, satırına tıklamak gibi o sekmeyi pencerede açar, panelden gelen bir menü artık sayfanın altına çizilmez ve sayfaya tıkladıktan sonra Esc’ye basmak ya da kenar çubuğuna dönmek, tarayıcı penceresini öne getirmek yerine klavyeyi panelde bırakır. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
+### Yeni Özellikler
+- Bir indirme kuralı, kaydedilen dosyanın kendisini {file_raw} ile bir hizmete gönderebilir; böylece rTorrent’e Gönder artık .torrent dosyasını devreder ve özel izleyicilerle çalışır. Bir hizmetin kullanıcı adı ve parolası adresinde değil, Anahtar Zinciri’nde tutulur. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
+- Dokunmatik bir ekranda ya da Sidecar iPad’de, parmakla açılan menülerin satırları daha yüksektir, küçük bir düğmenin hemen yanına dokunmak onu basar, seçilen birkaç sekmeden birine dokunup basılı tutmak hepsini taşır ve kenar çubuğunun kenarını parmakla tutmak daha kolaydır.
+
 ## [0.10.0] - 2026-11-25
 
 Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç yeni dilde Zigzag; kaydedilen dosyayı devreden indirme kuralları; en son ne zaman güncellendiğini gösteren canlı klasörler; ve Çince Pinyin yazarken İngilizceye geçince fazladan boşluk kalmaması.

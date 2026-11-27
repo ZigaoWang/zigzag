@@ -4,6 +4,22 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
+### Naprawiono
+- Zamknięcie przypiętej karty skrótem ⌘W, gdy przypięte karty przestrzeni są zwinięte, albo karty widocznej pod zamkniętym folderem, nie usuwa już jej wiersza z paska bocznego: zostaje, wyładowana, dopóki nie zmienisz przestrzeni albo nie otworzysz lub nie zamkniesz ponownie przypiętych kart lub tego folderu.
+- Aplikacja internetowa Zoom pod adresem app.zoom.us nie pozostaje już pusta: witryna, która pytała, czy może pokazywać powiadomienia, dostawała błąd zamiast odpowiedzi. Witryny nie widzą też już `window.browser`, obiektu rozszerzeń, którego Chrome im nigdy nie daje. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- Zamknięcie Zigzag i otwarcie go ponownie z ostatnią sesją znów zachowuje logowanie w witrynach takich jak Azure DevOps i Microsoft 365: Zigzag mógł pominąć zapisanie ich plików cookie sesji, a potem przy następnym uruchomieniu tracił te, które zachował. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- ⇧⌘T przywraca przypiętą kartę zamkniętą przez ⌘W: wczytuje się ponownie w swoim wierszu, na stronie i z historią, które miała. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#549](https://github.com/ZigaoWang/zigzag/issues/549))
+- Ustawienia nie zawieszają się już po otwarciu na Profile z danymi wielu profili, których nie ma już na liście: powyżej trzech zwijają się w jedno pole z informacją, ile ich jest.
+- Przetłumaczona strona pozostaje przetłumaczona, gdy się zmienia: wpisy i komentarze doładowywane podczas przewijania, tekst aktualizowany przez stronę i kolejna strona witryny, która się nie przeładowuje, jak Reddit, są tłumaczone w miarę pojawiania się, a długa strona jest tłumaczona aż do końca, zamiast urywać się w połowie.
+- Okno, które stoi w miejscu, nie obciąża już GPU zrywami: zmiana w twojej bibliotece, która zostawiała przestrzeń taką, jaka była, jak ta z synchronizacji, albo bateria zgłaszająca swój poziom naładowania, przenikała całe okno z jego koloru w ten sam kolor.
+- Zamknięcie karty, którą właśnie otwarto skrótem ⌘T, wraca do karty, na której byłeś, tak jak w Safari i Chrome, a nie do karty poniżej.
+- Podgląd stron w pasku bocznym wysuwanym od krawędzi ekranu nie zamyka się już i nie wraca, gdy przechodzisz od jednej karty do następnej, zwija się, gdy wskaźnik opuszcza karty i stronę na rzecz pustej części paska bocznego, i nie pokazuje się już rozszerzeniom jako osobne okno. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- W podglądzie stron w pasku bocznym wysuwanym od krawędzi ekranu kliknięcie karty uśpionej karty otwiera ją w oknie tak jak kliknięcie jej wiersza, menu z panelu nie jest już rysowane pod stroną, a Esc lub powrót do paska bocznego po kliknięciu strony zostawia klawiaturę przy panelu zamiast wysuwać okno przeglądarki na wierzch. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
+### Nowe
+- Reguła pobierania może wysłać sam zapisany plik do usługi za pomocą {file_raw}, więc Wyślij do rTorrent przekazuje teraz plik .torrent i działa z prywatnymi trackerami. Nazwa użytkownika i hasło usługi są przechowywane w pęku kluczy, a nie w jej adresie. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
+- Na ekranie dotykowym lub iPadzie z Sidecar menu otwierane palcem mają wyższe wiersze, stuknięcie tuż obok małego przycisku go naciska, dotknięcie i przytrzymanie jednej z kilku wybranych kart przenosi je wszystkie, a krawędź paska bocznego łatwiej chwycić palcem.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemiecki, francuski, hiszpański i rosyjski; reguły pobierania, które przekazują zachowany plik; foldery na żywo, które pokazują, kiedy ostatnio się zaktualizowały; oraz przełączanie z chińskiego pinyin na angielski bez zbędnych spacji.

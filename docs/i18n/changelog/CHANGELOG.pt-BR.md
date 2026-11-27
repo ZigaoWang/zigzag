@@ -4,6 +4,22 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 
 ## [Unreleased]
 
+### Corrigido
+- Fechar com ⌘W uma aba fixada enquanto as abas fixadas do espaço estão recolhidas, ou uma mostrada sob uma pasta fechada, não tira mais a linha dela da barra lateral: ela fica, descarregada, até você trocar de espaço ou abrir ou fechar de novo as abas fixadas ou aquela pasta.
+- O app web do Zoom em app.zoom.us não fica mais em branco: um site que perguntava se podia mostrar notificações recebia um erro em vez de uma resposta. Os sites também não veem mais `window.browser`, um objeto de extensões que o Chrome nunca dá a eles. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- Sair do Zigzag e abri-lo de novo na sua última sessão volta a manter você conectado a sites como Azure DevOps e Microsoft 365: o Zigzag podia deixar de salvar os cookies de sessão deles e depois perder, na abertura seguinte, os que tinha guardado. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- ⇧⌘T traz de volta uma aba fixada que você fechou com ⌘W: ela carrega de novo na própria linha, na página e com o histórico que tinha. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#549](https://github.com/ZigaoWang/zigzag/issues/549))
+- Os Ajustes não travam mais ao abrir em Perfis com dados de muitos perfis que não aparecem mais na lista: a partir de três, eles se recolhem em uma caixa que diz quantos são.
+- Uma página traduzida continua traduzida enquanto muda: publicações e comentários que carregam conforme você rola, texto que a página atualiza e outra página de um site que não recarrega, como o Reddit, são traduzidos à medida que chegam, e uma página longa é traduzida até o fim em vez de parar no meio.
+- Uma janela parada não deixa mais a GPU ocupada em rajadas: uma mudança na sua biblioteca que deixava o espaço como estava, como uma vinda da sincronização, ou a bateria informando a carga, fazia a janela inteira passar da cor dela para a mesma cor.
+- Fechar uma aba que você acabou de abrir com ⌘T leva de volta à aba em que você estava, como no Safari e no Chrome, em vez da aba logo abaixo.
+- A prévia de páginas da barra lateral a partir da borda da tela não fecha mais para voltar enquanto você passa de uma aba para a próxima, se recolhe quando o ponteiro sai das abas e da página para a parte vazia da barra lateral, e não aparece mais para as extensões como uma janela própria. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- Na prévia de páginas da barra lateral a partir da borda da tela, um clique no cartão de uma aba suspensa abre essa aba na janela, como um clique na linha dela, um menu do painel não é mais desenhado sob a página, e Esc ou voltar à barra lateral depois de clicar na página deixa o teclado com o painel em vez de trazer a janela do navegador para a frente. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
+### Novo
+- Uma regra de download pode enviar o próprio arquivo salvo a um serviço com {file_raw}, então Enviar ao rTorrent agora entrega o arquivo .torrent e funciona com trackers privados. O nome de usuário e a senha de um serviço ficam guardados em Chaves, e não no endereço dele. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
+- Em uma tela de toque ou em um iPad com Sidecar, os menus abertos com o dedo têm linhas mais altas, um toque logo ao lado de um botão pequeno o aciona, tocar e segurar uma de várias abas escolhidas leva todas elas, e a borda da barra lateral fica mais fácil de pegar com o dedo.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanhol e russo; regras de download que entregam o arquivo salvo; pastas dinâmicas que mostram quando foram atualizadas pela última vez; e digitar em pinyin chinês e mudar para o inglês sem espaços sobrando.

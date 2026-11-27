@@ -4,6 +4,22 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Corrections
+- Fermer avec ⌘W un onglet épinglé quand les onglets épinglés de l’espace sont repliés, ou un onglet affiché sous un dossier fermé, ne retire plus sa ligne de la barre latérale : elle reste, déchargée, jusqu’à ce que vous changiez d’espace ou que vous ouvriez ou fermiez de nouveau les onglets épinglés ou ce dossier.
+- L’app web de Zoom sur app.zoom.us ne reste plus blanche : un site qui demandait s’il pouvait afficher des notifications recevait une erreur au lieu d’une réponse. Les sites web ne voient plus non plus `window.browser`, un objet d’extension que Chrome ne leur donne jamais. Merci à [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- Quitter Zigzag puis le rouvrir sur votre dernière session vous garde de nouveau connecté à des sites comme Azure DevOps et Microsoft 365 : Zigzag pouvait ne pas enregistrer leurs cookies de session, puis perdre ceux qu’il avait gardés au lancement suivant. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- ⇧⌘T rétablit un onglet épinglé que vous avez fermé avec ⌘W : il se recharge dans sa ligne, à la page et avec l’historique qu’il avait. Merci à [Lakeland97](https://github.com/Lakeland97). ([#549](https://github.com/ZigaoWang/zigzag/issues/549))
+- Les Réglages ne se figent plus à l’ouverture sur Profils avec des données de nombreux profils qui ne sont plus listés : au-delà de trois, ils se replient dans une case qui indique combien il y en a.
+- Une page traduite reste traduite quand elle change : les publications et commentaires qui se chargent pendant le défilement, le texte que la page met à jour et une autre page d’un site qui ne se recharge pas, comme Reddit, sont traduits à mesure qu’ils arrivent, et une longue page est traduite jusqu’en bas au lieu de s’arrêter en route.
+- Une fenêtre immobile ne sollicite plus par à-coups le processeur graphique : un changement dans votre bibliothèque qui laissait l’espace tel quel, comme un venant de la synchronisation, ou la batterie qui indiquait sa charge, fondait toute la fenêtre de sa couleur vers la même couleur.
+- Fermer un onglet que vous venez d’ouvrir avec ⌘T vous ramène à l’onglet où vous étiez, comme dans Safari et Chrome, au lieu de l’onglet situé en dessous.
+- L’aperçu des pages de la barre latérale depuis le bord de l’écran ne se ferme plus pour revenir quand vous passez d’un onglet au suivant, se replie quand le pointeur quitte les onglets et la page pour la partie vide de la barre latérale, et n’apparaît plus pour les extensions comme une fenêtre à part. Merci à [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- Dans l’aperçu des pages de la barre latérale depuis le bord de l’écran, un clic sur la carte d’un onglet en veille ouvre cet onglet dans la fenêtre, comme un clic sur sa ligne, un menu du panneau n’est plus dessiné sous la page, et Échap ou le retour à la barre latérale après un clic dans la page laisse le clavier au panneau au lieu de ramener la fenêtre du navigateur au premier plan. Merci à [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
+### Nouveautés
+- Une règle de téléchargement peut envoyer le fichier enregistré lui-même à un service avec {file_raw} : Envoyer à rTorrent transmet donc désormais le fichier .torrent et fonctionne avec les trackers privés. Le nom d’utilisateur et le mot de passe d’un service sont conservés dans le trousseau plutôt que dans son adresse. Merci à [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
+- Sur un écran tactile ou un iPad Sidecar, les menus ouverts au doigt ont des lignes plus hautes, un appui juste à côté d’un petit bouton l’actionne, un toucher prolongé sur l’un de plusieurs onglets choisis les emporte tous, et le bord de la barre latérale se saisit plus facilement du doigt.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, au français, à l’espagnol et au russe ; des règles de téléchargement qui transfèrent le fichier enregistré ; des dossiers dynamiques qui indiquent leur dernière mise à jour ; et la saisie en pinyin chinois suivie d’un passage à l’anglais sans espaces parasites.

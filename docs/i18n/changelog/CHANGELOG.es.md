@@ -4,6 +4,22 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 
 ## [Unreleased]
 
+### Correcciones
+- Cerrar con ⌘W una pestaña fijada mientras las pestañas fijadas del espacio están plegadas, o una que aparece bajo una carpeta cerrada, ya no quita su fila de la barra lateral: se queda, descargada de la memoria, hasta que cambies de espacio o abras o cierres de nuevo las pestañas fijadas o esa carpeta.
+- La app web de Zoom en app.zoom.us ya no se queda en blanco: un sitio que preguntaba si podía mostrar notificaciones recibía un error en lugar de una respuesta. Los sitios web tampoco ven ya `window.browser`, un objeto de extensiones que Chrome nunca les da. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- Salir de Zigzag y abrirlo de nuevo con tu última sesión vuelve a mantener tu sesión iniciada en sitios como Azure DevOps y Microsoft 365: Zigzag podía omitir guardar sus cookies de sesión y luego perder las que había conservado en el siguiente inicio. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- ⇧⌘T recupera una pestaña fijada que cerraste con ⌘W: se carga de nuevo en su fila, en la página y con el historial que tenía. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#549](https://github.com/ZigaoWang/zigzag/issues/549))
+- Los Ajustes ya no se congelan al abrirse en Perfiles con datos de muchos perfiles que ya no aparecen en la lista: a partir de tres, se pliegan en un cuadro que indica cuántos son.
+- Una página traducida sigue traducida mientras cambia: las publicaciones y los comentarios que se cargan al desplazarte, el texto que la página actualiza y otra página de un sitio que no se recarga, como Reddit, se traducen según llegan, y una página larga se traduce hasta el final en lugar de detenerse a medias.
+- Una ventana quieta ya no mantiene ocupada la GPU a ráfagas: un cambio en tu biblioteca que dejaba el espacio como estaba, como uno de la sincronización, o que la batería informara de su carga, hacía pasar toda la ventana de su color al mismo color.
+- Al cerrar una pestaña que acabas de abrir con ⌘T, vuelves a la pestaña en la que estabas, como en Safari y Chrome, en lugar de ir a la pestaña de debajo.
+- La vista previa de páginas de la barra lateral desde el borde de la pantalla ya no se cierra y vuelve a aparecer mientras pasas de una pestaña a la siguiente, se pliega cuando el puntero deja las pestañas y la página por la parte vacía de la barra lateral, y ya no aparece ante las extensiones como una ventana propia. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- En la vista previa de páginas de la barra lateral desde el borde de la pantalla, un clic en la tarjeta de una pestaña suspendida abre esa pestaña en la ventana, como un clic en su fila, un menú del panel ya no se dibuja debajo de la página, y Esc o volver a la barra lateral después de hacer clic en la página deja el teclado con el panel en lugar de traer al frente la ventana del navegador. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
+### Nuevo
+- Una regla de descarga puede enviar el propio archivo guardado a un servicio con {file_raw}, así que Enviar a rTorrent ahora entrega el archivo .torrent y funciona con trackers privados. El nombre de usuario y la contraseña de un servicio se guardan en el llavero en lugar de en su dirección. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
+- En una pantalla táctil o un iPad con Sidecar, los menús que abre un dedo tienen filas más altas, un toque justo al lado de un botón pequeño lo pulsa, mantener pulsada una de varias pestañas elegidas las lleva todas, y el borde de la barra lateral es más fácil de tomar con un dedo.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés, el español y el ruso; reglas de descarga que envían el archivo guardado; carpetas dinámicas que dicen cuándo se actualizaron por última vez, y escribir en pinyin chino y pasar al inglés sin espacios de más.

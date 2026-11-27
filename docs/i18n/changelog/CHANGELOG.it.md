@@ -4,6 +4,22 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ## [Unreleased]
 
+### Correzioni
+- Chiudere con ⌘W un pannello fissato mentre i pannelli fissati dello spazio sono ripiegati, o uno mostrato sotto una cartella chiusa, non toglie più la sua riga dalla barra laterale: resta, scaricato dalla memoria, finché non cambi spazio o non apri o chiudi di nuovo i pannelli fissati o quella cartella.
+- L’app web di Zoom su app.zoom.us non resta più vuota: un sito che chiedeva se poteva mostrare notifiche riceveva un errore invece di una risposta. I siti web non vedono più nemmeno `window.browser`, un oggetto delle estensioni che Chrome non dà mai loro. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- Uscire da Zigzag e riaprirlo sull’ultima sessione ti mantiene di nuovo connesso a siti come Azure DevOps e Microsoft 365: Zigzag poteva saltare il salvataggio dei loro cookie di sessione e poi perdere, al lancio successivo, quelli che aveva conservato. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- ⇧⌘T riporta un pannello fissato che hai chiuso con ⌘W: si carica di nuovo nella sua riga, con la pagina e la cronologia che aveva. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#549](https://github.com/ZigaoWang/zigzag/issues/549))
+- Le Impostazioni non si bloccano più quando si aprono su Profili con dati di molti profili che non sono più elencati: oltre i tre, si riducono in un riquadro che dice quanti sono.
+- Una pagina tradotta resta tradotta mentre cambia: i post e i commenti che si caricano mentre scorri, il testo che la pagina aggiorna e un’altra pagina di un sito che non si ricarica, come Reddit, vengono tradotti man mano che arrivano, e una pagina lunga viene tradotta fino in fondo invece di fermarsi a metà.
+- Una finestra ferma non tiene più occupata a scatti la GPU: una modifica alla tua libreria che lasciava lo spazio com’era, come una dovuta alla sincronizzazione, o la batteria che indicava la sua carica, sfumava l’intera finestra dal suo colore allo stesso colore.
+- Chiudendo un pannello appena aperto con ⌘T si torna al pannello in cui eri, come in Safari e Chrome, invece che al pannello sotto.
+- L’anteprima delle pagine della barra laterale dal bordo dello schermo non si chiude più per poi tornare mentre passi da un pannello al successivo, si richiude quando il puntatore lascia i pannelli e la pagina per la parte vuota della barra laterale, e non appare più alle estensioni come una finestra a sé. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+- Nell’anteprima delle pagine della barra laterale dal bordo dello schermo, un clic sulla scheda di un pannello sospeso apre quel pannello nella finestra, come un clic sulla sua riga, un menu del riquadro non viene più disegnato sotto la pagina, e Esc o il ritorno alla barra laterale dopo aver fatto clic nella pagina lascia la tastiera al riquadro invece di portare in primo piano la finestra del browser. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
+### Novità
+- Una regola di download può inviare il file salvato stesso a un servizio con {file_raw}, così Invia a rTorrent ora consegna il file .torrent e funziona con i tracker privati. Nome utente e password di un servizio sono conservati nel Portachiavi invece che nel suo indirizzo. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#550](https://github.com/ZigaoWang/zigzag/pull/550))
+- Su uno schermo tattile o su un iPad Sidecar, i menu aperti con un dito hanno righe più alte, un tocco appena accanto a un piccolo pulsante lo preme, tenere premuto su uno di più pannelli scelti li porta tutti con sé, e il bordo della barra laterale è più facile da afferrare con un dito.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, francese, spagnolo e russo; regole di download che trasferiscono il file salvato; cartelle live che dicono quando si sono aggiornate l’ultima volta; e niente più spazi di troppo quando scrivi in pinyin cinese e passi all’inglese.
