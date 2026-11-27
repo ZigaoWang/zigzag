@@ -138,6 +138,8 @@ import WebKit
 
     /// The pane cards show `expected`.
     private func expectPanes(_ controller: BrowserWindowController, _ expected: [String], sourceLocation: SourceLocation = #_sourceLocation) async {
+        // A split's second page can come a moment after the first on a busy Mac.
+        _ = await untilAsync { await self.panes(controller) == expected }
         let shown = await panes(controller)
         #expect(shown == expected, sourceLocation: sourceLocation)
     }
