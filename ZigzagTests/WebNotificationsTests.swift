@@ -72,4 +72,22 @@ struct WebNotificationsTests {
         #expect(seen?[2] as? Bool == false)
         withExtendedLifetime(loading) {}
     }
+
+    /// Asking (`Notification.requestPermission()`) returns a promise instead of throwing, as app.zoom.us does on load (#551).
+    @Test func askingReturnsAPromise() async throws {
+        let configuration = WKWebViewConfiguration()
+        WebNotifications.attach(to: configuration, alwaysDenies: false)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<title>page</title>", baseURL: URL(string: "https://example.com/"))
+        }
+        let asked = try await webView.callAsyncJavaScript("""
+            try { return typeof Notification.requestPermission().then; } catch (e) { return e.message; }
+            """, contentWorld: .page) as? String
+        #expect(asked == "function")
+        withExtendedLifetime(loading) {}
+    }
 }
