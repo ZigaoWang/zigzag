@@ -145,10 +145,12 @@ enum Shortcuts {
         return saved != defaults[id]
     }
 
-    /// A fixed shortcut Zigzag keeps for itself (⌘1–9 for tabs, ⌃1–9 for spaces, ⌘= beside ⌘+): its title, if
+    /// A fixed shortcut Zigzag keeps for itself (⌘1–9 for tabs, ⌃1–9 for spaces, ⌘= beside ⌘+, the Vim keys while
+    /// they're on): its title, if
     /// these keys are one. They can't be given to anything else, or one of the two would silently stop working.
     static func reserved(_ combo: Combo, in menu: NSMenu? = NSApp.mainMenu) -> String? {
         guard !combo.key.isEmpty else { return nil }
+        if VimKeys.isOn, VimKeys.combos.contains(combo) { return VimKeys.title }
         func walk(_ menu: NSMenu) -> String? {
             for item in menu.items {
                 if let sub = item.submenu, let found = walk(sub) { return found }
@@ -289,5 +291,28 @@ enum Shortcuts {
         let isFunction = (0xF700...0xF8FF).contains(Int(scalar.value))
         guard isFunction || !flags.subtracting(.shift).isEmpty else { return nil }
         return Combo(key: chars, modifiers: flags.rawValue)
+    }
+}
+
+/// Settings › Tabs › Vim keys: ⌃J and ⌃K go down and up the sidebar, ⌃H and ⌃L to the previous and next space, beside
+/// the shortcuts those have in the menu bar. Off as Zigzag ships, since pages and text fields use these keys too.
+enum VimKeys {
+    enum Move: Equatable { case nextTab, previousTab, previousSpace, nextSpace }
+
+    static let key = "VimKeys"
+    static var isOn: Bool {
+        get { UserDefaults.standard.bool(forKey: key) }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    private static let moves: [String: Move] = ["j": .nextTab, "k": .previousTab, "h": .previousSpace, "l": .nextSpace]
+    static let combos = moves.keys.map { Shortcuts.Combo(key: $0, modifiers: NSEvent.ModifierFlags.control.rawValue) }
+    static var title: String { String(localized: "Vim keys", comment: "A setting in Settings › Tabs: Control with H, J, K and L move between tabs and spaces, as in the Vim editor. Also named in Settings › Shortcuts when these keys are tried for something else.") }
+
+    /// The move a pressed key asks for: Control alone with H, J, K or L, while the setting is on.
+    static func move(for event: NSEvent) -> Move? {
+        guard isOn, event.modifierFlags.intersection([.command, .shift, .option, .control]) == .control,
+              let key = event.charactersIgnoringModifiers?.lowercased() else { return nil }
+        return moves[key]
     }
 }

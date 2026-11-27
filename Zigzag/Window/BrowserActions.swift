@@ -761,6 +761,25 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func selectNextTab(_ sender: Any?) { selectAdjacentRow(by: 1) }
+
+    /// A Vim key (`VimKeys`). With the command bar open, ⌃J and ⌃K step its list, and ⌃H and ⌃L stay its field's.
+    func handleVimKey(_ move: VimKeys.Move) -> Bool {
+        if commandBar.isVisible {
+            switch move {
+            case .nextTab: commandBar.step(1)
+            case .previousTab: commandBar.step(-1)
+            case .previousSpace, .nextSpace: return false
+            }
+            return true
+        }
+        switch move {
+        case .nextTab: selectNextTab(nil)
+        case .previousTab: selectPreviousTab(nil)
+        case .previousSpace: previousSpace(nil)
+        case .nextSpace: nextSpace(nil)
+        }
+        return true
+    }
     @objc func selectPreviousTab(_ sender: Any?) { selectAdjacentRow(by: -1) }
 
     /// The stops ⌥⌘↑/↓ and ⇧⌘[/] walk, top to bottom: open favorites, then the sidebar's rows as shown.

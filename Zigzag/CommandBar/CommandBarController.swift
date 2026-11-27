@@ -805,7 +805,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     }
 
     /// Moves the selection by one row, wrapping around at either end.
-    private func step(_ delta: Int) {
+    func step(_ delta: Int) {
         guard !results.isEmpty else { return }
         select((selectedIndex + delta + results.count) % results.count)
         // Focus stays in the field, so VoiceOver hears which row the arrows landed on.
