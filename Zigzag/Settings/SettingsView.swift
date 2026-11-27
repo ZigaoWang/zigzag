@@ -1586,6 +1586,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let controlTabOrder = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
+    private let vimKeysToggle = Toggle()
     private let shareTabsToggle = Toggle()
     private let swipeToggle = Toggle()
     private let miniToggle = Toggle()
@@ -2155,6 +2156,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     control: controlTabOrder)
         controlTabRow.keywords = String(localized: "control tab ctrl tab switcher recent order next previous cycle keyboard shortcut chrome arc", comment: "Words that find the ⌃Tab switches to setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(controlTabRow)
+        vimKeysToggle.onChange = { on in VimKeys.isOn = on }
+        let vimKeysRow = FormRow(title: VimKeys.title,
+                                 detail: String(localized: "⌃J and ⌃K go down and up the sidebar, and the command bar’s list while it’s open. ⌃H and ⌃L go to the previous and next space. Pages and text fields no longer get these keys.",
+                                                comment: "Explanation under “Vim keys” in Settings › Tabs. ⌃ is the Control key."),
+                                 control: vimKeysToggle)
+        vimKeysRow.keywords = String(localized: "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc", comment: "Words that find the Vim keys setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(vimKeysRow)
         nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
         let nestRow = FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
                               detail: String(localized: "Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
@@ -4875,6 +4883,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshNewTabPlace()
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks
+        vimKeysToggle.isOn = VimKeys.isOn
         shareTabsToggle.isOn = TabStore.windowsShareTabs
         ownProfileToggle.isOn = Library.newSpacesGetOwnProfile
         swipeToggle.isOn = SwipeNavigator.isOn

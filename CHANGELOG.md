@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Vim keys, a new setting in Settings › Tabs, off by default: ⌃J and ⌃K go down and up the sidebar, and ⌃H and ⌃L to the previous and next space, beside ⌥⌘ with the arrow keys. With the command bar open, ⌃J and ⌃K move through its list. ([#567](https://github.com/ZigaoWang/zigzag/issues/567))
+
 ### Fixed
 - Unlocking your Mac shows Zigzag's window at once, as it was. In full screen the screen no longer stays black for a moment first, and in a window the one behind it no longer shows through for a moment.
 - Press and hold to open a menu, slide onto an item and let go to choose it, as in other Mac apps: right-press or hold a two-finger click on a tab, favorite, folder, space or the sidebar, or press a menu button like the sidebar's +, a … button or a dropdown, which now opens as the press goes down. Right-clicking the sidebar's Back or Forward in the title bar opens its list again.
