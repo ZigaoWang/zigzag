@@ -70,6 +70,7 @@ Sincronizza con iCloud mantiene uguali su ogni Mac i tuoi spazi, i pannelli fiss
 - Con la barra laterale nascosta e fatta uscire sopra la pagina, aprire un suo menu non la manda più via lasciando il menu da solo sopra la pagina. Resta fuori finché il menu non si chiude, poi rientra se il puntatore non è sopra di essa.
 - Zigzag non si blocca più per un secondo o più mentre scrivi nella ricerca della panoramica dei pannelli, o quando torni a una finestra che mostra Impostazioni su un Mac molto occupato.
 - Gli scorrimenti indietro e avanti seguono le dita in modo più fluido, anche su pagine pesanti, e Zigzag non si ferma più per un attimo una volta al minuto quando sono aperti molti pannelli.
+- ⌘Z dopo aver scritto in una pagina non fa più chiudere Zigzag di tanto in tanto.
 
 ## [0.9.6] - 2026-11-27
 

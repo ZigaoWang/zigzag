@@ -403,3 +403,23 @@ enum UndoClock {
         }
     }
 }
+
+/// The window's undo manager, shared with page text editing. Undo or redo while a group is still open inside another
+/// raises in AppKit, which quit Zigzag on ⌘Z; then the step is skipped and noted instead.
+final class WindowUndoManager: UndoManager {
+    override func undo() {
+        guard groupingLevel <= 1 else { skipped("Undo"); return }
+        super.undo()
+    }
+
+    override func redo() {
+        guard groupingLevel == 0 || (groupingLevel == 1 && groupsByEvent) else { skipped("Redo"); return }
+        if groupingLevel == 1 { endUndoGrouping() }
+        super.redo()
+    }
+
+    private func skipped(_ what: String) {
+        NSSound.beep()
+        Diagnostics.note("\(what) skipped", "an undo group was still open (\(groupingLevel) deep)")
+    }
+}

@@ -70,6 +70,7 @@ Synchroniser avec iCloud garde vos espaces, onglets épinglés, favoris et régl
 - Quand la barre latérale est masquée et sortie au-dessus de la page, ouvrir un menu depuis celle-ci ne la fait plus repartir en laissant le menu seul au-dessus de la page. Elle reste sortie jusqu’à la fermeture du menu, puis se retire si le pointeur n’est pas dessus.
 - Zigzag ne se fige plus une seconde ou plus pendant que vous tapez dans la recherche de l’aperçu des onglets, ni quand vous revenez sur une fenêtre qui affiche Réglages sur un Mac très occupé.
 - Les balayages vers l’arrière et vers l’avant suivent vos doigts plus fluidement, même sur des pages lourdes, et Zigzag ne marque plus une pause une fois par minute quand beaucoup d’onglets sont ouverts.
+- ⌘Z après une saisie dans une page ne fait plus quitter Zigzag de temps en temps.
 
 ## [0.9.6] - 2026-11-27
 

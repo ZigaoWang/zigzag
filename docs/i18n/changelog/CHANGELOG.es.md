@@ -70,6 +70,7 @@ Sincronizar con iCloud mantiene iguales tus espacios, pestañas fijadas, favorit
 - Con la barra lateral oculta y desplegada sobre la página, abrir un menú desde ella ya no la hace desaparecer dejando el menú solo sobre la página. Se queda fuera hasta que el menú se cierra, y luego se recoge si el puntero no está sobre ella.
 - Zigzag ya no se congela un segundo o más mientras escribes en la búsqueda de la vista general de pestañas, ni al volver a una ventana que muestra Ajustes en un Mac muy ocupado.
 - Los deslizamientos hacia atrás y hacia adelante siguen tus dedos con más fluidez, incluso en páginas pesadas, y Zigzag ya no se detiene un momento una vez por minuto cuando hay muchas pestañas abiertas.
+- ⌘Z después de escribir en una página ya no cierra Zigzag de vez en cuando.
 
 ## [0.9.6] - 2026-11-27
 

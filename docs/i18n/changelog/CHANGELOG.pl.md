@@ -70,6 +70,7 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 - Gdy pasek boczny jest ukryty i wysunięty nad stroną, otwarcie z niego menu nie chowa już paska bocznego, zostawiając samo menu nad stroną. Pasek zostaje, dopóki menu się nie zamknie, a potem się chowa, jeśli wskaźnik nie jest nad nim.
 - Zigzag nie zawiesza się już na sekundę lub dłużej, gdy piszesz w wyszukiwaniu przeglądu kart albo wracasz do okna z otwartymi Ustawieniami na obciążonym Macu.
 - Przesuwanie wstecz i do przodu płynniej podąża za palcami, nawet na ciężkich stronach, a Zigzag nie zacina się już na chwilę raz na minutę, gdy otwartych jest wiele kart.
+- ⌘Z po pisaniu na stronie nie zamyka już czasem Zigzaga.
 
 ## [0.9.6] - 2026-11-27
 

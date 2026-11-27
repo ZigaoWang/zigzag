@@ -70,6 +70,7 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 - Ist die Seitenleiste ausgeblendet und über die Seite herausgeschoben, schickt ein Menü, das du darin öffnest, die Seitenleiste nicht mehr weg, sodass das Menü allein über der Seite stünde. Sie bleibt draußen, bis das Menü schließt, und gleitet dann zurück, wenn der Zeiger nicht auf ihr ist.
 - Zigzag friert nicht mehr für eine Sekunde oder länger ein, während du in der Suche der Tab-Übersicht tippst oder wenn du auf einem ausgelasteten Mac zu einem Fenster zurückkehrst, das die Einstellungen zeigt.
 - Wischen zurück und vorwärts folgt deinen Fingern flüssiger, auch auf aufwendigen Seiten, und Zigzag hält nicht mehr einmal pro Minute kurz an, wenn viele Tabs offen sind.
+- ⌘Z nach dem Tippen auf einer Webseite beendet Zigzag nicht mehr gelegentlich.
 
 ## [0.9.6] - 2026-11-27
 

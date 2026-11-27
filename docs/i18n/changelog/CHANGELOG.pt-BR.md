@@ -70,6 +70,7 @@ Sincronizar com o iCloud mantém seus espaços, abas fixadas, favoritos e ajuste
 - Com a barra lateral oculta e aberta sobre a página, abrir um menu a partir dela não a faz mais sumir deixando o menu sozinho sobre a página. Ela fica aberta até o menu fechar e depois se recolhe se o ponteiro não estiver sobre ela.
 - O Zigzag não trava mais por um segundo ou mais enquanto você digita na busca da visão geral das abas, ou quando você volta a uma janela que mostra os Ajustes em um Mac ocupado.
 - Os deslizes para voltar e avançar seguem seus dedos com mais suavidade, mesmo em páginas pesadas, e o Zigzag não pausa mais por um momento uma vez por minuto quando há muitas abas abertas.
+- ⌘Z depois de digitar em uma página não fecha mais o Zigzag de vez em quando.
 
 ## [0.9.6] - 2026-11-27
 

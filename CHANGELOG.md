@@ -71,6 +71,7 @@ Sync with iCloud keeps your spaces, pinned tabs, favorites and settings the same
 - With the sidebar hidden and slid out over the page, opening a menu from it no longer sends the sidebar away and leaves the menu alone over the page. It stays out until the menu closes, then slides back if the pointer isn't on it.
 - Zigzag no longer freezes for a second or more while you type in the tab overview's search, or when you come back to a window showing Settings on a busy Mac.
 - Swiping back and forward follows your fingers more smoothly, even on busy pages, and Zigzag no longer pauses for a moment once a minute when many tabs are open.
+- Pressing ⌘Z after typing in a page no longer quits Zigzag now and then.
 
 ## [0.9.6] - 2026-11-27
 
