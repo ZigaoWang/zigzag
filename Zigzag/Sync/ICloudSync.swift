@@ -57,14 +57,14 @@ final class ICloudSync {
     /// Fires when the status changes.
     let changed = Signal<Void>()
 
-    var isOn: Bool { UserDefaults.standard.bool(forKey: Self.enabledKey) }
+    var isOn: Bool { defaults.bool(forKey: Self.enabledKey) }
 
     /// What stays on this Mac because it's too big for iCloud.
     var tooBig: SyncTooBig { session?.tooBig ?? SyncTooBig() }
 
     /// iCloud has a copy from this Mac, so Remove from iCloud… still means something while sync is off.
     static let copyKey = "SyncWithICloudCopy"
-    var hasCopy: Bool { UserDefaults.standard.bool(forKey: Self.copyKey) }
+    var hasCopy: Bool { defaults.bool(forKey: Self.copyKey) }
 
     /// Whether this build may use the container: one signed without it would stop at CKContainer.
     static var isEntitled: Bool {
@@ -74,8 +74,11 @@ final class ICloudSync {
     }
 
     private var session: SyncSession?
-    private var engine: CloudEngine?
-    private let host = AppSyncHost()
+    private var engine: SyncEngine?
+    private let cloud: SyncCloud
+    private let host: SyncHost
+    /// Where sync's own switch and what it notes beside it are kept.
+    private let defaults: UserDefaults
     private var tokens: [SignalToken] = []
     private var observers: [NSObjectProtocol] = []
     private let localDebouncer = Debouncer(delay: 1, maxWait: 10)
@@ -89,9 +92,15 @@ final class ICloudSync {
     private var network: NWPathMonitor?
     private var reachable: Bool?
 
-    private let stateFile = SyncStateFile(url: Paths.directory("Sync").appendingPathComponent("State.json"))
+    private let stateFile: SyncStateFile
 
-    private init() {
+    /// Zigzag's own sync is `shared`; tests make one on a stand-in for iCloud, with a library and settings of their own.
+    init(cloud: SyncCloud = CloudKitCloud(), host: SyncHost = AppSyncHost(), defaults: UserDefaults = .standard,
+         stateFile: URL = Paths.directory("Sync").appendingPathComponent("State.json")) {
+        self.cloud = cloud
+        self.host = host
+        self.defaults = defaults
+        self.stateFile = SyncStateFile(url: stateFile)
         retry.onRetry = { [weak self] in self?.tryAgain() }
         line.onChange = { [weak self] in self?.changed.send() }
     }
@@ -113,7 +122,7 @@ final class ICloudSync {
         let saved = stateFile.load() ?? SyncState()
         start(state: Self.stateAtLaunch(saved: saved, libraryWasRead: Self.libraryWasRead(library.wasRead && !library.profilesWereSetAside,
                                                                                         profilesFile: library.profilesFileExisted, saved: saved),
-                                        account: UserDefaults.standard.string(forKey: Self.accountKey)))
+                                        account: defaults.string(forKey: Self.accountKey)))
     }
 
     /// A Profiles.json that's gone while iCloud has this Mac's other profiles counts as unreadable, not as every
@@ -230,22 +239,25 @@ final class ICloudSync {
         defer { lastPreferences = now }
         // While on, sync reads them as they change.
         guard !isOn else { return }
-        var times = UserDefaults.standard.dictionary(forKey: Self.preferenceTimesKey) as? [String: Date] ?? [:]
+        var times = defaults.dictionary(forKey: Self.preferenceTimesKey) as? [String: Date] ?? [:]
         let changed = Set(now.keys).union(lastPreferences.keys).filter { now[$0] != lastPreferences[$0] }
         guard !changed.isEmpty else { return }
         for key in changed { times[key] = Date() }
-        UserDefaults.standard.set(times, forKey: Self.preferenceTimesKey)
+        defaults.set(times, forKey: Self.preferenceTimesKey)
     }
 
     /// The account sync was turned on with, beside State.json.
     static let accountKey = "SyncWithICloudAccount"
 
+    /// The backup turning sync on saves first, when not `backUp()`: a test's.
+    var backUpFirst: (() -> URL?)?
+
     /// Turned on in Settings: a backup first, then the first sync merges this Mac's library with iCloud's. Without the
     /// backup (a full disk), it stays off.
-    func turnOn(backingUp: () -> URL? = { ICloudSync.shared.backUp() }) {
+    func turnOn(backingUp: (() -> URL?)? = nil) {
         guard !isOn else { return }
-        guard backingUp() != nil else { shown = .backupFailed; return }
-        UserDefaults.standard.set(true, forKey: Self.enabledKey)
+        guard (backingUp ?? backUpFirst ?? { self.backUp() })() != nil else { shown = .backupFailed; return }
+        defaults.set(true, forKey: Self.enabledKey)
         stop()
         start(state: Self.stateTurningOn(saved: stateFile.load()))
     }
@@ -289,23 +301,22 @@ final class ICloudSync {
 
     /// Turned off: everything stays on this Mac, and iCloud keeps its copy.
     func turnOff(keepingLibrary: Bool = true) {
-        UserDefaults.standard.set(false, forKey: Self.enabledKey)
+        defaults.set(false, forKey: Self.enabledKey)
         let state = session?.state ?? stateFile.load()
         stop()
-        NSApplication.shared.unregisterForRemoteNotifications()
+        cloud.receivePushes(false)
         stateFile.saveNow(Self.stateTurningOff(state, keepingLibrary: keepingLibrary))
-        UserDefaults.standard.removeObject(forKey: Self.accountKey)
+        defaults.removeObject(forKey: Self.accountKey)
         shown = .off
     }
 
     /// Remove from iCloud…: the synced copy goes from iCloud, for every Mac; this Mac keeps its own, and sync turns off.
     func removeFromICloud() async -> Bool {
-        guard Self.isEntitled else { shown = .notEntitled; return false }
+        guard cloud.isEntitled else { shown = .notEntitled; return false }
         // Stopped first, so nothing makes the zone again on its way out.
         stop()
-        let container = CKContainer(identifier: Self.containerID)
         do {
-            _ = try await container.privateCloudDatabase.modifyRecordZones(saving: [], deleting: [Self.zoneID])
+            try await cloud.removeZone()
         } catch let error as CKError where error.code == .zoneNotFound {
         } catch {
             Self.log.error("removing the zone failed: \(error.localizedDescription, privacy: .public)")
@@ -314,7 +325,7 @@ final class ICloudSync {
             return false
         }
         turnOff(keepingLibrary: false)
-        UserDefaults.standard.set(false, forKey: Self.copyKey)
+        defaults.set(false, forKey: Self.copyKey)
         return true
     }
 
@@ -344,9 +355,9 @@ final class ICloudSync {
         self.session = session
         watchLibrary()
         session.checkAfterLaunch()
-        UserDefaults.standard.removeObject(forKey: Self.preferenceTimesKey)
+        defaults.removeObject(forKey: Self.preferenceTimesKey)
         // CKSyncEngine listens for pushes too, but its own fetch on one goes through a scheduler that can refuse it.
-        NSApplication.shared.registerForRemoteNotifications()
+        cloud.receivePushes(true)
         shown = .syncing
         Task { await connect() }
     }
@@ -369,21 +380,20 @@ final class ICloudSync {
 
     /// Checks the account before anything goes up: a different one than before pauses until sync is turned on again.
     private func connect() async {
-        guard Self.isEntitled else { shown = .notEntitled; return }
+        guard cloud.isEntitled else { shown = .notEntitled; return }
         // One engine at a time.
         guard !connecting, engine == nil else { return }
         connecting = true
         defer { connecting = false }
-        let container = CKContainer(identifier: Self.containerID)
         do {
-            switch try await container.accountStatus() {
+            switch try await cloud.accountStatus() {
             case .available: break
             // Signing in, or iCloud allowed again, posts CKAccountChanged.
             case .noAccount: shown = .notSignedIn; return
             case .restricted: shown = .restricted; return
             default: shown = .offline; retry.failed(nil); return
             }
-            let user = try await container.userRecordID().recordName
+            let user = try await cloud.userRecordName()
             guard let session, isOn else { return }
             // What was kept while off belongs to the account it was synced with: another one is merged afresh.
             if let earlier = session.state.resumeAccount {
@@ -391,8 +401,8 @@ final class ICloudSync {
             }
             guard Self.mayUse(account: user, saved: session.state.account) else { shown = .otherAccount; return }
             session.updateState { $0.account = user }
-            UserDefaults.standard.set(user, forKey: Self.accountKey)
-            let engine = CloudEngine(container: container, session: session, owner: self)
+            defaults.set(user, forKey: Self.accountKey)
+            let engine = cloud.engine(for: session, owner: self)
             self.engine = engine
             session.server = engine
             engine.start()
@@ -409,7 +419,7 @@ final class ICloudSync {
     private var catchingUp = false, catchUpAgain = false
 
     /// One at a time: one asked for meanwhile runs once more after it.
-    private func catchUp() async {
+    func catchUp() async {
         guard !catchingUp else { catchUpAgain = true; return }
         catchingUp = true
         defer { catchingUp = false }
@@ -426,7 +436,7 @@ final class ICloudSync {
             try await Self.catchUp(session, through: engine, isCurrent: { [weak self] in self?.session === session }) { [weak self] first in
                 guard let self else { return }
                 if first {
-                    UserDefaults.standard.set(true, forKey: Self.copyKey)
+                    self.defaults.set(true, forKey: Self.copyKey)
                     shown = .synced(session.state.lastSynced)
                 }
                 if session.state.resumed { session.updateState { $0.resumed = false } }
@@ -620,7 +630,7 @@ final class ICloudSync {
         retry.failed(CKError(.quotaExceeded))
     }
 
-    fileprivate func accountChanged() {
+    func accountChanged() {
         // Signed out or another account: nothing more goes up or comes down; the library here stays.
         retry.reset()
         engine?.stop()
@@ -696,7 +706,7 @@ final class ICloudSync {
             // Remove from iCloud on another Mac, or iCloud's data deleted in System Settings: sync stops here too, and
             // the library here stays.
             turnOff(keepingLibrary: false)
-            UserDefaults.standard.set(false, forKey: Self.copyKey)
+            defaults.set(false, forKey: Self.copyKey)
             shown = .removedElsewhere
         }
     }
@@ -714,6 +724,59 @@ final class ICloudSync {
         case .managedAccountRestricted: return .restricted
         default: return nil
         }
+    }
+}
+
+// MARK: - iCloud itself
+
+/// What sync asks of iCloud: CloudKit, or a test's stand-in.
+protocol SyncCloud: AnyObject {
+    /// Whether this build may use the container.
+    var isEntitled: Bool { get }
+    func accountStatus() async throws -> CKAccountStatus
+    /// The signed-in account's own name for this app (its user record's).
+    func userRecordName() async throws -> String
+    /// What fetches and sends for `session`.
+    func engine(for session: SyncSession, owner: ICloudSync) -> SyncEngine
+    /// Remove from iCloud…: the library's zone goes, for every Mac.
+    func removeZone() async throws
+    /// iCloud's pushes for this app, on or off.
+    func receivePushes(_ on: Bool)
+}
+
+/// What fetches and sends: CKSyncEngine, or a test's stand-in.
+protocol SyncEngine: SyncServer, SyncTransport {
+    /// The engine's own state, kept in State.json.
+    var serialization: Data? { get }
+    func start()
+    func stop()
+    /// Why the zone is gone, as the database's changes say, or nil when they say nothing.
+    func zoneDeletion() async -> CKDatabase.DatabaseChange.Deletion.Reason?
+}
+
+/// The private database of the signed-in iCloud account.
+final class CloudKitCloud: SyncCloud {
+    /// Made only when it's used: a build signed without the container would stop at it.
+    private lazy var container = CKContainer(identifier: ICloudSync.containerID)
+
+    var isEntitled: Bool {
+        #if DEBUG
+        // The test host never reaches a real iCloud account; tests use their own stand-in.
+        if DevDefaults.testsData != nil { return false }
+        #endif
+        return ICloudSync.isEntitled
+    }
+
+    func accountStatus() async throws -> CKAccountStatus { try await container.accountStatus() }
+    func userRecordName() async throws -> String { try await container.userRecordID().recordName }
+    func engine(for session: SyncSession, owner: ICloudSync) -> SyncEngine { CloudEngine(container: container, session: session, owner: owner) }
+
+    func removeZone() async throws {
+        _ = try await container.privateCloudDatabase.modifyRecordZones(saving: [], deleting: [ICloudSync.zoneID])
+    }
+
+    func receivePushes(_ on: Bool) {
+        if on { NSApplication.shared.registerForRemoteNotifications() } else { NSApplication.shared.unregisterForRemoteNotifications() }
     }
 }
 
@@ -1026,7 +1089,7 @@ extension AppSyncHost {
 
 /// CKSyncEngine on the private database, one zone. Records carry their fields as JSON (`payload`) and their date
 /// (`modified`), so a newer Zigzag adds fields without a new schema.
-final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
+final class CloudEngine: SyncEngine, CKSyncEngineDelegate {
     private let container: CKContainer
     private weak var session: SyncSession?
     private weak var owner: ICloudSync?

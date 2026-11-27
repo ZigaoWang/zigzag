@@ -4,17 +4,20 @@
 - A new Zigzag, or one updated → Settings › General › Sync with iCloud is off, with nothing under it, and nothing touches iCloud.
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
 - Turn on Sync with iCloud → a sheet says what syncs, what stays on this Mac, and that it merges; Continue turns it on, Cancel leaves it off.
-  No test yet.
+  Test: SyncTests.turningSyncOnAsksFirstThenBacksUpAndMerges
 - Continue → a Zigzag backup of this Mac's library, with every preference sync carries, is saved in Backups first, then the first sync merges this Mac with iCloud. Restoring it adds back whatever is missing; it doesn't undo renames or remove what the merge added.
   Test: SyncTests.aBackupIsSavedBeforeTheFirstSync
+  Test: SyncTests.turningSyncOnAsksFirstThenBacksUpAndMerges
 - The backup can't be saved (a full disk) → sync stays off and says so; nothing goes to iCloud.
   Test: SyncTests.withoutABackupSyncStaysOff
+- Zigzag's unit tests → never reach a real iCloud account: the test host's own sync is never entitled, and tests sync through a stand-in for iCloud.
+  Test: SyncTests.turningSyncOnAsksFirstThenBacksUpAndMerges
 - A debug build's test copy (its own data folder, ZIGZAG_DATA_DIR) → sync is off, never carried over from the dev build with its account, and stays off at each launch unless the copy is launched with --sync-with-icloud; only then can its syncremove command remove the dev build's iCloud copy. Release builds have no test copies.
   Test: DevDefaultsTests.aTestCopyNeverSyncsWithICloudUnlessAsked
 - Turn it off → everything stays on this Mac as it is, and iCloud keeps its copy.
-  No test yet.
+  Test: SyncTests.turningSyncOffKeepsEverythingHereAndICloudsCopy
 - Remove from iCloud…, then Remove → iCloud's copy is removed for every Mac and sync turns off; this Mac keeps everything. Another Mac syncing with it turns sync off too and keeps its own.
-  No test yet.
+  Test: SyncTests.removeFromICloudRemovesItForEveryMacAndBothKeepTheirOwn
 
 ## What syncs
 - Spaces → their name, color, glass, icon, order and profile.

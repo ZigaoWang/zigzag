@@ -26,15 +26,21 @@ import Testing
     /// iCloud's copy reset (its encryption keys): the zone is there, empty.
     func reset() { records = [:] }
 
-    /// The zone was removed (Remove from iCloud on another Mac).
-    func removeZone() {
+    /// The zone was removed: Remove from iCloud on another Mac (`.deleted`), or its keys reset (`.encryptedDataReset`).
+    func removeZone(reason: CKDatabase.DatabaseChange.Deletion.Reason = .deleted) {
         records = [:]
         zoneRemoved = true
+        deletion = reason
     }
+    /// Why the zone went, as the database's changes say.
+    private(set) var deletion: CKDatabase.DatabaseChange.Deletion.Reason?
     private(set) var zoneRemoved = false
 
     /// The zone made again, by the first sync after a reset.
-    func makeZoneAgain() { zoneRemoved = false }
+    func makeZoneAgain() {
+        zoneRemoved = false
+        deletion = nil
+    }
 
     /// `at`: the time it really is, as iCloud's clock has it; without one, the record's own date.
     @discardableResult
@@ -121,6 +127,15 @@ import Testing
         session.now = { [unowned self] in self.clock }
     }
 
+    /// The engine an `ICloudSync` under test connects with, for its own session, on the real clock.
+    init(_ cloud: FakeCloud, engineFor session: SyncSession, host: MemoryHost) {
+        self.cloud = cloud
+        self.host = host
+        self.session = session
+        realTime = true
+    }
+    private var realTime = false
+
     var library: SyncLibrary {
         get { host.library }
         set { host.library = newValue }
@@ -168,7 +183,7 @@ import Testing
         }
         guard scope == .zone || pushed else { return }
         pushed = false
-        if zoneMissing { throw CKError(.zoneNotFound) }
+        if zoneMissing || cloud.zoneRemoved { throw CKError(.zoneNotFound) }
         read()
         if session.state.merged { session.fetchFinished() }
     }
@@ -200,7 +215,7 @@ import Testing
         for name in names {
             guard let upload = session.upload(name) else { continue }
             sent += 1
-            switch cloud.save(upload, at: clock - skew) {
+            switch cloud.save(upload, at: realTime ? Date() : clock - skew) {
             case .saved(let record): saved.append(record)
             case .failed(let failure): session.saveFailed(name, failure)
             }
@@ -212,6 +227,50 @@ import Testing
         }
         session.deleted(removed)
     }
+}
+
+/// As CKSyncEngine for an `ICloudSync` under test: a first sync makes the zone, as its saveZone does.
+extension FakeMac: SyncEngine {
+    var serialization: Data? { nil }
+    func start() { if !session.state.merged { cloud.makeZoneAgain() } }
+    func stop() {}
+    func zoneDeletion() async -> CKDatabase.DatabaseChange.Deletion.Reason? { cloud.deletion }
+}
+
+/// iCloud for an `ICloudSync` under test: an account signed in, its private database, and the engines it made.
+@MainActor final class FakeICloud: SyncCloud {
+    /// Each account's private database.
+    var clouds: [String: FakeCloud]
+    var account: String
+    var status: CKAccountStatus = .available
+    let host: MemoryHost
+    private(set) var engines: [FakeMac] = []
+
+    init(_ cloud: FakeCloud, account: String = "_abc", library: SyncLibrary) {
+        clouds = [account: cloud]
+        self.account = account
+        host = MemoryHost(library)
+    }
+
+    var cloud: FakeCloud {
+        if let cloud = clouds[account] { return cloud }
+        let cloud = FakeCloud()
+        clouds[account] = cloud
+        return cloud
+    }
+
+    var isEntitled: Bool { true }
+    func accountStatus() async throws -> CKAccountStatus { status }
+    func userRecordName() async throws -> String { account }
+
+    func engine(for session: SyncSession, owner: ICloudSync) -> SyncEngine {
+        let engine = FakeMac(cloud, engineFor: session, host: host)
+        engines.append(engine)
+        return engine
+    }
+
+    func removeZone() async throws { cloud.removeZone(reason: .deleted) }
+    func receivePushes(_ on: Bool) {}
 }
 
 // MARK: - Libraries to sync
@@ -996,7 +1055,28 @@ extension SyncLibrary {
 
     // MARK: Account and settling
 
-    @Test func anotherAccountIsNeverSyncedWithoutAsking() {
+    @Test func anotherAccountIsNeverSyncedWithoutAsking() async {
+        let cloud = FakeCloud()
+        let fake = FakeICloud(cloud, account: "_abc", library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        // Signed in to another account: sync stops and says so, and nothing goes to that account.
+        fake.account = "_xyz"
+        sync.accountChanged()
+        #expect(await settled { sync.status == .otherAccount }, "\(sync.status)")
+        fake.host.library.editSpace("Personal") { $0.bookmarks.append(Sample.page("after")) }
+        await sync.catchUp()
+        try? await Task.sleep(for: .milliseconds(1200))
+        #expect(fake.cloud.records.isEmpty && sync.isOn && sync.status == .otherAccount)
+        #expect(pages(cloud) == ["a"])
+        // Only once turned off and on again, as asked, it merges with that account.
+        sync.turnOff()
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        #expect(pages(fake.cloud) == ["a", "after"])
+        #expect(pages(cloud) == ["a"])
         #expect(ICloudSync.mayUse(account: "_abc", saved: nil))
         #expect(ICloudSync.mayUse(account: "_abc", saved: "_abc"))
         #expect(!ICloudSync.mayUse(account: "_xyz", saved: "_abc"))
@@ -1714,9 +1794,32 @@ extension SyncLibrary {
     }
 
     @Test func aZoneRemovedAfterTheFirstSyncIsRemovedElsewhereNotTriedAgain() async {
-        let (_, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
-        a.zoneMissing = true
-        await #expect(throws: CKError.self) { try await ICloudSync.catchUp(a.session, through: a) }
+        let cloud = FakeCloud()
+        let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        // Removed from iCloud on another Mac: the next catch-up finds the zone gone, and the database says it was removed.
+        cloud.removeZone(reason: .deleted)
+        await sync.catchUp()
+        #expect(await settled { !sync.isOn }, "\(sync.status)")
+        #expect(sync.status == .removedElsewhere && !sync.hasCopy)
+        // Not tried again, and never made again; everything here stays.
+        #expect(!sync.retry.isWaiting && sync.retry.failures == 0)
+        #expect(cloud.zoneRemoved && cloud.records.isEmpty)
+        #expect(fake.host.library.urls(in: "Personal") == ["a"])
+        // iCloud's copy reset instead, found the same way: merged again as a first sync, and sync stays on.
+        let resetCloud = FakeCloud()
+        let resetFake = FakeICloud(resetCloud, library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let (reset, resetDone) = makeSync(resetFake)
+        defer { resetDone() }
+        reset.turnOn()
+        #expect(await settled { isSynced(reset) })
+        resetCloud.removeZone(reason: .encryptedDataReset)
+        await reset.catchUp()
+        #expect(await settled { !resetCloud.zoneRemoved && pages(resetCloud) == ["a"] }, "\(reset.status)")
+        #expect(reset.isOn && resetFake.host.library.urls(in: "Personal") == ["a"])
         let gone = CKError(.zoneNotFound)
         #expect(ICloudSync.isZoneGone(gone) && ICloudSync.isZoneGone(CKError(.userDeletedZone)))
         #expect(ICloudSync.isZoneGone(CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [ICloudSync.zoneID: gone]])))
@@ -2527,5 +2630,137 @@ extension SyncTests {
         b.sync()
         for _ in 0..<3 { a.sync(); b.sync() }
         #expect(a.library.spaceNames == ["Personal"])
+    }
+}
+
+// MARK: - Zigzag's own sync, on a stand-in for iCloud
+
+extension SyncTests {
+    /// An `ICloudSync` on `fake`, with settings and a State.json of its own; `done` turns it off and clears them.
+    private func makeSync(_ fake: FakeICloud) -> (sync: ICloudSync, done: () -> Void) {
+        let suite = "SyncTests.icloud.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("SyncTests-\(UUID().uuidString).json")
+        let sync = ICloudSync(cloud: fake, host: fake.host, defaults: defaults, stateFile: file)
+        sync.backUpFirst = { file }
+        return (sync, {
+            if sync.isOn { sync.turnOff() }
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: file)
+        })
+    }
+
+    /// Waits, a little at a time, for what `ICloudSync` does in its own tasks.
+    private func settled(_ done: () -> Bool) async -> Bool {
+        for _ in 0..<300 {
+            if done() { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return done()
+    }
+
+    private func isSynced(_ sync: ICloudSync) -> Bool { if case .synced = sync.status { true } else { false } }
+
+    private func pages(_ cloud: FakeCloud) -> [String] {
+        cloud.records.values.filter { $0.type == SyncBody.pageType }.compactMap { record in
+            if case .page(let page) = SyncBody.decode(type: record.type, payload: record.payload) { page.url.lastPathComponent } else { nil }
+        }.sorted()
+    }
+
+    /// A Mac already syncing, and one that turns sync on from Settings.
+    @Test func turningSyncOnAsksFirstThenBacksUpAndMerges() async throws {
+        // The test host's own sync never reaches a real iCloud account.
+        #expect(!CloudKitCloud().isEntitled)
+        let cloud = FakeCloud()
+        let other = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("from iCloud")])]))
+        other.sync()
+        let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("here")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let rows = SyncSettingsRows(sync: sync)
+        window.contentView?.addSubview(rows.row)
+        func sheet() -> ConfirmSheet? { window.contentView?.subviews.compactMap { $0 as? ConfirmSheet }.last }
+        // Turned on, it asks first; Cancel leaves it off, and nothing touches iCloud.
+        rows.toggle.isOn = true
+        rows.toggle.onChange?(true)
+        try #require(sheet()).debugCancel()
+        #expect(!sync.isOn && !rows.toggle.isOn && sync.status == .off)
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(fake.engines.isEmpty && pages(cloud) == ["from iCloud"])
+        // Continue: the backup is saved before anything goes to iCloud, then the first sync merges.
+        var cloudAtBackup: [String]?
+        sync.backUpFirst = { cloudAtBackup = self.pages(cloud); return URL(fileURLWithPath: "/tmp/backup.zigzag") }
+        rows.toggle.isOn = true
+        rows.toggle.onChange?(true)
+        try #require(sheet()).debugConfirm()
+        #expect(sync.isOn && rows.toggle.isOn)
+        #expect(cloudAtBackup == ["from iCloud"])
+        #expect(await settled { isSynced(sync) }, "\(sync.status)")
+        #expect(fake.host.library.urls(in: "Personal").sorted() == ["from iCloud", "here"])
+        #expect(pages(cloud) == ["from iCloud", "here"])
+        #expect(sync.hasCopy)
+        other.sync()
+        #expect(other.library.urls(in: "Personal").sorted() == ["from iCloud", "here"])
+        // Without the backup it stays off, and says so.
+        sync.turnOff()
+        sync.backUpFirst = { nil }
+        sync.turnOn()
+        #expect(!sync.isOn && sync.status == .backupFailed)
+    }
+
+    @Test func turningSyncOffKeepsEverythingHereAndICloudsCopy() async throws {
+        let cloud = FakeCloud()
+        let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        let (sync, done) = makeSync(fake)
+        defer { done() }
+        sync.turnOn()
+        #expect(await settled { isSynced(sync) })
+        let records = cloud.records.mapValues(\.tag)
+        let library = fake.host.library
+        sync.turnOff()
+        #expect(!sync.isOn && sync.status == .off && sync.hasCopy)
+        // Changes here while off go nowhere.
+        fake.host.library.editSpace("Personal") { $0.bookmarks.append(Sample.page("while off")) }
+        try? await Task.sleep(for: .milliseconds(1200))
+        #expect(cloud.records.mapValues(\.tag) == records)
+        #expect(fake.host.library.urls(in: "Personal") == library.urls(in: "Personal") + ["while off"])
+        // On again, it keeps what changed here and adds nothing twice.
+        sync.turnOn()
+        #expect(sync.isOn)
+        #expect(await settled { pages(cloud).count == 3 })
+        #expect(pages(cloud) == ["a", "b", "while off"])
+    }
+
+    /// Remove from iCloud on one Mac: iCloud's copy goes for every Mac, and the other Mac turns sync off too.
+    @Test func removeFromICloudRemovesItForEveryMacAndBothKeepTheirOwn() async throws {
+        let cloud = FakeCloud()
+        let fakeA = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let fakeB = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("b")])]))
+        let (a, doneA) = makeSync(fakeA), (b, doneB) = makeSync(fakeB)
+        defer { doneA(); doneB() }
+        a.turnOn()
+        #expect(await settled { isSynced(a) })
+        b.turnOn()
+        #expect(await settled { isSynced(b) })
+        await a.catchUp()
+        #expect(fakeA.host.library.urls(in: "Personal").sorted() == ["a", "b"])
+        #expect(await a.removeFromICloud())
+        #expect(cloud.records.isEmpty && cloud.zoneRemoved)
+        #expect(!a.isOn && !a.hasCopy && a.status == .off)
+        #expect(fakeA.host.library.urls(in: "Personal").sorted() == ["a", "b"])
+        // The other Mac finds it gone at its next catch-up: sync turns off there and says so; it keeps everything.
+        await b.catchUp()
+        #expect(await settled { !b.isOn }, "\(b.status)")
+        #expect(b.status == .removedElsewhere && !b.hasCopy)
+        #expect(fakeB.host.library.urls(in: "Personal").sorted() == ["a", "b"])
+        // Nothing made the zone again.
+        #expect(cloud.records.isEmpty && cloud.zoneRemoved)
+        // Turned on again here, it merges afresh as a first sync, nothing twice.
+        a.turnOn()
+        #expect(await settled { isSynced(a) && !cloud.records.isEmpty })
+        #expect(pages(cloud) == ["a", "b"])
     }
 }

@@ -8,11 +8,14 @@ protocol SyncHost: AnyObject {
     var libraryStamp: Date? { get }
     /// When each carried preference last changed while sync wasn't reading them (off), by key.
     var settingTimes: [String: Date] { get }
+    /// True while it writes what came from iCloud, so the change that causes isn't read as one made here.
+    var isWriting: Bool { get }
 }
 
 extension SyncHost {
     var libraryStamp: Date? { nil }
     var settingTimes: [String: Date] { [:] }
+    var isWriting: Bool { false }
 }
 
 /// The server's side: CKSyncEngine, or a test's stand-in for iCloud.
