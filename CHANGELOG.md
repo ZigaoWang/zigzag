@@ -62,8 +62,6 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - Settings no longer freezes when it opens on Profiles with data from many profiles that are no longer listed: past three, they fold into one box that says how many.
 - A translated page stays translated as it changes: posts and comments that load as you scroll, text the page updates and another page of a site that doesn't reload, like Reddit, are translated as they come, and a long page is translated all the way down instead of stopping partway.
 - A window sitting still no longer keeps the GPU busy in bursts: a change in your library that leaves the space as it was, like one from sync, or the battery reporting its charge, faded the whole window from its color to the same color.
-- Closing a tab you just opened with ⌘T goes back to the tab you were on, as in Safari and Chrome, instead of the tab below it.
-- The screen edge's page preview no longer closes and comes back while you move from one tab to the next, folds back when the pointer leaves the tabs and the page for the sidebar's empty part, and no longer shows up to extensions as a window of its own. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 - In the screen edge's page preview, a click on a sleeping tab's card opens that tab in the window as a click on its row does, a menu from the panel is no longer drawn under the page, and Esc or moving back to the sidebar after clicking into the page leaves the keyboard with the panel instead of bringing the browser window forward. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
 ## [0.9.6] - 2026-11-27

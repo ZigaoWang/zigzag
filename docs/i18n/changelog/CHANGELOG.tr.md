@@ -61,8 +61,6 @@ Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç 
 - Ayarlar, artık listelenmeyen birçok profilin verisiyle Profiller’de açılırken donmuyor: üçten fazlası, kaç tane olduğunu söyleyen tek bir kutuda katlanıyor.
 - Çevrilmiş bir sayfa değişirken çevrilmiş kalır: kaydırdıkça yüklenen gönderiler ve yorumlar, sayfanın güncellediği metin ve Reddit gibi yeniden yüklenmeyen bir sitenin başka bir sayfası geldikçe çevrilir, uzun bir sayfa da yarıda kesilmek yerine en alta kadar çevrilir.
 - Hareketsiz duran bir pencere artık grafik işlemciyi ara ara meşgul etmez: kitaplığınızda Space’i olduğu gibi bırakan bir değişiklik, örneğin eşitlemeden gelen ya da pilin şarjını bildirmesi, tüm pencereyi rengiyle aynı renge soldurup duruyordu.
-- ⌘T ile az önce açtığınız bir sekmeyi kapatmak, Safari ve Chrome’daki gibi, alttaki sekmeye değil bulunduğunuz sekmeye geri götürür.
-- Ekranın kenarından açılan kenar çubuğunun sayfa önizlemesi artık bir sekmeden diğerine geçerken kapanıp geri gelmez, imleç sekmeleri ve sayfayı bırakıp kenar çubuğunun boş kısmına geçince katlanır ve uzantılara artık ayrı bir pencere olarak görünmez. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 - Ekranın kenarından açılan kenar çubuğunun sayfa önizlemesinde, uykuya alınmış bir sekmenin kartına tıklamak, satırına tıklamak gibi o sekmeyi pencerede açar, panelden gelen bir menü artık sayfanın altına çizilmez ve sayfaya tıkladıktan sonra Esc’ye basmak ya da kenar çubuğuna dönmek, tarayıcı penceresini öne getirmek yerine klavyeyi panelde bırakır. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
 ## [0.9.6] - 2026-11-27
