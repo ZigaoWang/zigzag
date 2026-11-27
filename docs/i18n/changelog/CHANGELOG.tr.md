@@ -4,9 +4,6 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 
 ## [Unreleased]
 
-### Düzeltmeler
-- Bir sayfada yazdıktan sonra ⌘Z artık Zigzag'ı zaman zaman kapatmıyor.
-
 ## [0.10.0] - 2026-11-25
 
 “iCloud ile eşzamanla” ayarı Space’lerinizi, sabitlenmiş sekmelerinizi, favorilerinizi ve ayarlarınızı her Mac’te aynı tutar; ekranın kenarından açılan kenar çubuğu da sayfaları yanında önizler. Zigzag ayrıca on bir yeni dilde; uyumluluk modu bir siteyi bozabilecek şeyleri tek bir anahtarla kapatır ve indirme kuralları kaydedilen dosyayı devredebilir.
@@ -65,6 +62,7 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 - Kenar çubuğu gizli ve sayfanın üzerine kaymışken ondan bir menü açmak artık kenar çubuğunu geri gönderip menüyü sayfanın üzerinde yalnız bırakmaz. Kenar çubuğu menü kapanana kadar açık kalır, imleç üzerinde değilse sonra geri kayar.
 - Zigzag, sekme genel görünümünün aramasında yazarken veya yoğun bir Mac’te Ayarlar’ı gösteren bir pencereye döndüğünüzde artık bir saniye ya da daha uzun süre donmaz.
 - Geri ve ileri kaydırma, ağır sayfalarda bile parmaklarınızı daha akıcı izler ve çok sayıda sekme açıkken Zigzag artık dakikada bir kısa süre duraklamaz.
+- Bir sayfada yazdıktan sonra ⌘Z artık Zigzag'ı zaman zaman kapatmıyor.
 
 ## [0.9.6] - 2026-11-27
 

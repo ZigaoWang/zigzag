@@ -4,9 +4,6 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
-### Opgelost
-- ⌘Z na typen op een pagina sluit Zigzag niet meer af en toe af.
-
 ## [0.10.0] - 2026-11-25
 
 Synchroniseer met iCloud houdt je spaces, vastgezette tabbladen, favorieten en instellingen gelijk op elke Mac, en de navigatiekolom vanaf de schermrand toont voorbeelden van pagina’s ernaast. Zigzag is ook in elf extra talen, de compatibiliteitsmodus zet met één schakelaar uit wat een website kan breken, en downloadregels kunnen het bewaarde bestand doorgeven.
@@ -65,6 +62,7 @@ Synchroniseer met iCloud houdt je spaces, vastgezette tabbladen, favorieten en i
 - Als de navigatiekolom verborgen is en over de pagina is uitgeschoven, stuurt een menu dat je eruit opent de navigatiekolom niet meer weg, waardoor het menu alleen boven de pagina bleef. Hij blijft staan tot het menu sluit en schuift dan terug als de aanwijzer er niet op staat.
 - Zigzag loopt niet meer een seconde of langer vast terwijl je typt in de zoekfunctie van het tabbladoverzicht, of als je op een drukke Mac terugkomt bij een venster dat Instellingen toont.
 - Terug- en vooruitswipen volgt je vingers soepeler, ook op zware pagina’s, en Zigzag hapert niet meer eens per minuut even als er veel tabbladen open zijn.
+- ⌘Z na typen op een pagina sluit Zigzag niet meer af en toe af.
 
 ## [0.9.6] - 2026-11-27
 
