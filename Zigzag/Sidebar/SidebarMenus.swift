@@ -685,26 +685,40 @@ enum SidebarMenus {
     }
 
     static func addPanel(controller: BrowserWindowController) -> [MenuPanel.Entry] {
-        panel(addEntries(isPrivate: controller.tabManager.isPrivate), controller: controller, from: controller.sidebar.newSpaceButton)
+        let panel = EdgeSidebar.shared.isShowing
+        return panelEntries(controller, addEntries(isPrivate: controller.tabManager.isPrivate),
+                            panel ? controller.edgeSidebar : nil)
     }
 
     static func blankPanel(controller: BrowserWindowController) -> [MenuPanel.Entry] {
-        panel(blankEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
+        let panel = EdgeSidebar.shared.isShowing
+        return panelEntries(controller, blankEntries(isPrivate: controller.tabManager.isPrivate),
+                            panel ? controller.edgeSidebar : nil)
     }
 
-    /// `from`: the button the menu opened from, where a new space's editor opens.
-    private static func panel(_ entries: [Entry], controller: BrowserWindowController, from button: NSView? = nil) -> [MenuPanel.Entry] {
+    /// `mirror`: the edge panel's sidebar while it is out. Its + and name are the ones on screen there, so a space's
+    /// editor opens in the panel rather than beside the window behind.
+    private static func panelEntries(_ controller: BrowserWindowController, _ entries: [Entry], _ mirror: SidebarView?) -> [MenuPanel.Entry] {
+        panel(entries, controller: controller,
+              from: mirror?.newSpaceButton ?? controller.sidebar.newSpaceButton,
+              header: mirror?.list.headerView ?? controller.sidebar.list.headerView)
+    }
+
+    /// `from`: the button the menu opened from, where a new space's editor opens. `header`: the space's name, beside
+    /// which Edit Space… opens it.
+    private static func panel(_ entries: [Entry], controller: BrowserWindowController, from button: NSView? = nil,
+                              header: NSView? = nil) -> [MenuPanel.Entry] {
         entries.map { entry in
             guard entry != .separator else { return .separator }
             let shortcut = action(of: entry).map(Shortcuts.keys(for:)) ?? ""
-            return .item(MenuPanel.Item(title: title(of: entry), symbol: symbol(of: entry), shortcut: shortcut) { [weak controller, weak button] in
+            return .item(MenuPanel.Item(title: title(of: entry), symbol: symbol(of: entry), shortcut: shortcut) { [weak controller, weak button, weak header] in
                 guard let controller else { return }
                 switch entry {
                 case .newTab: controller.listNewTab()
                 case .newFolder: controller.newFolder()
                 case .newLiveFolder: controller.newLiveFolder()
                 // Beside the space's name, as the View menu's Edit Space… opens it.
-                case .editSpace: controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)
+                case .editSpace: controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: header)
                 case .newSpace: controller.newSpace(button)
                 case .separator: break
                 }

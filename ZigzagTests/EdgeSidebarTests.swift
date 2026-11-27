@@ -225,15 +225,16 @@ struct EdgeSidebarTests {
         #expect(MiniWindowController.all.allSatisfy { $0.tab !== tabs[1] })
     }
 
-    /// A page Zigzag serves itself stays the window's: resting on its row shows nothing beside the panel, and a click
-    /// opens it in the window as any row's does.
-    @Test func zigzagsOwnPagesOpenInTheWindow() async throws {
+    /// Zigzag's own pages are pages: the scheme handler serves them into a web view, so resting on a row brings one
+    /// out beside the panel like any other, and a click still opens it in the window.
+    @Test func zigzagsOwnPagesPreviewLikeAnyPage() async throws {
         let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/first", "zigzag://history"])
         defer { done() }
         EdgeSidebar.shared.hover(tabs[1], in: controller)
-        try? await Task.sleep(for: .milliseconds(600))
-        #expect(EdgeSidebar.shared.pagePreview == nil)
-        // The same rest on a web page's row does bring it out.
+        #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[1] })
+        // A page the panel is told not to preview still gets its card instead.
+        #expect(EdgeLensPolicy.previews(url: URL(string: "zigzag://history")))
+
         EdgeSidebar.shared.hover(tabs[0], in: controller)
         #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[0] })
 
@@ -429,8 +430,9 @@ struct EdgeSidebarTests {
         #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[2] })
     }
 
-    /// Off the rows and the page, even with no row saying so, the page folds back and the sidebar stays out.
-    @Test func leavingTheRowsAndThePageFoldsItBack() async throws {
+    /// Off the rows and the page, even with no row saying so, the panel keeps the page while the pointer is still on
+    /// it; once the pointer leaves the panel the page folds back.
+    @Test func aPageStaysWhileThePointerIsOnThePanel() async throws {
         let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
         defer { done() }
         let (panel, host) = try panelParts()
@@ -442,21 +444,25 @@ struct EdgeSidebarTests {
         EdgeSidebar.debugPointer = NSPoint(x: pill.midX, y: pill.midY)
         try? await Task.sleep(for: .milliseconds(400))
         #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
-        // From the page to the sidebar's empty part, below the rows.
+        // From the page to the sidebar's empty part, below the rows: still the panel, so the page stays.
         EdgeSidebar.debugPointer = NSPoint(x: card.midX, y: min(b.minY - 120, card.midY))
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
+        // Off the panel entirely, the page folds back.
+        EdgeSidebar.debugPointer = offScreen
+        EdgeSidebar.shared.hover(nil, in: controller)
         #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
-        #expect(EdgeSidebar.shared.isShowing)
     }
 
-    /// A row of Zigzag's own pages has nothing to show beside the sidebar: resting on it puts the page away, though the
-    /// pointer is on a row.
-    @Test func anOwnPagesRowPutsThePageAway() async throws {
-        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "zigzag://history"])
+    /// A row with no page of its own puts the page away, even though the pointer is on the panel: there is nothing
+    /// for that row to show beside the sidebar.
+    @Test func aRowWithNoPagePutsThePageAway() async throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a"])
         defer { done() }
-        let history = try rowOnScreen(tabs[1], in: controller)
         EdgeSidebar.shared.previewNow(tabs[0], in: controller)
-        EdgeSidebar.debugPointer = NSPoint(x: history.midX, y: history.midY)
-        EdgeSidebar.shared.hover(tabs[1], in: controller)
+        #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[0])
+        let blank = manager.newTab(url: nil, spaceID: Library.shared.spaces[0].id)
+        EdgeSidebar.shared.hover(blank, in: controller)
         #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
     }
 
