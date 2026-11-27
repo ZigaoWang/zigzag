@@ -25,6 +25,8 @@
   Test: ReopenLastClosedTests.aClosedTabComesBackIntoItsWindow
 - ⇧⌘T for a tab of a closed window → it opens in the front window on its own.
   Test: ReopenLastClosedTests.aTabOfAClosedWindowComesBackOnItsOwn
+- ⇧⌘T after ⌘W on a pinned page or favorite → it loads again in its own row, at the page and history it had; opened from its row in between, it's back already and ⇧⌘T passes it over.
+  Test: ReopenLastClosedTests.aClosedPinnedPageComesBackInItsPlace
 - ⇧⌘T in an everyday window → never a private tab; private windows reopen only their own.
   Test: ReopenLastClosedTests.aPrivateTabNeverComesBackInAnEverydayWindow
 
