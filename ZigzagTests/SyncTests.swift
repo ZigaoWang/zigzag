@@ -1431,7 +1431,7 @@ extension SyncLibrary {
         // A adds one more and goes over: what's new here stays here, and what iCloud has stays in iCloud and on B.
         a.edit { $0.settings["JavaScriptOffSites"] = sites(2_200, "scripts") }
         a.sync(); b.sync(); a.sync(); b.sync()
-        #expect(a.session.tooBig.settings == ["JavaScriptOffSites"])
+        #expect(a.session.tooBig.settings.contains("JavaScriptOffSites"))
         for (key, value) in four { #expect(b.library.settings[key] == value, "\(key)") }
         #expect(b.library.settings["JavaScriptOffSites"] == nil)
         guard case .settings(let record)? = cloud.remote(SyncName.settings).map({ SyncBody.decode(type: $0.type, payload: $0.payload) }) else { Issue.record("no settings"); return }
@@ -1440,12 +1440,90 @@ extension SyncLibrary {
         let sentA = a.sent, sentB = b.sent
         a.sync(); b.sync(); a.sync(); b.sync()
         #expect(a.sent == sentA && b.sent == sentB)
+        // A crossing the limit again and again: B never loses what iCloud has, and nothing is sent as unset.
+        for _ in 0..<2 {
+            a.edit { $0.settings["JavaScriptOffSites"] = nil }
+            a.sync(); b.sync(); a.sync()
+            for (key, value) in four { #expect(b.library.settings[key] == value, "\(key)") }
+            a.edit { $0.settings["JavaScriptOffSites"] = sites(2_200, "scripts") }
+            a.sync(); b.sync(); a.sync()
+            for (key, value) in four { #expect(b.library.settings[key] == value, "\(key)") }
+            if case .settings(let now)? = cloud.remote(SyncName.settings).map({ SyncBody.decode(type: $0.type, payload: $0.payload) }) {
+                #expect(four.keys.allSatisfy { now.values[$0]?.value != nil })
+            }
+        }
         // A B with its own value of the one that stays on A keeps it, and A keeps its own.
         b.edit { $0.settings["JavaScriptOffSites"] = .array([.string("b.example")]) }
         b.sync(); a.sync(); b.sync(); a.sync()
         #expect(b.library.settings["JavaScriptOffSites"] == .array([.string("b.example")]))
         #expect(a.library.settings["JavaScriptOffSites"] == sites(2_200, "scripts"))
         for (key, value) in four { #expect(b.library.settings[key] == value && a.library.settings[key] == value, "\(key)") }
+    }
+
+    /// Preferences of about this many bytes in the record, named by `tag`.
+    private func sized(_ bytes: Int, _ tag: String) -> SettingValue {
+        let one = "\(tag)-0000-with-a-long-name.example.com".utf8.count + 3
+        return .array((0..<(bytes / one)).map { .string("\(tag)-\(String(format: "%04d", $0))-with-a-long-name.example.com") })
+    }
+
+    /// Settled: syncing again and again sends nothing more from either Mac.
+    private func settledSettings(_ a: FakeMac, _ b: FakeMac) -> Bool {
+        let sentA = a.sent, sentB = b.sent
+        for _ in 0..<3 { a.sync(); b.sync() }
+        return a.sent == sentA && b.sent == sentB
+    }
+
+    /// Two Macs offline, each adding about 640 KB of its own, then meeting: together over what one record holds.
+    @Test func twoMacsOverTheLimitTogetherStillFitAndKeepSyncing() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal")], settings: ["ReaderSize": .int(16)]))
+        let ofA = ["DarkPagesOnSites", "DarkPagesOffSites", "CookieBannersHandledSites", "TranslateNeverSites"], ofB = ["AdsAllowedSites", "CookieBannersLeftSites", "JavaScriptOffSites", "KeepAwakeSites"]
+        let valuesA = Dictionary(uniqueKeysWithValues: ofA.map { ($0, sized(160_000, "a-" + $0)) })
+        let valuesB = Dictionary(uniqueKeysWithValues: ofB.map { ($0, sized(160_000, "b-" + $0)) })
+        for value in Array(valuesA.values) + Array(valuesB.values) { #expect(!SyncPreferences.isTooBig(value)) }
+        a.online = false
+        b.online = false
+        a.edit { $0.settings.merge(valuesA) { $1 } }
+        b.edit { $0.settings.merge(valuesB) { $1 } }
+        a.online = true
+        b.online = true
+        for _ in 0..<3 { a.sync(); b.sync() }
+        // What went up fits, and each Mac keeps every value of its own.
+        let record = try #require(cloud.records[SyncName.settings])
+        #expect(record.payload.count <= SyncSession.largestPayload)
+        for (key, value) in valuesA { #expect(a.library.settings[key] == value, "\(key)") }
+        for (key, value) in valuesB { #expect(b.library.settings[key] == value, "\(key)") }
+        #expect(!b.session.tooBig.isEmpty)
+        // Later changes still go both ways.
+        b.edit { $0.settings["ReaderSize"] = .int(20) }
+        b.sync(); a.sync()
+        #expect(a.library.settings["ReaderSize"] == .int(20))
+        a.edit { $0.settings["ReaderSize"] = .int(22) }
+        a.sync(); b.sync()
+        #expect(b.library.settings["ReaderSize"] == .int(22))
+        #expect(settledSettings(a, b))
+        for (key, value) in valuesA { #expect(a.library.settings[key] == value, "\(key)") }
+        for (key, value) in valuesB { #expect(b.library.settings[key] == value, "\(key)") }
+    }
+
+    /// A Mac over the limit because of its own big value still takes another Mac's smaller one.
+    @Test func aSmallerValueFromAnotherMacIsTakenWhileOverTheLimit() {
+        let shared: [String: SettingValue] = ["DarkPagesOnSites": sized(185_000, "dark"), "DarkPagesOffSites": sized(150_000, "light"),
+                                              "CookieBannersHandledSites": sized(150_000, "banners"), "TranslateNeverSites": sized(150_000, "never")]
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal")], settings: shared))
+        for (key, value) in shared { #expect(b.library.settings[key] == value, "\(key)") }
+        // B adds a big one of its own and goes over: it stays on B.
+        let scripts = sized(133_000, "scripts")
+        b.edit { $0.settings["JavaScriptOffSites"] = scripts }
+        b.sync(); a.sync()
+        #expect(b.session.tooBig.settings.contains("JavaScriptOffSites"))
+        // A shrinks its dark pages list: B takes it.
+        let smaller = sized(67_000, "dark")
+        a.edit { $0.settings["DarkPagesOnSites"] = smaller }
+        a.sync(); b.sync(); a.sync(); b.sync()
+        #expect(b.library.settings["DarkPagesOnSites"] == smaller)
+        #expect(b.library.settings["JavaScriptOffSites"] == scripts)
+        #expect(settledSettings(a, b))
+        #expect(b.library.settings["DarkPagesOnSites"] == smaller && a.library.settings["DarkPagesOnSites"] == smaller)
     }
 
     @Test func aRemovalsRecordTooBigKeepsItsNewestNotes() throws {

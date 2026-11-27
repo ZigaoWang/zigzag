@@ -240,6 +240,13 @@ final class SyncSession {
         return result
     }
     private var tooBigSettings: Set<String> = [] { didSet { if tooBigSettings != oldValue { onTooBig?() } } }
+
+    /// The preferences in iCloud's record as it last came back from iCloud, never this Mac's edits not yet sent.
+    private var settingsInICloud: [String: SyncSettings.Entry] {
+        guard let payload = state.serverPayloads[SyncName.settings],
+              case .settings(let settings) = SyncBody.decode(type: SyncBody.settingsType, payload: payload) else { return [:] }
+        return settings.values
+    }
     private var tooBigNames: Set<String> = [] { didSet { if tooBigNames != oldValue { onTooBig?() } } }
     /// Called when what's too big for iCloud changed.
     var onTooBig: (() -> Void)?
@@ -337,7 +344,8 @@ final class SyncSession {
         let library = host.read()
         let export = SyncMapping.export(library, previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: (stamp.map(edited) ?? editedNow()),
-                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow())
+                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow(),
+                                        settingsInICloud: settingsInICloud)
         state.emptyFolders = export.emptyFolders
         tooBigSettings = export.staysHere
         queue(diff(export.items, deletes: true, stamp: stamp))
@@ -366,7 +374,8 @@ final class SyncSession {
         }
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: (changedAt.map(edited) ?? editedNow()),
-                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow())
+                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow(),
+                                        settingsInICloud: settingsInICloud)
         if let gone = Self.manyRemovals(from: state.base, to: export.items, unsent: state.unsent) {
             state.heldNames.formUnion(gone)
             // Turned on after tidying up while off, the rest is this Mac's own: sent. At a launch, it may be an old
@@ -385,7 +394,8 @@ final class SyncSession {
     private func takeICloudKeepingNew(stamp: Date?) -> Bool {
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: (stamp.map(edited) ?? editedNow()),
-                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow())
+                                        settingsChanged: host.settingTimes.mapValues(edited), settingsNow: editedNow(),
+                                        settingsInICloud: settingsInICloud)
         // Removed since, unless Library.json was saved after the removal (an unpin undone), so it's back on purpose.
         let saved = host.libraryStamp
         let new = export.items.filter { name, _ in
@@ -513,7 +523,7 @@ final class SyncSession {
     /// at the top of its space) goes up too.
     private func layOut() {
         write(SyncMapping.apply(state.base.filter { !state.heldNames.contains($0.key) }, onto: host.read(), aliases: state.aliases,
-                                kept: state.keptProfiles, unsent: state.unsent).library)
+                                kept: state.keptProfiles, unsent: state.unsent, keepHere: tooBigSettings).library)
         localChanged()
     }
 
@@ -863,7 +873,7 @@ final class SyncSession {
         state.claimSeen = nil
         state.merged = true
         write(SyncMapping.apply(merge.items, onto: host.read(), aliases: state.aliases).library)
-        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, now: editedNow())
+        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, now: editedNow(), settingsInICloud: settingsInICloud)
         state.emptyFolders = export.emptyFolders
         tooBigSettings = export.staysHere
         // Nothing in iCloud is removed because this Mac lacks it.
@@ -880,10 +890,36 @@ final class SyncSession {
     func upload(_ name: String) -> SyncUpload? {
         guard let item = state.base[name] else { tooBigNames.remove(name); return nil }
         if case .unknown = item.body, item.type != Self.claimType { return nil }
-        let payload = SyncBody.overlay(item.payload, on: state.serverPayloads[name], type: item.type)
+        var payload = SyncBody.overlay(item.payload, on: state.serverPayloads[name], type: item.type)
+        // The preferences still too big together (two Macs' added at once, merged): trimmed to fit, never failing on
+        // size again and again.
+        if payload.count > Self.largestPayload, name == SyncName.settings, let fitted = fitSettings(item) {
+            state.base[name] = fitted
+            payload = SyncBody.overlay(fitted.payload, on: state.serverPayloads[name], type: fitted.type)
+        }
         guard payload.count <= Self.largestPayload else { tooBigNames.insert(name); return nil }
         tooBigNames.remove(name)
         return SyncUpload(name: name, type: item.type, payload: payload, modified: item.modified, systemFields: state.systemFields[name])
+    }
+
+    /// The settings record trimmed until it fits: what differs from iCloud's goes back to iCloud's entry, or, when iCloud
+    /// has none, is left out and stays on this Mac, the biggest first. Nothing iCloud has is sent as unset or left out.
+    private func fitSettings(_ item: SyncItem) -> SyncItem? {
+        guard case .settings(var settings) = item.body else { return nil }
+        let inICloud = settingsInICloud
+        var total = settings.values.reduce(0) { $0 + SyncPreferences.cost($1.key, $1.value.value) }
+        let differing = settings.values.filter { inICloud[$0.key] != $0.value }
+            .sorted { (SyncPreferences.cost($0.key, $0.value.value), $0.key) > (SyncPreferences.cost($1.key, $1.value.value), $1.key) }
+        var kept: Set<String> = []
+        for (key, entry) in differing where total > Self.largestPayload - 100_000 {
+            let theirs = inICloud[key]
+            total += SyncPreferences.cost(key, theirs?.value) - SyncPreferences.cost(key, entry.value)
+            settings.values[key] = theirs
+            kept.insert(SyncPreferences.renamed(key, state.aliases.local))
+        }
+        guard !kept.isEmpty else { return nil }
+        tooBigSettings.formUnion(kept)
+        return SyncItem(.settings(settings), modified: item.modified)
     }
 
     func saved(_ records: [SyncRemote], sentAt: Date? = nil) {
