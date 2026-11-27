@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
-- Closing a pinned tab with ⌘W while the space's pinned tabs are folded no longer takes its row out of the sidebar: it stays, unloaded, until you switch spaces or fold them again.
+- Closing a pinned tab with ⌘W while the space's pinned tabs are folded, or one shown under a closed folder, no longer takes its row out of the sidebar: it stays, unloaded, until you switch spaces or open or close the pinned tabs or that folder again.
 - Settings no longer freezes when it opens on Profiles with data from many profiles that are no longer listed: past three, they fold into one box that says how many.
 - A translated page stays translated as it changes: posts and comments that load as you scroll, text the page updates and another page of a site that doesn't reload, like Reddit, are translated as they come, and a long page is translated all the way down instead of stopping partway.
 - A window sitting still no longer keeps the GPU busy in bursts: a change in your library that leaves the space as it was, like one from sync, or the battery reporting its charge, faded the whole window from its color to the same color.
