@@ -80,7 +80,7 @@
 - A box's header → a click, Space, → or ← opens or folds it, ↑ and ↓ move to the box above or below; VoiceOver reads it as a disclosure triangle.
   Test: FoldBoxTests.keysOpenFoldAndMoveBetweenBoxes
 
-## Settings › Privacy › Stored by Websites
+## Settings › Privacy › Stored by Websites (Settings › Website Data with more than one profile)
 - A site → a box with its cookies and its cache inside, each with Clear… that asks first; the trash still removes everything the site keeps.
   Test: SiteDataListTests.aBoxIsADisclosureTriangleWithItsKindsInside
 - Clearing one kind → the site stays listed with what's left, and goes once nothing is.
@@ -113,9 +113,9 @@
   Test: SiteUserAgentsTests.aNewWindowStartsWithTheSitesChoice
 - A choice for a site → covers its subdomains; a subdomain's own choice wins, Safari included.
   Test: SiteUserAgentsTests.aSiteCoversItsSubdomainsAndTheMostSpecificWins
-- Back to Default, or × in Settings › Privacy › Sites → the site gets Zigzag's own again.
+- Back to Default, or × in Settings › Privacy › Site Permissions → the site gets Zigzag's own again.
   Test: SiteUserAgentsTests.removalRestoresTheDefault
-- A choice → kept across launches and listed in Settings › Privacy › Sites.
+- A choice → kept across launches and listed in Settings › Privacy › Site Permissions.
   Test: SiteUserAgentsTests.choicesReadBack
 - Custom… → the typed agent is trimmed to one line; an empty one, or one with characters a header can't carry, can't be used.
   Test: SiteUserAgentsTests.aTypedAgentIsTrimmedAndNeverEmpty
@@ -139,7 +139,7 @@
   Test: SiteCompatibilityTests.siteControlsShowsItInTheAccent
 - Turning it on or off → the page reloads once.
   No test yet.
-- Turned on → kept across launches and listed in Settings › Privacy › Sites, where × and Forget turn it off.
+- Turned on → kept across launches and listed in Settings › Privacy › Site Permissions, where × and Forget turn it off.
   Test: SiteCompatibilityTests.itIsKeptAndListedInSettings
 - A private window → follows it with no row of its own, and keeps nothing new for the site.
   Test: SiteCompatibilityTests.privateWindowsFollowItAndKeepNothing

@@ -39,7 +39,7 @@
   Test: ExtensionSecurityTests.aFolderThatNowAsksForMoreWaitsForThePerson
 
 ## Site Access
-- Site Access in Settings › Extensions → On All Sites, On Click or On Specific Sites.
+- Site access in Settings › Extensions → On All Sites, On Click or On Specific Sites.
   Test: SettingsSiteAccessTests.theMenuSetsSiteAccess
 - On Specific Sites → a list you add sites to and remove them from; choosing it again later starts an empty list.
   Test: SettingsSiteAccessTests.specificSitesAreAddedAndRemoved

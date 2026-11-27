@@ -13,7 +13,7 @@
   Test: SiteBoostsTests.removingAZapShowsItOnTheOpenPage
 - × on one zapped element → it stays shown on later visits; the others keep their order.
   Test: SiteBoostsTests.oneZapComesOffAndTheRestStayInOrder
-- Settings › Privacy › Sites → lists the same zapped elements, each with its own ×.
+- Settings › Privacy › Site Permissions → lists the same zapped elements, each with its own ×.
   Test: SiteBoostsTests.settingsListsEachZapWithItsOwnRemove
 - In a private window → zaps and their removal stay in that window.
   Test: SiteBoostsTests.aPrivateWindowKeepsItsOwnCopy
