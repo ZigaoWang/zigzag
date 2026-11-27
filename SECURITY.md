@@ -46,7 +46,7 @@ General › Beta updates chooses the beta channel.
 In scope: the Zigzag app and its code in this repository. That includes:
 
 - The password manager, passkeys, autofill and import from other browsers.
-- Extension support: installing from the Chrome Web Store or a folder, the Chrome APIs Zigzag adds, native
+- Extension support: installing from the Chrome Web Store, Firefox Add-ons or a folder, the Chrome APIs Zigzag adds, native
   messaging, and user scripts for script managers like Tampermonkey and Violentmonkey.
 - AI apps over MCP: the local server, its key and how it's stored and copied, what tools can reach (private
   windows, passwords, Zigzag's own pages) and how page content is marked in tool results. AppleScript and
