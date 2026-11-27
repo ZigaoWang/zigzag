@@ -917,6 +917,11 @@ final class Tab: NSObject {
         webView.callAsyncJavaScript(PageState.restorer, arguments: state.restoreArguments, in: nil, in: .defaultClient) { _ in }
     }
 
+    /// Freed without closing, it still lets go of its page on the main run loop.
+    isolated deinit {
+        if let webView { PageRetirement.release(webView) }
+    }
+
     /// `keepingSnapshot`: its window closed but the tab may come back (reopening the last window), so its
     /// thumbnail stays until the next save prunes what isn't kept.
     func close(keepingSnapshot: Bool = false) {
