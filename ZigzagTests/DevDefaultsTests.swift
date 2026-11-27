@@ -44,4 +44,19 @@ struct DevDefaultsTests {
         #expect(one != DevDefaults.copySuite(dataDir: "/tmp/copy-two"))
         #expect(one.hasPrefix("wang.zigao.zigzag.dev.copy."))
     }
+
+    @Test func aTestCopyNeverSyncsWithICloudUnlessAsked() {
+        let dev: [String: Any] = [ICloudSync.enabledKey: true, ICloudSync.accountKey: "_dev", ICloudSync.copyKey: true, "ReaderSize": 18]
+        // A new copy starts from the dev build's settings, sync off and without the dev build's account.
+        let new = DevDefaults.copyDomain(existing: nil, dev: dev, arguments: ["Zigzag"])
+        #expect(new["ReaderSize"] as? Int == 18)
+        #expect(new[ICloudSync.enabledKey] == nil && new[ICloudSync.accountKey] == nil && new[ICloudSync.copyKey] == nil)
+        // Asked for at launch, still off until turned on in the copy.
+        #expect(DevDefaults.copyDomain(existing: nil, dev: dev, arguments: ["Zigzag", DevDefaults.syncArgument])[ICloudSync.enabledKey] == nil)
+        // A copy that had it on syncs only while launched with the argument.
+        let on: [String: Any] = [ICloudSync.enabledKey: true, "ReaderSize": 14]
+        #expect(DevDefaults.copyDomain(existing: on, dev: dev, arguments: ["Zigzag"])[ICloudSync.enabledKey] as? Bool != true)
+        #expect(DevDefaults.copyDomain(existing: on, dev: dev, arguments: ["Zigzag"])["ReaderSize"] as? Int == 14)
+        #expect(DevDefaults.copyDomain(existing: on, dev: dev, arguments: ["Zigzag", DevDefaults.syncArgument])[ICloudSync.enabledKey] as? Bool == true)
+    }
 }

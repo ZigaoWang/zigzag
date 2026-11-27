@@ -23,7 +23,7 @@ nonisolated enum DevDefaults {
     }
 
     /// Runs first thing in main, before anything reads a setting.
-    static func isolate(environment env: [String: String] = ProcessInfo.processInfo.environment) {
+    static func isolate(environment env: [String: String] = ProcessInfo.processInfo.environment, arguments: [String] = CommandLine.arguments) {
         let name: String
         var seed = false
         if env["XCTestConfigurationFilePath"] != nil {
@@ -39,13 +39,29 @@ nonisolated enum DevDefaults {
         guard let suite = UserDefaults(suiteName: name) else { return }
         if !seed {
             suite.removePersistentDomain(forName: name)
-        } else if suite.persistentDomain(forName: name) == nil, let own = Bundle.main.bundleIdentifier {
-            // A new copy starts from the dev build's settings, as it did when it shared them.
-            suite.setPersistentDomain(UserDefaults.standard.persistentDomain(forName: own) ?? [:], forName: name)
+        } else if let own = Bundle.main.bundleIdentifier {
+            suite.setPersistentDomain(copyDomain(existing: suite.persistentDomain(forName: name),
+                                                 dev: UserDefaults.standard.persistentDomain(forName: own) ?? [:],
+                                                 arguments: arguments), forName: name)
         }
         guard let method = class_getClassMethod(UserDefaults.self, #selector(getter: UserDefaults.standard)) else { return }
         let standard: @convention(block) (AnyObject) -> UserDefaults = { _ in suite }
         method_setImplementation(method, imp_implementationWithBlock(standard))
+    }
+
+    /// A test copy launched with this syncs with iCloud when it's turned on in the copy; without it, sync stays off,
+    /// so a copy never syncs into, or removes, the dev build's iCloud.
+    static let syncArgument = "--sync-with-icloud"
+
+    /// Sync with iCloud's own switch and what it notes beside it (ICloudSync.enabledKey and the rest).
+    static let syncKeys: Set<String> = ["SyncWithICloud", "SyncWithICloudAccount", "SyncWithICloudCopy", "SyncWithICloudPreferenceTimes"]
+
+    /// A test copy's settings at launch: a new copy starts from the dev build's, as it did when it shared them, but
+    /// never with sync on or the dev build's account. Launched without `syncArgument`, a copy's sync is off.
+    static func copyDomain(existing: [String: Any]?, dev: [String: Any], arguments: [String]) -> [String: Any] {
+        var domain = existing ?? dev.filter { !syncKeys.contains($0.key) }
+        if !arguments.contains(syncArgument) { domain["SyncWithICloud"] = nil }
+        return domain
     }
 
     /// This test process's settings and data, at exit.

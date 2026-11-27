@@ -9,6 +9,8 @@
   Test: SyncTests.aBackupIsSavedBeforeTheFirstSync
 - The backup can't be saved (a full disk) → sync stays off and says so; nothing goes to iCloud.
   Test: SyncTests.withoutABackupSyncStaysOff
+- A debug build's test copy (its own data folder, ZIGZAG_DATA_DIR) → sync is off, never carried over from the dev build with its account, and stays off at each launch unless the copy is launched with --sync-with-icloud; only then can its syncremove command remove the dev build's iCloud copy. Release builds have no test copies.
+  Test: DevDefaultsTests.aTestCopyNeverSyncsWithICloudUnlessAsked
 - Turn it off → everything stays on this Mac as it is, and iCloud keeps its copy.
   No test yet.
 - Remove from iCloud…, then Remove → iCloud's copy is removed for every Mac and sync turns off; this Mac keeps everything. Another Mac syncing with it turns sync off too and keeps its own.
