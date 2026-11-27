@@ -10,10 +10,12 @@ struct TutorialTests {
         let name = "TutorialTests.\(UUID().uuidString)"
         let saved = Tutorial.store
         Tutorial.store = UserDefaults(suiteName: name)!
+        defer {
+            Tutorial.store.removeScratchSuite(name)
+            Tutorial.store = saved
+        }
         Tutorial.restart()
         body()
-        Tutorial.store.removePersistentDomain(forName: name)
-        Tutorial.store = saved
     }
 
     @Test func stepsComeInOrder() {

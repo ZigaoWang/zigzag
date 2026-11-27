@@ -79,7 +79,7 @@ struct RelaunchIgnoresLaunchChoiceTests {
         LaunchChoice.defaults = defaults
         defer {
             LaunchChoice.defaults = shared
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         LaunchChoice.choice = .fresh
         let now = Date()
@@ -326,7 +326,7 @@ struct LaunchChoiceTests {
         LaunchChoice.defaults = defaults
         defer {
             LaunchChoice.defaults = shared
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         #expect(LaunchChoice.choice == .resume)
         LaunchChoice.choice = .fresh

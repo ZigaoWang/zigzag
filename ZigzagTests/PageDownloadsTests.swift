@@ -196,7 +196,7 @@ struct PageDownloadsTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         SitePermissions.asksBeforeDownloads = asking
         try await body()

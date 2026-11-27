@@ -172,7 +172,7 @@ import Testing
         defer {
             SiteBoosts.defaults = boosts
             CookieBanners.defaults = banners
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         let url = try #require(URL(string: "https://example.com/page"))
         CookieBanners.setChoice(false, for: url)

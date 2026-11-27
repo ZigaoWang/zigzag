@@ -110,8 +110,8 @@ function recoverSolver(reason) {
 
     /// One patch that no longer fits leaves every file as it was, so a future build never gets half a fix.
     @Test func everyPatchMustFitOrNoneApply() throws {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("patches-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try FileManager.default.scratchFolder("patches")
+        defer { try? FileManager.default.removeItem(at: folder) }
         try "one\ntwo".write(to: folder.appendingPathComponent("a.js"), atomically: true, encoding: .utf8)
         try "three".write(to: folder.appendingPathComponent("b.html"), atomically: true, encoding: .utf8)
         let fits = [ExtensionStore.OverlayPatch(file: "a.js", find: "one", replace: "1"),

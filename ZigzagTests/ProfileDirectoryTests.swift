@@ -194,7 +194,7 @@ struct ProfileChoiceTests {
     @Test func aRemovedProfileLeavesNoChoiceBehindAndTheFirstKeepsIts() throws {
         let suite = "ProfileChoiceTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         let work = UUID()
         for key in ProfileKey.allCases {
             defaults.set(true, forKey: key.name(in: work))
@@ -224,7 +224,7 @@ struct ProfileChoiceTests {
     @Test func iCloudPasswordsTurnsZigzagOffAndZigzagComesBackAsItWas() throws {
         let suite = "ProfileChoiceTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         let work = UUID(), home = Profile.defaultID
         #expect(PasswordFiller.chosen(in: work, defaults: defaults) == nil)
         // Work saved but didn't fill; home did both.
@@ -328,7 +328,7 @@ struct ProfileChoiceTests {
     @Test func choosingAPasswordManagerTurnsZigzagOffAndZigzagComesBackOn() throws {
         let suite = "ProfileChoiceTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         let bitwarden = "nngceckbapebfimnlniiiahkandclblb", onePassword = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
         let work = UUID()
         func saves() -> Bool? { ProfileKey.offersToSavePasswords.choice(in: work, defaults: defaults) }
@@ -390,7 +390,7 @@ struct ProfileChoiceTests {
     @Test func anExtensionThatTurnsSavingOffIsAPasswordManager() throws {
         let suite = "ProfileChoiceTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         let work = UUID(), vault = "vault-extension", other = "some-extension", bitwarden = "nngceckbapebfimnlniiiahkandclblb"
         let names = [vault: "Vault", other: "Other"]
         func claimed() -> [String] { PasswordSavingClaims.claimants(in: work, defaults: defaults) }
@@ -426,7 +426,7 @@ struct ProfileChoiceTests {
     @Test func passwordSavingReadsWhoControlsIt() throws {
         let suite = "ProfileChoiceTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         let work = UUID()
         func answer(_ id: String) -> PasswordSavingClaims.Answer { PasswordSavingClaims.answer(for: id, in: work, defaults: defaults) }
         #expect(answer("a") == .init(value: true, levelOfControl: "controllable_by_this_extension"))
@@ -691,7 +691,7 @@ struct NothingOfYoursTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try await withTabs { theirs, yours in
             let origin = "https://news.example"
@@ -755,7 +755,7 @@ struct NothingOfYoursTests {
         defer {
             LocalReceivers.isEnabled = master
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let origin = "https://creator.zerowork.io"
         LocalReceivers.isEnabled = true

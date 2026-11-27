@@ -16,7 +16,7 @@ struct SiteJavaScriptTests {
         SiteJavaScript.defaults = defaults
         defer {
             SiteJavaScript.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try await body()
     }

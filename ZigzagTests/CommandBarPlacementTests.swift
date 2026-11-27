@@ -93,7 +93,7 @@ struct CommandBarPlacementTests {
     @Test func savesFractionsAndForgetsTheDefault() throws {
         let suite = "CommandBarPlacementTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         #expect(CommandBarPlacement.load(from: defaults) == .standard)
         let moved = CommandBarPlacement.Position(centerX: 0.25, top: 0.6)
         CommandBarPlacement.save(moved, to: defaults)

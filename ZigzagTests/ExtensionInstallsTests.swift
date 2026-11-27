@@ -7,9 +7,7 @@ import WebKit
 /// the other's knowledge, so neither may lose what the other keeps there.
 struct ExtensionRecordTests {
     private func file() throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-records-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appendingPathComponent("state.json")
+        try FileManager.default.scratchFolder("zigzag-records").appendingPathComponent("state.json")
     }
 
     private let packageKeys = ["version", "pendingVersion", "unpackedPath"]

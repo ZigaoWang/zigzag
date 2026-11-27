@@ -78,7 +78,7 @@ struct MiniWindowTests {
     @Test func takesLinksFromOtherAppsUnlessTurnedOff() throws {
         let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         // Unset: on, as in Little Arc.
         #expect(MiniWindowController.opensExternalLinks(in: defaults))
         // Turned off in Settings: stays off.
@@ -91,7 +91,7 @@ struct MiniWindowTests {
     @Test func gotItKeepsMiniAndEndsTheNote() throws {
         let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         #expect(MiniWindowController.needsLinksNote(in: defaults))
         MiniWindowController.answerLinksNote(useTabs: false, in: defaults)
         #expect(!MiniWindowController.needsLinksNote(in: defaults))
@@ -101,7 +101,7 @@ struct MiniWindowTests {
     @Test func useTabsInsteadTurnsMiniOffAndUndoTurnsItBack() throws {
         let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { defaults.removeScratchSuite(suite) }
         MiniWindowController.answerLinksNote(useTabs: true, in: defaults)
         #expect(!MiniWindowController.needsLinksNote(in: defaults))
         #expect(!MiniWindowController.opensExternalLinks(in: defaults))

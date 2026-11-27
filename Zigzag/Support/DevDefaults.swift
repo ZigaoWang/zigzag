@@ -15,6 +15,26 @@ nonisolated enum DevDefaults {
     static let testsData: URL? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? nil
         : FileManager.default.temporaryDirectory.appendingPathComponent("\(dataPrefix)\(getpid())", isDirectory: true)
 
+    /// Where tests keep files of their own: one folder per test process, removed when it ends.
+    static let testsScratch: URL? = testsData == nil ? nil
+        : FileManager.default.temporaryDirectory.appendingPathComponent("\(scratchPrefix)\(getpid())", isDirectory: true)
+    private static let scratchPrefix = "ZigzagTests-Scratch-"
+    private static let suitesPrefix = "ZigzagTests-Suites-"
+
+    /// Notes a suite a test emptied, whose file the system writes again as the test process ends; the next test
+    /// process deletes it.
+    static func noteEmptiedSuite(_ name: String) {
+        let list = FileManager.default.temporaryDirectory.appendingPathComponent("\(suitesPrefix)\(getpid())")
+        suitesLock.withLock {
+            if !FileManager.default.fileExists(atPath: list.path) { FileManager.default.createFile(atPath: list.path, contents: nil) }
+            guard let handle = try? FileHandle(forWritingTo: list) else { return }
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data((name + "\n").utf8))
+        }
+    }
+    private static let suitesLock = NSLock()
+
     /// The suite a test copy on this data folder keeps, one per folder.
     static func copySuite(dataDir: String) -> String {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
@@ -75,6 +95,7 @@ nonisolated enum DevDefaults {
     private static func removeTestState() {
         removeSuite(testsSuite)
         if let testsData { try? FileManager.default.removeItem(at: testsData) }
+        if let testsScratch { try? FileManager.default.removeItem(at: testsScratch) }
     }
 
     private static func removeSuite(_ name: String) {
@@ -95,10 +116,21 @@ nonisolated enum DevDefaults {
             let domain = file.dropLast(".plist".count)
             if gone(domain.dropFirst(testsPrefix.count + 1)) { removeSuite(String(domain)) }
         }
-        // Also the folders StrictTransport and DarkSeen keep per test process.
+        // Suites tests emptied, when the system wrote their files again: only those still empty.
         let temporary = fm.temporaryDirectory
+        for list in (try? fm.contentsOfDirectory(atPath: temporary.path)) ?? [] where list.hasPrefix(suitesPrefix) {
+            guard gone(list.dropFirst(suitesPrefix.count)) else { continue }
+            let url = temporary.appendingPathComponent(list)
+            let names = (try? String(contentsOf: url, encoding: .utf8))?.split(separator: "\n") ?? []
+            for name in names where !name.contains("/") && !name.hasPrefix("wang.zigao.zigzag") {
+                let file = preferences.appendingPathComponent("\(name).plist")
+                if let values = NSDictionary(contentsOf: file), values.count == 0 { try? fm.removeItem(at: file) }
+            }
+            try? fm.removeItem(at: url)
+        }
+        // Also the folders StrictTransport and DarkSeen keep per test process.
         for folder in (try? fm.contentsOfDirectory(atPath: temporary.path)) ?? [] {
-            guard let prefix = [dataPrefix, "ZigzagTests-StrictTransport-", "ZigzagTests-DarkSeen-"].first(where: folder.hasPrefix),
+            guard let prefix = [dataPrefix, scratchPrefix, "ZigzagTests-StrictTransport-", "ZigzagTests-DarkSeen-"].first(where: folder.hasPrefix),
                   gone(folder.dropFirst(prefix.count)) else { continue }
             try? fm.removeItem(at: temporary.appendingPathComponent(folder))
         }

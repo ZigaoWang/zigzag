@@ -13,7 +13,7 @@ struct DeveloperStateTests {
         let saved = DeveloperTools.defaults
         DeveloperTools.defaults = UserDefaults(suiteName: name)!
         defer {
-            DeveloperTools.defaults.removePersistentDomain(forName: name)
+            DeveloperTools.defaults.removeScratchSuite(name)
             DeveloperTools.defaults = saved
             DeveloperTools.changed.send()
         }
@@ -105,7 +105,7 @@ struct DeveloperStateTests {
         let name = "DeveloperStateTests-dark-\(UUID().uuidString)"
         DarkPages.defaults = UserDefaults(suiteName: name)!
         defer {
-            DarkPages.defaults.removePersistentDomain(forName: name)
+            DarkPages.defaults.removeScratchSuite(name)
             DarkPages.defaults = saved
         }
         DarkPages.defaults.set("always", forKey: "DarkPages")

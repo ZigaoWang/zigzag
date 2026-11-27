@@ -677,7 +677,7 @@ struct PageLanguageChoiceTests {
     private func withChoices(_ body: (PageTranslator.Choices) throws -> Void) rethrows {
         let name = "PageTranslatorTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { defaults.removeScratchSuite(name) }
         try body(PageTranslator.Choices(defaults: defaults))
     }
 
@@ -835,7 +835,7 @@ extension PageTranslatorTests {
     @MainActor @Test func everyChoiceSaysItChanged() {
         let name = "PageTranslatorTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { defaults.removeScratchSuite(name) }
         let choices = PageTranslator.Choices(defaults: defaults)
         var heard = 0
         let token = PageTranslator.choicesChanged.observe { heard += 1 }

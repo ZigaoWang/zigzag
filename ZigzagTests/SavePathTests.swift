@@ -327,7 +327,7 @@ import Testing
         let saved = SavePath.defaults
         defer { SavePath.defaults = saved }
         let suite = UserDefaults(suiteName: "SavePathTests.remembered")!
-        defer { suite.removePersistentDomain(forName: "SavePathTests.remembered") }
+        defer { suite.removeScratchSuite("SavePathTests.remembered") }
         SavePath.defaults = suite
 
         try scratch { space, elsewhere, folder in

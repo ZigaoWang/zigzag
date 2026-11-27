@@ -357,7 +357,7 @@ extension CertificateTrustTests {
         CertificateExceptions.defaults = defaults
         defer {
             CertificateExceptions.defaults = saved
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         try body(defaults)
     }

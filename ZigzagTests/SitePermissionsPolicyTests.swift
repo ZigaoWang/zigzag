@@ -12,7 +12,7 @@ import WebKit
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try body(defaults)
     }
@@ -25,7 +25,7 @@ import WebKit
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         try await body()
     }
@@ -57,7 +57,7 @@ import WebKit
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: suite)
+            defaults.removeScratchSuite(suite)
         }
         do {
             // 500 kept answers, as a long-used profile has, and 300 tabs.

@@ -12,7 +12,7 @@ struct DeveloperMoreTests {
         let saved = DeveloperTools.defaults
         DeveloperTools.defaults = UserDefaults(suiteName: name)!
         defer {
-            DeveloperTools.defaults.removePersistentDomain(forName: name)
+            DeveloperTools.defaults.removeScratchSuite(name)
             DeveloperTools.defaults = saved
             DeveloperTools.changed.send()
         }
@@ -24,7 +24,7 @@ struct DeveloperMoreTests {
         let saved = DeveloperTools.defaults
         DeveloperTools.defaults = UserDefaults(suiteName: name)!
         defer {
-            DeveloperTools.defaults.removePersistentDomain(forName: name)
+            DeveloperTools.defaults.removeScratchSuite(name)
             DeveloperTools.defaults = saved
             DeveloperTools.changed.send()
             PageImages.sitesChanged()
@@ -172,7 +172,7 @@ struct DeveloperMoreTests {
         let saved = DeveloperTools.defaults
         DeveloperTools.defaults = UserDefaults(suiteName: name)!
         defer {
-            DeveloperTools.defaults.removePersistentDomain(forName: name)
+            DeveloperTools.defaults.removeScratchSuite(name)
             DeveloperTools.defaults = saved
             PageImages.sitesChanged()
         }

@@ -136,7 +136,7 @@ import Testing
     @Test func settingsCarryPreferencesNeverSecretsOrCounters() throws {
         let name = "zigzag-export-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { defaults.removeScratchSuite(name) }
         let other = UUID(), gone = UUID()
         for (key, value) in [("AskBeforeQuitting", true as Any), ("SiteBoosts", Data([1])), ("CookiesKeptSites.\(other.uuidString)", ["a.com"]),
                              ("CookiesKeptSites.\(gone.uuidString)", ["b.com"]), ("AllowsAIApps", true), ("MCPPort", 8123),
@@ -149,7 +149,7 @@ import Testing
 
         // A backup that names more than that only ever writes the carried ones, and only for profiles here.
         let target = try #require(UserDefaults(suiteName: name + "-in"))
-        defer { target.removePersistentDomain(forName: name + "-in") }
+        defer { target.removeScratchSuite(name + "-in") }
         let crafted = ZigzagBackup.Settings(values: ["AllowsAIApps": .bool(true), "MCPPort": .int(1), "ReduceMotion": .bool(true),
                                                      "CookiesKeptSites.\(gone.uuidString)": .array([.string("b.com")])])
         #expect(ZigzagBackup.apply(crafted, to: target, profiles: [Profile.defaultID]) == 1)

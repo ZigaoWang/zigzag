@@ -12,7 +12,7 @@ struct DevelopmentSitesTests {
         let saved = DeveloperTools.defaults
         DeveloperTools.defaults = UserDefaults(suiteName: name)!
         defer {
-            DeveloperTools.defaults.removePersistentDomain(forName: name)
+            DeveloperTools.defaults.removeScratchSuite(name)
             DeveloperTools.defaults = saved
             // Whatever heard a change made here (the app the tests run in) reads its own choices again.
             DeveloperTools.changed.send()

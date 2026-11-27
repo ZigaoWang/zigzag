@@ -321,7 +321,7 @@ struct SettingsSitePermissionsTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         try body(defaults)
     }
@@ -575,7 +575,7 @@ struct SettingsFoldingTests {
         SitePermissions.defaults = defaults
         defer {
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let sites = (0..<count).map { "fold-\($0).example" }
         for site in sites { SitePermissions.setChoice(.allow, for: .camera, origin: "https://\(site)") }
@@ -654,8 +654,7 @@ struct SettingsFoldingTests {
 
     @available(macOS 15.4, *)
     private func fixture(_ name: String) async throws -> WKWebExtension {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("fold-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try FileManager.default.scratchFolder("fold")
         let manifest = #"{"manifest_version": 3, "name": "\#(name)", "version": "1.2", "host_permissions": ["<all_urls>"]}"#
         try manifest.write(to: folder.appendingPathComponent("manifest.json"), atomically: true, encoding: .utf8)
         return try await WKWebExtension(resourceBaseURL: folder)
@@ -731,7 +730,7 @@ struct SettingsFoldingTests {
         DeveloperTools.defaults = defaults
         defer {
             DeveloperTools.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let sites = (0..<5).map { "fold-dev-\($0).example" }
         DevelopmentSites.sites = sites
@@ -786,7 +785,7 @@ struct SettingsLazyBuildTests {
         defer {
             store.replace(kept)
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let answered = DownloadRule(name: "Answered", pattern: "answered.example", action: DownloadRuleAction(kind: .openURL))
         let plain = DownloadRule(name: "Plain", pattern: "plain.example", action: DownloadRuleAction(kind: .openURL))

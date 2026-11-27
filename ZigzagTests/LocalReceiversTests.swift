@@ -203,7 +203,7 @@ struct LocalReceiversTests {
         defer {
             LocalReceivers.isEnabled = master
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let origin = "https://creator.zerowork.io"
 
@@ -248,7 +248,7 @@ struct LocalReceiversTests {
         defer {
             LocalReceivers.isEnabled = master
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let origin = "https://creator.zerowork.io"
         SitePermissions.setLocalReceivers(true, origin: origin)
@@ -269,7 +269,7 @@ struct LocalReceiversTests {
         defer {
             LocalReceivers.isEnabled = master
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let allowed = "https://creator.zerowork.io"
         let localhostPage = "http://localhost:3000"
@@ -291,7 +291,7 @@ struct LocalReceiversTests {
         defer {
             LocalReceivers.isEnabled = master
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         #expect(!LocalReceivers.isEnabled)
         LocalReceivers.isEnabled = true
@@ -322,7 +322,7 @@ struct LocalReceiversTests {
         defer {
             LocalReceivers.isEnabled = master
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let first = "https://creator.zerowork.io"
         let second = "https://second.example"
@@ -412,7 +412,7 @@ struct LocalReceiversTests {
         defer {
             LocalReceivers.isEnabled = master
             SitePermissions.defaults = before
-            defaults.removePersistentDomain(forName: name)
+            defaults.removeScratchSuite(name)
         }
         let allowed = "https://creator.zerowork.io"
         LocalReceivers.isEnabled = true

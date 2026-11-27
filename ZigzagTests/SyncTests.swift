@@ -1021,8 +1021,9 @@ extension SyncLibrary {
     }
 
     @Test func onlyPreferencesTravelNeverWhatIsAboutThisMac() {
-        let defaults = UserDefaults(suiteName: "SyncTests-\(UUID().uuidString)")!
-        defer { defaults.removePersistentDomain(forName: defaults.description) }
+        let suite = "SyncTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removeScratchSuite(suite) }
         for (key, value) in ["ReaderSize": 18, "DownloadFolder": "/Users/me/Downloads", "BetaUpdates": true, "SUAutomaticallyUpdate": false,
                              "MiniWindowSize": "{300, 200}", "SidebarWidth": 260, "LaunchCount": 9, "DebugNoAutoplay": true, "MCPPort": 8000,
                              "AllowsAIApps": true, "TrustedCertificates": ["a": "b"], "SyncWithICloud": true, "AppleLanguages": ["de"]] as [String: Any] {
@@ -1285,7 +1286,7 @@ extension SyncLibrary {
     @Test func anUnrelatedDefaultsChangeSendsNothing() throws {
         let (_, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
         let defaults = try #require(UserDefaults(suiteName: "SyncTests.unrelated"))
-        defer { defaults.removePersistentDomain(forName: "SyncTests.unrelated") }
+        defer { defaults.removeScratchSuite("SyncTests.unrelated") }
         var carried = SyncPreferences.read(from: defaults, profiles: [])
         defaults.set("{{0, 0}, {800, 600}}", forKey: "NSWindow Frame main")
         #expect(!ICloudSync.carriedPreferencesChanged(&carried, now: SyncPreferences.read(from: defaults, profiles: [])))

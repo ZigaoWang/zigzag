@@ -18,7 +18,7 @@ struct PageFullScreenTests {
         let saved = PageFullScreen.defaults
         PageFullScreen.defaults = UserDefaults(suiteName: name)!
         defer {
-            PageFullScreen.defaults.removePersistentDomain(forName: name)
+            PageFullScreen.defaults.removeScratchSuite(name)
             PageFullScreen.defaults = saved
         }
         try body()

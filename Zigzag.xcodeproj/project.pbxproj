@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E44933E8A74D5389CD1576AE /* TestScratch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E64961A922BEEA0BBBB7EA4 /* TestScratch.swift */; };
 		8EDD98C71A9B2D031C21E2CC /* HelperLifetimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */; };
 		C5E205C75B78676838E7A67B /* HelperProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DCAC029985B8485280EC93A /* HelperProbe.swift */; };
 		04ED955E9964B0EBEE95A893 /* HelperLifetime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4918D8BAD599CEF14063B226 /* HelperLifetime.swift */; };
@@ -717,6 +718,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2E64961A922BEEA0BBBB7EA4 /* TestScratch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestScratch.swift; sourceTree = "<group>"; };
 		05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperLifetimeTests.swift; sourceTree = "<group>"; };
 		9DCAC029985B8485280EC93A /* HelperProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperProbe.swift; sourceTree = "<group>"; };
 		4918D8BAD599CEF14063B226 /* HelperLifetime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperLifetime.swift; sourceTree = "<group>"; };
@@ -1970,6 +1972,7 @@
 		DF27ED16EF9BB28D19F995E5 /* ZigzagTests */ = {
 			isa = PBXGroup;
 			children = (
+				2E64961A922BEEA0BBBB7EA4 /* TestScratch.swift */,
 				05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */,
 				60823191217F3C0F87144EA5 /* AccessibilityTests.swift */,
 				FFDAD5641E480BF83AE887CA /* XPIPackageTests.swift */,
@@ -2943,6 +2946,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E44933E8A74D5389CD1576AE /* TestScratch.swift in Sources */,
 				8EDD98C71A9B2D031C21E2CC /* HelperLifetimeTests.swift in Sources */,
 				8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */,
 				FFFBC7AE9229B53B119F8200 /* FirefoxInstallTests.swift in Sources */,
