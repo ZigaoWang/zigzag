@@ -18,7 +18,7 @@
 
 <p align="center">
   分頁放在側邊欄裡，依空間分組。用 Swift 在 WebKit 上寫成的原生 Mac App，<br>
-  安裝後大約 35 MB，不需要帳號，也沒有遙測。
+  安裝後大約 55 MB，不需要帳號，也沒有遙測。
 </p>
 
 ## 我為什麼做它
@@ -106,7 +106,7 @@
 
 ## 它是怎麼做的
 
-Zigzag 大約是 120,000 行 Swift 6 和 AppKit，圍繞 `WKWebView` 寫成。沒有 Chromium，也沒有 Electron：引擎是 macOS 內建的 WebKit，所以 App 很小，引擎的安全性修正也隨 macOS 更新而來，而不是由我發布。
+Zigzag 大約是 170,000 行 Swift 6 和 AppKit，圍繞 `WKWebView` 寫成。沒有 Chromium，也沒有 Electron：引擎是 macOS 內建的 WebKit，所以 App 很小，引擎的安全性修正也隨 macOS 更新而來，而不是由我發布。
 
 | 部分 | 怎麼做的 |
 |---|---|
@@ -124,7 +124,7 @@ Zigzag 大約是 120,000 行 Swift 6 和 AppKit，圍繞 `WKWebView` 寫成。�
 | **網頁 App** | 安裝為 App 的網站，是 `~/Applications/Zigzag Apps` 裡一個獨立的小 App，每次啟動都交給 Zigzag，所以網頁在 Zigzag 裡執行，帶著你的登入狀態、延伸功能和阻擋設定。 |
 | **更新** | Sparkle 2，從 zigzagbrowser.com 取得 EdDSA 簽署的更新，分成穩定版和 Beta 版兩個更新來源。發布的版本用 Developer ID 簽署並經過公證。 |
 
-原始碼依功能組織：`Sidebar`、`Tabs`、`Web`、`Extensions`、`Passwords`、`Import`、`Profiles`、`CommandBar`、`Desk`（所有分頁一覽）、`WebApps`、`Developer`、`MCP`（AI App）、`Settings`、`Window` 和 `Design`（Zigzag 自己繪製的控制項和設計權杖）。2,000 多個測試涵蓋匯入、密碼、延伸功能、網址處理、瀏覽記錄、AI App 和安全性修正。
+原始碼依功能組織：`Sidebar`、`Tabs`、`Web`、`Extensions`、`Passwords`、`Import`、`Profiles`、`CommandBar`、`Desk`（所有分頁一覽）、`WebApps`、`Developer`、`MCP`（AI App）、`Settings`、`Window` 和 `Design`（Zigzag 自己繪製的控制項和設計權杖）。4,000 多個測試涵蓋匯入、密碼、延伸功能、網址處理、瀏覽記錄、AI App 和安全性修正。
 
 ## 隱私
 

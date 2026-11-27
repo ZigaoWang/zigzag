@@ -18,7 +18,7 @@
 
 <p align="center">
   タブをサイドバーに置いて、スペースごとにまとめます。WebKitの上にSwiftで作ったネイティブなMac Appで、<br>
-  インストール後は約35 MB。アカウントもテレメトリも不要です。
+  インストール後は約55 MB。アカウントもテレメトリも不要です。
 </p>
 
 ## 作った理由
@@ -106,7 +106,7 @@
 
 ## 仕組み
 
-Zigzagは、`WKWebView` を中心にした約12万行のSwift 6とAppKitでできています。ChromiumもElectronも使っていません。エンジンはmacOSに入っているWebKitなので、Appが小さく、エンジンのセキュリティ修正も私ではなくmacOSのアップデートで届きます。
+Zigzagは、`WKWebView` を中心にした約17万行のSwift 6とAppKitでできています。ChromiumもElectronも使っていません。エンジンはmacOSに入っているWebKitなので、Appが小さく、エンジンのセキュリティ修正も私ではなくmacOSのアップデートで届きます。
 
 | 項目 | 仕組み |
 |---|---|
@@ -124,7 +124,7 @@ Zigzagは、`WKWebView` を中心にした約12万行のSwift 6とAppKitでで�
 | **Webアプリ** | Appとしてインストールしたサイトは、`~/Applications/Zigzag Apps` に置かれる小さな独立したAppです。起動のたびにZigzagに処理を渡すので、ページはZigzagの中で、ログイン状態、機能拡張、ブロックの設定を使って動きます。 |
 | **アップデート** | Sparkle 2を使い、zigzagbrowser.comからEdDSAで署名されたアップデートを、安定版またはベータ版のフィードで配信します。リリースはDeveloper IDで署名され、公証されています。 |
 
-ソースは機能ごとに分かれています。`Sidebar`、`Tabs`、`Web`、`Extensions`、`Passwords`、`Import`、`Profiles`、`CommandBar`、`Desk`（すべてのタブを一度に）、`WebApps`、`Developer`、`MCP`（AI App）、`Settings`、`Window`、`Design`（Zigzag独自に描いたコントロールとデザイントークン）です。2,000を超えるテストが、読み込み、パスワード、機能拡張、アドレスの処理、履歴、AI App、セキュリティ修正をカバーしています。
+ソースは機能ごとに分かれています。`Sidebar`、`Tabs`、`Web`、`Extensions`、`Passwords`、`Import`、`Profiles`、`CommandBar`、`Desk`（すべてのタブを一度に）、`WebApps`、`Developer`、`MCP`（AI App）、`Settings`、`Window`、`Design`（Zigzag独自に描いたコントロールとデザイントークン）です。4,000を超えるテストが、読み込み、パスワード、機能拡張、アドレスの処理、履歴、AI App、セキュリティ修正をカバーしています。
 
 ## プライバシー
 

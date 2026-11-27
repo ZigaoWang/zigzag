@@ -18,7 +18,7 @@ Cette page est une traduction de README.md ; si elles diffèrent, la version a
 
 <p align="center">
   Vos onglets dans une barre latérale, regroupés en espaces. Une app Mac native en Swift sur WebKit,<br>
-  environ 35 Mo installée, sans compte et sans télémétrie.
+  environ 55 Mo installée, sans compte et sans télémétrie.
 </p>
 
 ## Pourquoi je l’ai créé
@@ -106,7 +106,7 @@ C’est mon navigateur de tous les jours, mais Zigzag est jeune et vous y trouve
 
 ## Comment il est construit
 
-Zigzag compte environ 120 000 lignes de Swift 6 et d’AppKit autour de `WKWebView`. Il n’y a ni Chromium ni Electron : le moteur est le WebKit fourni avec macOS, ce qui explique que l’app soit petite et que les correctifs de sécurité du moteur arrivent avec les mises à jour de macOS plutôt que de moi.
+Zigzag compte environ 170 000 lignes de Swift 6 et d’AppKit autour de `WKWebView`. Il n’y a ni Chromium ni Electron : le moteur est le WebKit fourni avec macOS, ce qui explique que l’app soit petite et que les correctifs de sécurité du moteur arrivent avec les mises à jour de macOS plutôt que de moi.
 
 | Partie | Comment |
 |---|---|
@@ -124,7 +124,7 @@ Zigzag compte environ 120 000 lignes de Swift 6 et d’AppKit autour de `WKWeb
 | **Apps web** | Un site installé en tant qu’app est une petite app à part entière dans `~/Applications/Zigzag Apps` qui confie chaque lancement à Zigzag, de sorte que la page s’exécute dans Zigzag avec vos connexions, vos extensions et le blocage. |
 | **Mises à jour** | Sparkle 2, avec des mises à jour signées EdDSA depuis zigzagbrowser.com, sur un flux stable ou bêta. Les versions sont signées avec Developer ID et notarisées. |
 
-Le code source est organisé par fonctionnalité : `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (tous les onglets d’un coup), `WebApps`, `Developer`, `MCP` (apps d’IA), `Settings`, `Window` et `Design` (les contrôles dessinés par Zigzag et ses variables de design). Plus de 2 000 tests couvrent l’importation, les mots de passe, les extensions, le traitement des adresses, l’historique, les apps d’IA et les correctifs de sécurité.
+Le code source est organisé par fonctionnalité : `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (tous les onglets d’un coup), `WebApps`, `Developer`, `MCP` (apps d’IA), `Settings`, `Window` et `Design` (les contrôles dessinés par Zigzag et ses variables de design). Plus de 4 000 tests couvrent l’importation, les mots de passe, les extensions, le traitement des adresses, l’historique, les apps d’IA et les correctifs de sécurité.
 
 ## Confidentialité
 

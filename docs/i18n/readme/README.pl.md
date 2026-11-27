@@ -18,7 +18,7 @@ Ta strona jest tłumaczeniem pliku README.md; jeśli się różnią, obowiązuje
 
 <p align="center">
   Twoje karty na pasku bocznym, pogrupowane w przestrzenie. Natywna aplikacja na Maca napisana w Swift na WebKit,<br>
-  po instalacji zajmuje około 35 MB, bez konta i bez telemetrii.
+  po instalacji zajmuje około 55 MB, bez konta i bez telemetrii.
 </p>
 
 ## Dlaczego go stworzyłem
@@ -106,7 +106,7 @@ To moja codzienna przeglądarka, ale Zigzag jest młody i znajdziesz w nim błę
 
 ## Jak jest zbudowany
 
-Zigzag to około 120 000 linii Swift 6 i AppKit wokół `WKWebView`. Nie ma w nim Chromium ani Electrona: silnikiem jest WebKit dostarczany z macOS, dlatego aplikacja jest mała, a poprawki bezpieczeństwa silnika przychodzą z aktualizacjami macOS, a nie ode mnie.
+Zigzag to około 170 000 linii Swift 6 i AppKit wokół `WKWebView`. Nie ma w nim Chromium ani Electrona: silnikiem jest WebKit dostarczany z macOS, dlatego aplikacja jest mała, a poprawki bezpieczeństwa silnika przychodzą z aktualizacjami macOS, a nie ode mnie.
 
 | Część | Jak |
 |---|---|
@@ -124,7 +124,7 @@ Zigzag to około 120 000 linii Swift 6 i AppKit wokół `WKWebView`. Nie ma w ni
 | **Aplikacje WWW** | Witryna zainstalowana jako aplikacja to osobna mała aplikacja w `~/Applications/Zigzag Apps`, która przekazuje każde uruchomienie do Zigzag, więc strona działa w Zigzag z twoimi logowaniami, rozszerzeniami i blokowaniem. |
 | **Aktualizacje** | Sparkle 2, z aktualizacjami podpisanymi EdDSA z zigzagbrowser.com, w kanale stabilnym lub beta. Wydania są podpisywane Developer ID i notaryzowane. |
 
-Kod źródłowy jest zorganizowany według funkcji: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (wszystkie karty naraz), `WebApps`, `Developer`, `MCP` (aplikacje AI), `Settings`, `Window` i `Design` (własne rysowane kontrolki i tokeny projektowe Zigzag). Ponad 2000 testów obejmuje import, hasła, rozszerzenia, obsługę adresów, historię, aplikacje AI i poprawki bezpieczeństwa.
+Kod źródłowy jest zorganizowany według funkcji: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (wszystkie karty naraz), `WebApps`, `Developer`, `MCP` (aplikacje AI), `Settings`, `Window` i `Design` (własne rysowane kontrolki i tokeny projektowe Zigzag). Ponad 4000 testów obejmuje import, hasła, rozszerzenia, obsługę adresów, historię, aplikacje AI i poprawki bezpieczeństwa.
 
 ## Prywatność
 

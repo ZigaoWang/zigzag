@@ -18,7 +18,7 @@ Esta página é uma tradução do README.md; se houver diferenças, a versão em
 
 <p align="center">
   Suas abas em uma barra lateral, agrupadas em espaços. Um app nativo para Mac em Swift sobre o WebKit,<br>
-  com cerca de 35 MB instalado, sem conta e sem telemetria.
+  com cerca de 55 MB instalado, sem conta e sem telemetria.
 </p>
 
 ## Por que eu fiz
@@ -106,7 +106,7 @@ Oi, eu sou o Zigao, estudante do ensino médio em Xangai. Eu usava o Arc todos o
 
 ## Como ele é feito
 
-O Zigzag tem cerca de 120.000 linhas de Swift 6 e AppKit em torno do `WKWebView`. Não há Chromium nem Electron: o mecanismo é o WebKit que vem com o macOS, e é por isso que o app é pequeno e que as correções de segurança do mecanismo chegam com as atualizações do macOS, e não de mim.
+O Zigzag tem cerca de 170.000 linhas de Swift 6 e AppKit em torno do `WKWebView`. Não há Chromium nem Electron: o mecanismo é o WebKit que vem com o macOS, e é por isso que o app é pequeno e que as correções de segurança do mecanismo chegam com as atualizações do macOS, e não de mim.
 
 | Parte | Como |
 |---|---|
@@ -124,7 +124,7 @@ O Zigzag tem cerca de 120.000 linhas de Swift 6 e AppKit em torno do `WKWebView`
 | **Web apps** | Um site instalado como app é um pequeno app próprio em `~/Applications/Zigzag Apps` que entrega cada abertura ao Zigzag, então a página roda no Zigzag com seus logins, extensões e bloqueio. |
 | **Atualizações** | Sparkle 2, com atualizações assinadas com EdDSA vindas de zigzagbrowser.com, em um feed estável ou beta. As versões são assinadas com Developer ID e notarizadas. |
 
-O código-fonte é organizado por recurso: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (todas as abas de uma vez), `WebApps`, `Developer`, `MCP` (apps de IA), `Settings`, `Window` e `Design` (os controles desenhados do próprio Zigzag e os tokens de design). Mais de 2.000 testes cobrem importação, senhas, extensões, tratamento de endereços, histórico, apps de IA e as correções de segurança.
+O código-fonte é organizado por recurso: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (todas as abas de uma vez), `WebApps`, `Developer`, `MCP` (apps de IA), `Settings`, `Window` e `Design` (os controles desenhados do próprio Zigzag e os tokens de design). Mais de 4.000 testes cobrem importação, senhas, extensões, tratamento de endereços, histórico, apps de IA e as correções de segurança.
 
 ## Privacidade
 

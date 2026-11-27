@@ -18,7 +18,7 @@ Esta página es una traducción de README.md; si hay diferencias, la versión en
 
 <p align="center">
   Tus pestañas en una barra lateral, agrupadas en espacios. Una app nativa para Mac hecha en Swift sobre WebKit,<br>
-  de unos 35 MB instalada, sin cuenta y sin telemetría.
+  de unos 55 MB instalada, sin cuenta y sin telemetría.
 </p>
 
 ## Por qué lo hice
@@ -106,7 +106,7 @@ Es mi navegador de todos los días, pero Zigzag es joven y encontrarás errores.
 
 ## Cómo está hecho
 
-Zigzag tiene unas 120 000 líneas de Swift 6 y AppKit alrededor de `WKWebView`. No hay Chromium ni Electron: el
+Zigzag tiene unas 170 000 líneas de Swift 6 y AppKit alrededor de `WKWebView`. No hay Chromium ni Electron: el
 motor es el WebKit que viene con macOS, y por eso la app es pequeña y las correcciones de seguridad del motor
 llegan con las actualizaciones de macOS en lugar de llegar de mí.
 
@@ -128,7 +128,7 @@ llegan con las actualizaciones de macOS en lugar de llegar de mí.
 
 El código fuente está organizado por función: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`,
 `CommandBar`, `Desk` (todas las pestañas a la vez), `WebApps`, `Developer`, `MCP` (apps de IA), `Settings`, `Window` y
-`Design` (los controles dibujados por el propio Zigzag y los tokens de diseño). Más de 2000 pruebas cubren la importación, las contraseñas, las extensiones,
+`Design` (los controles dibujados por el propio Zigzag y los tokens de diseño). Más de 4000 pruebas cubren la importación, las contraseñas, las extensiones,
 el tratamiento de direcciones, el historial, las apps de IA y las correcciones de seguridad.
 
 ## Privacidad

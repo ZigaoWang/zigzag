@@ -18,7 +18,7 @@ Deze pagina is een vertaling van README.md. Als ze van elkaar verschillen, is de
 
 <p align="center">
   Je tabbladen in een navigatiekolom, gegroepeerd in spaces. Een native Mac-app in Swift op WebKit,<br>
-  ongeveer 35 MB na installatie, zonder account en zonder telemetrie.
+  ongeveer 55 MB na installatie, zonder account en zonder telemetrie.
 </p>
 
 ## Waarom ik het heb gemaakt
@@ -106,7 +106,7 @@ Het is mijn dagelijkse browser, maar Zigzag is jong en je zult bugs vinden. Ding
 
 ## Hoe het is gebouwd
 
-Zigzag is ongeveer 120.000 regels Swift 6 en AppKit rond `WKWebView`. Er is geen Chromium en geen Electron: de engine is het WebKit dat met macOS wordt meegeleverd, en daarom is de app klein en komen beveiligingsfixes van de engine met macOS-updates in plaats van van mij.
+Zigzag is ongeveer 170.000 regels Swift 6 en AppKit rond `WKWebView`. Er is geen Chromium en geen Electron: de engine is het WebKit dat met macOS wordt meegeleverd, en daarom is de app klein en komen beveiligingsfixes van de engine met macOS-updates in plaats van van mij.
 
 | Onderdeel | Hoe |
 |---|---|
@@ -124,7 +124,7 @@ Zigzag is ongeveer 120.000 regels Swift 6 en AppKit rond `WKWebView`. Er is geen
 | **Web-apps** | Een als app geïnstalleerde website is een kleine eigen app in `~/Applications/Zigzag Apps` die elke start doorgeeft aan Zigzag, zodat de pagina in Zigzag draait met je aanmeldingen, extensies en blokkering. |
 | **Updates** | Sparkle 2, met EdDSA-ondertekende updates van zigzagbrowser.com, op een stabiele of een bèta-feed. Releases zijn ondertekend met Developer ID en genotariseerd. |
 
-De broncode is georganiseerd per functie: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (alle tabbladen tegelijk), `WebApps`, `Developer`, `MCP` (AI-apps), `Settings`, `Window` en `Design` (de eigen getekende regelaars en designtokens van Zigzag). Meer dan 2.000 tests dekken importeren, wachtwoorden, extensies, adresverwerking, geschiedenis, AI-apps en de beveiligingsfixes.
+De broncode is georganiseerd per functie: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (alle tabbladen tegelijk), `WebApps`, `Developer`, `MCP` (AI-apps), `Settings`, `Window` en `Design` (de eigen getekende regelaars en designtokens van Zigzag). Meer dan 4.000 tests dekken importeren, wachtwoorden, extensies, adresverwerking, geschiedenis, AI-apps en de beveiligingsfixes.
 
 ## Privacy
 

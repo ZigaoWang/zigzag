@@ -18,7 +18,7 @@ Diese Seite ist eine Übersetzung der README.md. Weichen sie voneinander ab, gil
 
 <p align="center">
   Deine Tabs in einer Seitenleiste, in Spaces gruppiert. Eine native Mac-App in Swift auf WebKit,<br>
-  installiert etwa 35 MB groß, ohne Account und ohne Telemetrie.
+  installiert etwa 55 MB groß, ohne Account und ohne Telemetrie.
 </p>
 
 ## Warum ich es gebaut habe
@@ -121,7 +121,7 @@ Es ist mein Alltagsbrowser, aber Zigzag ist jung, und du wirst Fehler finden. Wa
 
 ## Wie es gebaut ist
 
-Zigzag besteht aus etwa 120.000 Zeilen Swift 6 und AppKit rund um `WKWebView`. Es gibt kein Chromium und kein Electron: Die
+Zigzag besteht aus etwa 170.000 Zeilen Swift 6 und AppKit rund um `WKWebView`. Es gibt kein Chromium und kein Electron: Die
 Engine ist das WebKit, das mit macOS kommt, weshalb die App klein ist und Sicherheitskorrekturen der Engine
 mit macOS-Updates eintreffen statt von mir.
 
@@ -143,7 +143,7 @@ mit macOS-Updates eintreffen statt von mir.
 
 Der Quellcode ist nach Funktionen gegliedert: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`,
 `CommandBar`, `Desk` (alle Tabs auf einmal), `WebApps`, `Developer`, `MCP` (KI-Apps), `Settings`, `Window` und
-`Design` (Zigzags eigene gezeichnete Bedienelemente und Design-Tokens). Über 2.000 Tests decken Import, Passwörter, Erweiterungen,
+`Design` (Zigzags eigene gezeichnete Bedienelemente und Design-Tokens). Über 4.000 Tests decken Import, Passwörter, Erweiterungen,
 Adressverarbeitung, Verlauf, KI-Apps und die Sicherheitskorrekturen ab.
 
 ## Datenschutz

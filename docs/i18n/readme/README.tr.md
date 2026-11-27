@@ -18,7 +18,7 @@ Bu sayfa README.md dosyasının çevirisidir; aralarında fark olursa başvuru k
 
 <p align="center">
   Sekmeleriniz kenar çubuğunda, Space’lere ayrılmış durumda. WebKit üzerinde Swift ile yazılmış yerel bir Mac uygulaması,<br>
-  kurulu hâlde yaklaşık 35 MB; hesap yok, telemetri yok.
+  kurulu hâlde yaklaşık 55 MB; hesap yok, telemetri yok.
 </p>
 
 ## Neden yaptım
@@ -106,7 +106,7 @@ Günlük tarayıcım bu, ama Zigzag genç ve hatalarla karşılaşacaksınız. A
 
 ## Nasıl yapıldı
 
-Zigzag, `WKWebView` etrafında yaklaşık 120.000 satır Swift 6 ve AppKit. Chromium yok, Electron yok: motor, macOS ile gelen WebKit’tir; uygulamanın küçük olmasının ve motorun güvenlik düzeltmelerinin benden değil macOS güncellemeleriyle gelmesinin nedeni de budur.
+Zigzag, `WKWebView` etrafında yaklaşık 170.000 satır Swift 6 ve AppKit. Chromium yok, Electron yok: motor, macOS ile gelen WebKit’tir; uygulamanın küçük olmasının ve motorun güvenlik düzeltmelerinin benden değil macOS güncellemeleriyle gelmesinin nedeni de budur.
 
 | Bölüm | Nasıl |
 |---|---|
@@ -124,7 +124,7 @@ Zigzag, `WKWebView` etrafında yaklaşık 120.000 satır Swift 6 ve AppKit. Chro
 | **Web uygulamaları** | Uygulama olarak yüklenen bir site, `~/Applications/Zigzag Apps` içinde kendi başına küçük bir uygulamadır ve her açılışı Zigzag’e devreder; böylece sayfa, girişleriniz, genişletmeleriniz ve engellemenizle Zigzag’de çalışır. |
 | **Güncellemeler** | Sparkle 2, zigzagbrowser.com’dan EdDSA ile imzalı güncellemeler, kararlı veya beta akışında. Sürümler Developer ID ile imzalanır ve noter onayından geçirilir. |
 
-Kaynak kod özelliğe göre düzenlenmiştir: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (tüm sekmeler bir arada), `WebApps`, `Developer`, `MCP` (yapay zekâ uygulamaları), `Settings`, `Window` ve `Design` (Zigzag’in kendi çizdiği denetimler ve tasarım belirteçleri). 2.000’den fazla test içe aktarmayı, parolaları, genişletmeleri, adres işlemeyi, geçmişi, yapay zekâ uygulamalarını ve güvenlik düzeltmelerini kapsar.
+Kaynak kod özelliğe göre düzenlenmiştir: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk` (tüm sekmeler bir arada), `WebApps`, `Developer`, `MCP` (yapay zekâ uygulamaları), `Settings`, `Window` ve `Design` (Zigzag’in kendi çizdiği denetimler ve tasarım belirteçleri). 4.000’den fazla test içe aktarmayı, parolaları, genişletmeleri, adres işlemeyi, geçmişi, yapay zekâ uygulamalarını ve güvenlik düzeltmelerini kapsar.
 
 ## Gizlilik
 

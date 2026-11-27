@@ -18,7 +18,7 @@
 
 <p align="center">
   탭이 사이드바에 있고, 스페이스별로 묶입니다. WebKit 위에서 Swift로 만든 네이티브 Mac 앱으로,<br>
-  설치 후 용량은 약 35 MB입니다. 계정도, 텔레메트리도 없습니다.
+  설치 후 용량은 약 55 MB입니다. 계정도, 텔레메트리도 없습니다.
 </p>
 
 ## 만든 이유
@@ -106,7 +106,7 @@
 
 ## 구성 방식
 
-Zigzag는 `WKWebView`를 중심으로 한 Swift 6와 AppKit 코드 약 120,000줄입니다. Chromium도 Electron도 없습니다. 엔진은 macOS에 포함된 WebKit이어서 앱이 작고, 엔진의 보안 수정도 제가 아니라 macOS 업데이트로 전달됩니다.
+Zigzag는 `WKWebView`를 중심으로 한 Swift 6와 AppKit 코드 약 170,000줄입니다. Chromium도 Electron도 없습니다. 엔진은 macOS에 포함된 WebKit이어서 앱이 작고, 엔진의 보안 수정도 제가 아니라 macOS 업데이트로 전달됩니다.
 
 | 구성 요소 | 방식 |
 |---|---|
@@ -124,7 +124,7 @@ Zigzag는 `WKWebView`를 중심으로 한 Swift 6와 AppKit 코드 약 120,000�
 | **웹 앱** | 앱으로 설치한 사이트는 `~/Applications/Zigzag Apps`에 있는 작은 앱이며, 실행할 때마다 Zigzag에 넘깁니다. 그래서 페이지는 Zigzag 안에서 로그인 상태, 확장 프로그램, 차단 기능과 함께 실행됩니다. |
 | **업데이트** | Sparkle 2를 쓰며, zigzagbrowser.com에서 EdDSA 서명된 업데이트를 안정 또는 베타 피드로 받습니다. 릴리스는 Developer ID로 서명하고 공증합니다. |
 
-소스는 기능별로 나뉘어 있습니다. `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk`(모든 탭), `WebApps`, `Developer`, `MCP`(AI 앱), `Settings`, `Window`, `Design`(Zigzag가 직접 그린 컨트롤과 디자인 토큰)입니다. 테스트 2,000개 이상이 가져오기, 암호, 확장 프로그램, 주소 처리, 방문 기록, AI 앱, 보안 수정을 다룹니다.
+소스는 기능별로 나뉘어 있습니다. `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`, `CommandBar`, `Desk`(모든 탭), `WebApps`, `Developer`, `MCP`(AI 앱), `Settings`, `Window`, `Design`(Zigzag가 직접 그린 컨트롤과 디자인 토큰)입니다. 테스트 4,000개 이상이 가져오기, 암호, 확장 프로그램, 주소 처리, 방문 기록, AI 앱, 보안 수정을 다룹니다.
 
 ## 개인정보 보호
 
