@@ -80,7 +80,7 @@ Zigzag가 일본어와 한국어부터 독일어, 프랑스어, 스페인어, �
 - 아무것도 하지 않는 윈도우가 더 이상 Mac의 그래픽 처리를 간헐적으로 붙잡아 두지 않습니다. 사이트의 새 아이콘처럼 스페이스를 그대로 두는 변경이나 배터리가 충전량을 알리는 일이 있으면, 윈도우 전체가 자기 색에서 같은 색으로 페이드되고 있었습니다.
 - ⌘T로 막 연 탭을 닫으면 Safari와 Chrome처럼 아래 탭이 아니라 보고 있던 탭으로 돌아갑니다.
 - 스페이스의 고정된 탭이 접혀 있을 때, 또는 닫힌 폴더 아래에 표시된 고정된 탭을 ⌘W로 닫아도 그 행이 사이드바에서 사라지지 않습니다. 스페이스를 전환하거나 고정된 탭이나 그 폴더를 다시 열거나 닫을 때까지 로드 해제된 채로 남습니다.
-- Zoom의 웹 앱처럼 알림 표시를 요청하는 사이트가 요청할 때 스크립트 오류로 깨지지 않습니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Zoom의 웹 앱처럼 알림 표시를 요청하는 사이트가 요청할 때 스크립트 오류로 깨지지 않습니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
 - Mac의 메모리가 부족한 상태에서 몇 시간 동안 잠들어 있던 탭이 Azure DevOps나 Microsoft 365 같은 사이트에서 로그아웃된 채로 깨어나는 일이 없어졌습니다. 메모리가 부족할 때 macOS가 로그인 쿠키를 보관하는 WebKit 부분을 멈추게 하면, Zigzag가 페이지를 불러오기 전에 쿠키를 되돌려 놓습니다. Zigzag를 종료했다가 마지막 세션으로 다시 열어도 그 로그인이 유지됩니다. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 - Bitwarden의 ‘생체 인식으로 잠금 해제’가 이제 Bitwarden 앱에 연결됩니다. Zigzag가 Bitwarden에 앱과 이미 통신할 수 있다고 알려서 Bitwarden이 허용을 요청하지 않았고, 그다음에는 Zigzag가 앱 연결을 막고 있었습니다. 이제 Bitwarden이 요청하고 Zigzag가 허용할지 묻습니다. 전에 생체 인식을 켜 두었다면 Bitwarden 설정에서 ‘생체 인식으로 잠금 해제’를 껐다가 다시 켜세요. [retorquere](https://github.com/retorquere) 님께 감사드립니다. ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - 더 많은 권한을 요청하는 확장 프로그램 업데이트를 승인해도 나중에 허용해 둔 항목이 사라지지 않습니다. 예를 들어 Bitwarden이 ‘생체 인식으로 잠금 해제’를 위해 앱에 연결하는 권한입니다. [retorquere](https://github.com/retorquere) 님께 감사드립니다. ([#484](https://github.com/ZigaoWang/zigzag/issues/484))

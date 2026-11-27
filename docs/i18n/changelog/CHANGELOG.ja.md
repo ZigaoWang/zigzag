@@ -80,7 +80,7 @@ Zigzagが日本語、韓国語からドイツ語、フランス語、スペイ�
 - 何もしていないウインドウが、Macのグラフィックスをときどき使い続けることはなくなりました。サイトの新しいアイコンや、バッテリーが充電量を知らせたときなど、スペースが変わらない変化でも、ウインドウ全体がその色から同じ色へフェードしていました。
 - ⌘Tで開いたばかりのタブを閉じると、下のタブではなく、SafariやChromeと同じように、それまで見ていたタブに戻ります。
 - 固定タブが折りたたまれているスペースで、固定タブや、閉じたフォルダの中に表示されている固定タブを⌘Wで閉じても、その行がサイドバーから消えなくなりました。スペースを切り替えるか、固定タブやそのフォルダをもう一度開閉するまで、アンロードされた状態で残ります。
-- Zoomのウェブアプリのように通知の表示を求めるサイトが、求めたときにスクリプトエラーで動かなくなることはなくなりました。[Lakeland97](https://github.com/Lakeland97)さん、ありがとうございます。([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Zoomのウェブアプリのように通知の表示を求めるサイトが、求めたときにスクリプトエラーで動かなくなることはなくなりました。[Lakeland97](https://github.com/Lakeland97)さん、ありがとうございます。([#551](https://github.com/ZigaoWang/zigzag/issues/551))
 - Macのメモリが少ない状態で何時間もスリープしていたタブが、Azure DevOpsやMicrosoft 365などのサイトからログアウトした状態で復帰することはなくなりました。ログイン用のCookieを保持するWebKitの部分が、メモリ不足でmacOSによって停止された場合は、Zigzagがページを読み込む前にCookieを元に戻します。Zigzagを終了して前回のセッションで開き直しても、それらのログインは保たれます。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 - Bitwardenの「生体認証でロック解除」がBitwardenのAppに届くようになりました。ZigzagはすでにAppと通信できるとBitwardenに伝えていたため、Bitwardenは許可を求めず、そのうえでZigzagがAppへの接続を止めていました。今はBitwardenが許可を求め、Zigzagが許可するかどうかを尋ねます。以前に生体認証をオンにしていた場合は、Bitwardenの設定で「生体認証でロック解除」をオフにしてからもう一度オンにしてください。[retorquere](https://github.com/retorquere)さん、ありがとうございます。 ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - より多くの権限を求める機能拡張のアップデートを承認しても、あとから許可した内容が取り消されなくなりました。たとえば、Bitwardenが「生体認証でロック解除」のためにアプリと接続する許可です。[retorquere](https://github.com/retorquere)さん、ありがとうございます。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
