@@ -89,4 +89,35 @@ import Testing
         #expect(!ReadyPictures.renew(old, replacing: old, in: nil))
         #expect(!ReadyPictures.renew(nil, replacing: old, in: nil))
     }
+
+    /// A whole page's picture, `bits` per channel in `space`: white, with a line of text-like gray when `marked`.
+    private func page(bits: Int, space: String, marked: Bool) -> NSImage {
+        let info = bits == 16 ? CGImageAlphaInfo.premultipliedLast.rawValue
+            : CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        let context = CGContext(data: nil, width: 2560, height: 1600, bitsPerComponent: bits, bytesPerRow: 0,
+                                space: CGColorSpace(name: space as CFString)!, bitmapInfo: info)!
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 2560, height: 1600))
+        if marked {
+            context.setFillColor(gray: 0.3, alpha: 1)
+            context.fill(CGRect(x: 200, y: 700, width: 1600, height: 60))
+        }
+        return NSImage(cgImage: context.makeImage()!, size: NSSize(width: 1280, height: 800))
+    }
+
+    /// Whether a page's picture is blank is asked on the main thread as the tab overview's search filters its cards:
+    /// a Display P3 or 16-bit picture is checked in its own colors, not converted whole first.
+    @Test(arguments: [(8, "kCGColorSpaceDisplayP3"), (16, "kCGColorSpaceDisplayP3"), (8, "kCGColorSpaceSRGB")])
+    func aPagesPictureIsCheckedForBlanknessQuickly(bits: Int, space: String) {
+        var times: [Double] = []
+        for i in 0..<5 {
+            let image = page(bits: bits, space: space, marked: i % 2 == 1)
+            let start = CACurrentMediaTime()
+            let blank = TabThumbnailView.isBlank(image)
+            times.append((CACurrentMediaTime() - start) * 1000)
+            #expect(blank == (i % 2 == 0))
+        }
+        // Converted whole first, the middle of five took 24 ms (8-bit Display P3) and 92 ms (16-bit); now 5 and 16.
+        #expect(times.sorted()[2] < (bits == 16 ? 45 : 12), "\(times)")
+    }
 }

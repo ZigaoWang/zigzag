@@ -286,8 +286,7 @@ final class TabThumbnailView: InteractiveView {
 
     nonisolated static func isBlank(_ cg: CGImage) -> Bool {
         let side = 64
-        guard let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
-                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+        guard let context = blankCheckContext(side: side, for: cg),
               let pixels = context.data?.bindMemory(to: UInt8.self, capacity: side * side * 4) else { return false }
         context.interpolationQuality = .medium
         context.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
@@ -300,6 +299,23 @@ final class TabThumbnailView: InteractiveView {
             }
         }
         return zip(low, high).allSatisfy { Int($1) - Int($0) < 8 }
+    }
+
+    /// A small bitmap in the picture's own colors, so drawing it in scales without converting the whole picture.
+    nonisolated static func blankCheckContext(side: Int, for cg: CGImage) -> CGContext? {
+        let info = CGImageAlphaInfo.premultipliedLast.rawValue
+        var spaces: [CGColorSpace] = []
+        if let own = cg.colorSpace, own.model == .rgb {
+            // An extended-range space has no 8-bit bitmaps; its standard range does.
+            spaces += [own, CGColorSpaceCreateCopyWithStandardRange(own)]
+        }
+        spaces.append(CGColorSpaceCreateDeviceRGB())
+        for space in spaces {
+            if let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4, space: space, bitmapInfo: info) {
+                return context
+            }
+        }
+        return nil
     }
 
     /// Which page a click landed on: with a split, the pane under the pointer.
