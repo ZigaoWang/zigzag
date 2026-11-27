@@ -701,6 +701,8 @@ final class PageCardView: NSView {
     private var swipeMoving: [CALayer] {
         [holder, document, overlay, placeholder].compactMap { $0?.layer } + [swipeShade]
     }
+    /// `swipeMoving` as the swipe started, so its steps make no list of their own.
+    private var swipeStepLayers: [CALayer] = []
 
     /// Offsets the page by `offset`, showing the backdrop in the gap, clipped to the card (and pane in a split).
     func setSwipeOffset(_ offset: CGFloat) {
@@ -724,8 +726,10 @@ final class PageCardView: NSView {
                 swipeShade.shadowOpacity = 1
                 swipeShade.shadowRadius = Tokens.Shadow.sheetRadius
                 swipeShade.shadowOffset = .zero
+                swipeStepLayers = swipeMoving
             }
-            for layer in swipeMoving {
+            if swipeStepLayers.isEmpty { swipeStepLayers = swipeMoving }
+            for layer in swipeStepLayers {
                 layer.removeAnimation(forKey: "swipe.settle")
                 layer.setAffineTransform(CGAffineTransform(translationX: offset, y: 0))
             }
@@ -740,6 +744,7 @@ final class PageCardView: NSView {
             guard let self, self.swipeSettles == settle else { return }
             self.swipeBackdrop.isHidden = true
             self.holder?.layer?.masksToBounds = false
+            self.swipeStepLayers = []
         }
         CATransaction.begin()
         CATransaction.setCompletionBlock { MainActor.assumeIsolated { finish() } }
@@ -771,6 +776,7 @@ final class PageCardView: NSView {
     private func dropSwipe() {
         guard !swipeBackdrop.isHidden, swipeBackdrop.superview != nil else { return }
         swipeSettles += 1
+        swipeStepLayers = []
         Tokens.Motion.withoutAnimation {
             for layer in swipeMoving { SwipeExit.rest(layer, undims: swipeDimmed) }
             swipeDimmed = false

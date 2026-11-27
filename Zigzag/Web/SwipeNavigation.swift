@@ -59,6 +59,12 @@ final class SwipeNavigator {
     private var samples: [(time: TimeInterval, dx: CGFloat)] = []
     /// Clears the arrow if the gesture's end never arrives (macOS sometimes drops it between quick swipes).
     private var watchdog: DispatchWorkItem?
+    /// When the last step came, so the watchdog's one timer can tell a rest from a pause between steps.
+    private var lastStep: TimeInterval = 0
+    /// Counts the watchdog's timers, so one run early (`debugRest`) doesn't run again when its time comes.
+    private var restChecks = 0
+    /// How fast the page was moving as the fingers lifted, points a second, for the spring back or the carry on.
+    private var letGoSpeed: CGFloat = 0
     /// While the fingers rest mid-swipe no events come at all, which looks the same as a lost end. A rest keeps the
     /// swipe where it is; only doing something else (moving the pointer, a click, a key) shows the fingers are gone.
     private var restMonitor: Any?
@@ -318,7 +324,9 @@ final class SwipeNavigator {
     /// The probe's answer, as if the page had said it.
     func debugHeard(left: Bool, right: Bool, frame: Bool = false, still: Bool = false) { heard([left, right, frame, still], early: false) }
     /// Runs the watchdog's timer now, as if the fingers had been still that long.
-    func debugRest() { watchdog?.perform() }
+    func debugRest() { lastStep = -.infinity; watchdog?.perform() }
+    /// How many timers the watchdog has set.
+    private(set) var debugWatchdogTimers = 0
     /// Gone, with the page carried on and waiting for the next one.
     var isCarryingOn: Bool { arrival != nil }
     #endif
@@ -346,49 +354,68 @@ final class SwipeNavigator {
         SwipeDecision.speed(samples, at: now, direction: direction)
     }
 
+    /// Still this long mid-swipe, the fingers may be resting.
+    private static let restAfter: TimeInterval = 0.4
+
     private func armWatchdog() {
-        watchdog?.cancel()
-        stopWatchingRest()
+        lastStep = ProcessInfo.processInfo.systemUptime
+        // Watching a rest: this step shows the fingers are moving again.
+        if restMonitor != nil { stopWatchingRest(); watchdog?.cancel(); watchdog = nil }
+        // One timer for the swipe, not one a step: when it fires it waits out the rest from the last step.
+        if watchdog == nil { checkRest(after: Self.restAfter) }
+    }
+
+    private func checkRest(after delay: TimeInterval) {
+        restChecks += 1
+        #if DEBUG
+        debugWatchdogTimers += 1
+        #endif
+        let check = restChecks
+        let work = DispatchWorkItem { [weak self] in self?.restCheck(check) }
+        watchdog = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func restCheck(_ check: Int) {
+        guard check == restChecks, restMonitor == nil, state == .tracking || state == .leaning else { return }
+        let still = ProcessInfo.processInfo.systemUptime - lastStep
+        if still < Self.restAfter { checkRest(after: Self.restAfter - still); return }
         // Still for a moment: the fingers may be resting (to read a little more before going back), so the swipe
         // holds. Anything else the hand does means the gesture ended without saying so, and it's dropped then.
-        let work = DispatchWorkItem { [weak self] in
-            guard let self, self.state == .tracking || self.state == .leaning else { return }
-            // Not shown any more: there's no resting on a page that's gone.
-            guard self.webView?.window != nil else { self.abandonRest(); return }
-            let gone: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown,
-                                               .magnify, .rotate, .swipe, .smartMagnify, .scrollWheel]
-            self.restMonitor = NSEvent.addLocalMonitorForEvents(matching: gone) { [weak self] event in
-                // This gesture's own steps carry on; only a new gesture or a wheel's turn shows it ended.
-                if event.type != .scrollWheel || SwipeNavigator.startsAnother(event) {
-                    MainActor.assumeIsolated { self?.abandonRest() }
-                }
-                return event
+        // Not shown any more: there's no resting on a page that's gone.
+        guard webView?.window != nil else { abandonRest(); return }
+        let gone: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown,
+                                           .magnify, .rotate, .swipe, .smartMagnify, .scrollWheel]
+        restMonitor = NSEvent.addLocalMonitorForEvents(matching: gone) { [weak self] event in
+            // This gesture's own steps carry on; only a new gesture or a wheel's turn shows it ended.
+            if event.type != .scrollWheel || SwipeNavigator.startsAnother(event) {
+                MainActor.assumeIsolated { self?.abandonRest() }
             }
-            // Pointer moves reach a window only when it tracks them (a Zigzag Mini that isn't key doesn't), so it's watched.
-            let pointer = self.pointer()
-            self.restTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let now = self?.pointer() else { return }
-                    if hypot(now.x - pointer.x, now.y - pointer.y) > 2 { self?.abandonRest() }
-                }
-            }
-            // The window or the app going to the back ends it too.
-            let center = NotificationCenter.default
-            self.restObservers = [
-                center.addObserver(forName: NSWindow.didResignKeyNotification, object: self.webView?.window, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.abandonRest() }
-                },
-                center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.abandonRest() }
-                },
-            ]
-            // A rest that long is a lost gesture, not a pause.
-            let lost = DispatchWorkItem { [weak self] in self?.abandonRest() }
-            self.watchdog = lost
-            DispatchQueue.main.asyncAfter(deadline: .now() + SwipeDecision.lostAfter, execute: lost)
+            return event
         }
-        watchdog = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+        // Pointer moves reach a window only when it tracks them (a Zigzag Mini that isn't key doesn't), so it's watched.
+        let pointer = self.pointer()
+        restTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let now = self?.pointer() else { return }
+                if hypot(now.x - pointer.x, now.y - pointer.y) > 2 { self?.abandonRest() }
+            }
+        }
+        // The window or the app going to the back ends it too.
+        let center = NotificationCenter.default
+        restObservers = [
+            center.addObserver(forName: NSWindow.didResignKeyNotification, object: webView?.window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.abandonRest() }
+            },
+            center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.abandonRest() }
+            },
+        ]
+        // A rest that long is a lost gesture, not a pause.
+        restChecks += 1
+        let lost = DispatchWorkItem { [weak self] in self?.abandonRest() }
+        watchdog = lost
+        DispatchQueue.main.asyncAfter(deadline: .now() + SwipeDecision.lostAfter, execute: lost)
     }
 
     private func abandonRest() {
@@ -826,6 +853,8 @@ enum SwipeDecision: Equatable {
     /// Over a frame (a web app's sheet or editor) only the frame can answer, and a busy app takes longer: Chrome
     /// doesn't go back before it has. Also while it's not yet known what's under the pointer.
     static let frameWait: TimeInterval = 0.12
+    /// The longest the first movement waits for the page to say what's under the pointer: one frame.
+    static let probeWait: TimeInterval = 1.0 / 60
 
     /// What the page did with the gesture once a frame answers that it kept (`kept`) or left a scroll that came at
     /// `at`, for a gesture that began at `began` (both wall-clock milliseconds).
