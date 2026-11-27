@@ -1154,6 +1154,8 @@ enum Toast {
             }
         }
         toast.optionsButton.isHidden = options == nil
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        toast.optionsButton.clicksOnMouseDown = true
         toast.optionsButton.onClick = { [weak toast] _ in
             guard let toast, let options else { return }
             MenuPanel.show(options(), from: toast.optionsButton, placement: .below)

@@ -192,6 +192,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        sidebar.address.translateButton.clicksOnMouseDown = true
         sidebar.address.translateButton.onClick = { [weak self] _ in self?.showTranslateMenu() }
         wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
@@ -235,6 +237,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
             return nil
         }
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        sidebar.address.captureButton.clicksOnMouseDown = true
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { return }
             var items: [MenuPanel.Entry] = [

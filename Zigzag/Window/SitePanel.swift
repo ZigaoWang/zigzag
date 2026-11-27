@@ -253,6 +253,8 @@ final class SitePanel: FloatingPanelView {
                   SitePanelRows.rows(self.rowContext).contains(.keepCookies) != self.rows.contains(where: { $0 === self.keepCookiesRow }) else { return }
             self.rebuildRows()
         }
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        moreButton.clicksOnMouseDown = true
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
         moreButton.isHidden = !canClear && !canBoost && !canSetIcon
         // No page: only your extensions, one click away, the whole panel.

@@ -92,6 +92,8 @@ final class PaneHeaderView: NSView {
         super.init(frame: frame)
         [windowGuard, sidebarButton, back, forward, reload, address, zoom, swap, orientation, resetLayout, close, more, closeTab, line].forEach { addSubview($0) }
         sidebarButton.isHidden = true
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        more.clicksOnMouseDown = true
         more.onClick = { [weak self] _ in self?.showMore() }
         back.onClick = { [weak self] _ in self?.tab?.goBack() }
         forward.onClick = { [weak self] _ in self?.tab?.goForward() }

@@ -347,6 +347,8 @@ final class DownloadsPanelView: FloatingPanelView {
         super.init(frame: .zero)
         folderButton.iconColumn = DownloadRowView.iconColumn
         [title, clearButton, more, folderButton, emptyIcon, emptyNote].forEach { addSubview($0) }
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        more.clicksOnMouseDown = true
         more.onClick = { [weak self] _ in self?.showMoreMenu() }
         emptyIcon.contentTintColor = Tokens.Color.textTertiary
         emptyNote.alignment = .left

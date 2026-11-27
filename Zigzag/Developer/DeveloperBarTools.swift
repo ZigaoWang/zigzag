@@ -154,8 +154,12 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         sizeReadout.onMenu = { [weak self] in self?.showSizeMenu() }
         addSubview(sizeReadout)
         for (i, button) in buttons.enumerated() {
+            // A button of several tools is a menu: it opens as the press goes down.
+            button.clicksOnMouseDown = Self.parts[i].tools.count > 1
             button.onClick = { [weak self] _ in self?.pressed(i) }
         }
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        more.clicksOnMouseDown = true
         more.onClick = { [weak self] _ in self?.showMore() }
         // Its shortcuts are said in its tooltips: they follow a change in Settings › Shortcuts.
         shortcutsToken = Shortcuts.changed.observe { [weak self] in self?.refreshTips() }

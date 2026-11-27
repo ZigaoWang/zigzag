@@ -1948,6 +1948,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     control: downloadPlaceRules)
         rulesPlaceRow.keywords = String(localized: "folder location downloads", comment: "Words that find the Save downloads to setting with Find a setting. Not shown.")
         downloadPlaceGroup.add(rulesPlaceRow)
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        addDownloadRuleButton.clicksOnMouseDown = true
         addDownloadRuleButton.onClick = { [weak self] _ in self?.showDownloadRuleMenu() }
         addFileTypeButton.onClick = { [weak self] _ in
             guard let self else { return }
@@ -2360,6 +2362,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Extensions: the buttons over the list, which is read later.
     private func buildExtensions() {
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        getExtensionsButton.clicksOnMouseDown = true
         getExtensionsButton.onClick = { [weak self] _ in if let self { self.showGetExtensionsMenu(from: self.getExtensionsButton) } }
         loadUnpackedButton.onClick = { [weak self] _ in self?.loadUnpacked() }
         checkUpdatesButton.onClick = { [weak self] _ in self?.checkForUpdates() }
@@ -2903,6 +2907,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         if installed.isEmpty {
             let get = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens a menu of the Chrome Web Store and Firefox Add-ons."))
+            // Its menu opens as the press goes down, as a pop-up button's does.
+            get.clicksOnMouseDown = true
             get.onClick = { [weak self, weak get] _ in if let get { self?.showGetExtensionsMenu(from: get) } }
             extensionsGroup.add(FormRow(title: String(localized: "No extensions yet", comment: "A setting in Settings › Extensions."),
                                         detail: String(localized: "Find one in the Chrome Web Store or Firefox Add-ons and choose Add to Zigzag.", comment: "Explanation under “No extensions yet” in Settings › Extensions. Firefox Add-ons is addons.mozilla.org."),

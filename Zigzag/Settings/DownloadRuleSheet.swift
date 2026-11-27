@@ -99,6 +99,8 @@ enum DownloadRuleSheet {
                 sheetRef?.revalidate()
             }
             let button = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
+            // Its menu opens as the press goes down, as a pop-up button's does.
+            button.clicksOnMouseDown = true
             button.onClick = { [weak button] _ in
                 guard let button else { return }
                 var entries: [MenuPanel.Entry] = Applications.named().map { app in
@@ -152,6 +154,8 @@ enum DownloadRuleSheet {
                 sheetRef?.revalidate()
             }
             let button = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
+            // Its menu opens as the press goes down, as a pop-up button's does.
+            button.clicksOnMouseDown = true
             button.onClick = { [weak button] _ in
                 guard let button else { return }
                 var entries: [MenuPanel.Entry] = Paths.scriptNames().map { name in
