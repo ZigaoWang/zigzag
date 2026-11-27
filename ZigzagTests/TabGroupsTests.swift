@@ -434,6 +434,49 @@ struct TabGroupRulesTests {
         }
     }
 
+    /// ⌘T then ⌘W from a pinned page, a favorite, a pin in a folder or a page in a split goes back to that page,
+    /// not to a regular tab.
+    @Test func aNewTabClosesBackToThePinOrFavoriteYouWereOn() throws {
+        try inWindow(["A", "B", "C"]) { controller, tabs in
+            let manager = controller.tabManager
+            let pinned = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/back/pinned")!, title: "Pinned", to: space))
+            let favorite = Library.shared.addFavorite(url: URL(string: "http://127.0.0.1:9/back/favorite")!, title: "Favorite",
+                                                      in: Library.shared.profileID(ofSpace: space))
+            let filed = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/back/filed")!, title: "Filed", to: space))
+            let folder = try #require(Library.shared.addFolder(named: "Folder", with: [filed.id], in: space))
+            Library.shared.setFolderOpen(folder.id, true)
+            for mark in [pinned, favorite, filed] {
+                manager.select(tabs[2])
+                manager.openBookmark(mark)
+                let page = try #require(manager.bookmarkTab(for: mark.id))
+                #expect(manager.selectedTab === page)
+                let opened = manager.newTab(url: nil, spaceID: space, select: true)
+                controller.closeTab(nil)
+                #expect(opened.isClosed)
+                #expect(manager.selectedTab === page, "\(mark.title): \(manager.selectedTab?.title ?? "none")")
+            }
+            // A pinned split: back to the half you were on.
+            let left = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/back/left")!, title: "Left", to: space))
+            let right = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/back/right")!, title: "Right", to: space))
+            controller.listJoinPinned(right.id, onto: left.id, onRight: true)
+            let half = try #require(manager.bookmarkTab(for: right.id))
+            manager.select(tabs[2])
+            manager.select(half)
+            let opened = manager.newTab(url: nil, spaceID: space, select: true)
+            controller.closeTab(nil)
+            #expect(opened.isClosed)
+            #expect(manager.selectedTab === half)
+            // A split of regular tabs: back to the half you were on.
+            manager.makeSplit(tabs[0], with: tabs[1])
+            manager.select(tabs[2])
+            manager.select(tabs[1])
+            let again = manager.newTab(url: nil, spaceID: space, select: true)
+            controller.closeTab(nil)
+            #expect(again.isClosed)
+            #expect(manager.selectedTab === tabs[1])
+        }
+    }
+
     /// ⌘W on the space's last tab goes to the page you were on before it in the space; with none, the space is empty.
     @Test func closingTheLastTabGoesToTheSpacesRecentPageElseEmpty() throws {
         try inWindow(["Last"]) { controller, tabs in

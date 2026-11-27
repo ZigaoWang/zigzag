@@ -7,6 +7,9 @@
 - ⌘W on a tab you opened yourself (⌘T, New Tab), before you switched tabs → the tab you were on.
   Test: TabCloseSelectionTests.aNewTabClosesBackToTheTabYouWereOn
   Test: EverydayFlowsTests.commandTThenCommandWGoesBackToTheTabYouWereOn
+- The same when the tab you were on is a pinned page, a favorite, a pin in a folder or a page of a split.
+  Test: TabCloseSelectionTests.aNewTabClosesBackToThePinOrFavoriteYouWereOn
+  Test: EverydayFlowsTests.commandTThenCommandWGoesBackToThePinOrFavoriteYouWereOn
 - ⌘W on any other tab you switched to → the tab below, else the one above; never the one you used last.
   Test: TabCloseSelectionTests.closingGoesToTheTabBelowNotTheOneYouWereOnBefore
   Test: EverydayFlowsTests.aLinkOpenedBehindThenClosedGoesToTheNext

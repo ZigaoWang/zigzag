@@ -1706,7 +1706,8 @@ final class TabManager {
         let recent = recentTabs
         let before = { (tab: Tab) in tab !== closed && tab.spaceID == closed.spaceID && !tab.isClosed }
         let openerCounts = openedSinceSwitch.remove(closed.id) != nil
-        let returnTo = newTabReturns.removeValue(forKey: closed.id).flatMap { id in list.first { $0.id == id } }
+        // The tab you were on may be a pinned page or favorite, which `list` doesn't hold.
+        let returnTo = newTabReturns.removeValue(forKey: closed.id).flatMap { tab(with: $0) }.flatMap { $0.spaceID == closed.spaceID ? $0 : nil }
         if closed.bookmarkID == nil, let back = returnTo, !back.isClosed, !isShownElsewhere(back) {
             // A tab you opened yourself and closed before switching: back to the tab you were on, as in Chrome and Safari.
             selectQuietly(back, claiming: false)

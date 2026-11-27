@@ -66,7 +66,10 @@ import WebKit
         var favorites: [String]
         var page: Tab?
         var isEmpty: Bool
-        var lit: [String] { (rows + favorites).filter { $0.hasPrefix("*") }.map { String($0.dropFirst()) } }
+        /// The lit rows and tiles by title, a tile's "+" left off.
+        var lit: [String] {
+            (rows + favorites).filter { $0.hasPrefix("*") }.map { let title = $0.dropFirst(); return String(title.hasPrefix("+") ? title.dropFirst() : title) }
+        }
         var description: String { "rows \(rows) favorites \(favorites) page \(page?.displayTitle ?? "none")\(isEmpty ? " empty" : "")" }
     }
 
@@ -187,6 +190,53 @@ import WebKit
             controller.closeTab(nil)
             await expectShown(tabs[1], in: controller, "after ⌘W")
             await expectRows(controller, ["A", "*B", "C", "D"])
+        }
+    }
+
+    enum ReturnPlace: String, CaseIterable { case pin, favorite, pinInFolder, pinnedSplit }
+
+    /// tabs.md: "⌘W on a tab you opened yourself … → the tab you were on", when that was a pinned page, a favorite,
+    /// a pin in a folder or a page of a pinned split.
+    @Test(arguments: ReturnPlace.allCases)
+    func commandTThenCommandWGoesBackToThePinOrFavoriteYouWereOn(place: ReturnPlace) async throws {
+        try await inWindow(["A", "B", "C"]) { controller, tabs in
+            let mark: Bookmark
+            switch place {
+            case .pin: mark = try pin("Pinned")
+            case .favorite: mark = favorite("Favorite")
+            case .pinInFolder:
+                mark = try pin("Filed")
+                let folder = try #require(Library.shared.addFolder(named: "Folder", with: [mark.id], in: space))
+                Library.shared.setFolderOpen(folder.id, true)
+            case .pinnedSplit:
+                let left = try pin("Left")
+                mark = try pin("Right")
+                controller.listJoinPinned(mark.id, onto: left.id, onRight: true)
+            }
+            controller.sidebar.list.reload(animated: false)
+            controller.listSelect(tabs[2])
+            controller.listOpenBookmark(mark)
+            let page = try #require(controller.tabManager.bookmarkTab(for: mark.id))
+            // A split shows its pages side by side, the half you were on lit with them.
+            let shownAs = { (comment: String) async in
+                if place == .pinnedSplit {
+                    #expect(controller.tabManager.selectedTab === page, "\(comment)")
+                    await self.expectPanes(controller, controller.tabManager.panes(of: page).map(\.displayTitle))
+                    #expect(await self.screen(controller).lit == [controller.tabManager.panes(of: page).map(\.displayTitle).joined(separator: "|")], "\(comment)")
+                } else {
+                    await self.expectShown(page, in: controller, comment)
+                }
+            }
+            await shownAs("\(place) opened")
+            controller.newTab(nil)
+            controller.commandBar.debugType("http://127.0.0.1:9/everyday/new")
+            controller.commandBar.debugEnter()
+            let opened = try #require(controller.tabManager.selectedTab)
+            #expect(opened !== page)
+            await expectShown(opened, in: controller, "\(place) the new tab")
+            controller.closeTab(nil)
+            #expect(opened.isClosed)
+            await shownAs("\(place) after ⌘W")
         }
     }
 
