@@ -61,11 +61,12 @@ Settings › Appearance › Sidebar from the screen edge (#363).
 - Click a row while its page is out → the panel and the page go, and the browser window comes forward with that tab, its page in the window.
   Test: EdgeSidebarTests.clickingAPreviewedRowShowsItsPageInTheWindow
   Test: InPageMiniHostTests.aBorrowedPageSelectedWhileOutComesBackToTheCard
-- Esc, or the pointer off the rows and the page → the page folds back and the sidebar stays out.
+- Esc → the page folds back and the sidebar stays out. The pointer off the panel → the page folds, and the panel goes
+  back with it unless a menu, a sheet or a held button keeps it out.
   Test: EdgeSidebarTests.escPutsThePageAwayFirst
-  Test: EdgeSidebarTests.leavingTheRowsAndThePageFoldsItBack
-- The pointer on its way from the page to a row, across the gap or the sidebar's empty part → the page stays out while it moves, and folds back once it stops off the rows and the page.
-  Test: EdgeSidebarTests.aPointerOnItsWayToARowKeepsThePage
+  Test: EdgeSidebarTests.thePageStaysWhileThePointerIsOnThePanel
+- Cross the panel slowly, rest below the rows, or reach for its Downloads, its + or a space's name → the page stays out. It shares the panel's lifetime: while the pointer is anywhere on the panel, the panel is not going anywhere, so neither is the page. Only leaving the panel lets it go.
+  Test: EdgeSidebarTests.thePageStaysWhileThePointerIsOnThePanel
 - Switch spaces in the panel while a page is out → the page goes back to its tab at once, also one still folding back, and the sidebar stays out on the new space. A row of the space left never brings its page out again; resting on a row of the new space brings that row's page out.
   Test: EdgeSidebarTests.aSpaceSwitchPutsThePageAwayAndNeverShowsTheOldSpace
   Test: EdgeSidebarTests.aSpaceSwitchDuringTheFoldGivesThePageBackAtOnce

@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The mini player shows Previous and Next when the site offers them, as YouTube does in a playlist, so you can move on without going back to the page. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 
 ### Fixed
+- The page beside the screen edge's sidebar stays out while the pointer is anywhere on the panel, and does not fold back on the way to its Downloads, its + or a space's name: the panel and its page go together, rather than the page going first.
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
 - Unlocking your Mac shows Zigzag's window at once, as it was. In full screen the screen no longer stays black for a moment first, and in a window the one behind it no longer shows through for a moment.
 - Press and hold to open a menu, slide onto an item and let go to choose it, as in other Mac apps: right-press or hold a two-finger click on a tab, favorite, folder, space or the sidebar, or press a menu button like the sidebar's +, a … button or a dropdown, which now opens as the press goes down. Right-clicking the sidebar's Back or Forward in the title bar opens its list again.

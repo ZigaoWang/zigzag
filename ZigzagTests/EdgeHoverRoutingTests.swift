@@ -3,26 +3,28 @@ import Testing
 @testable import Zigzag
 
 /// The edge panel's hover behaviour. A row reports its own hover, so crossing from one row to the next sends a nil
-/// from the row being left; that nil must not close the page.
+/// from the row being left; that nil must not close the page. The panel and its page share one lifetime: the page goes
+/// when the panel does, not when the pointer leaves the rows.
 @MainActor
 @Suite(.serialized)
 struct EdgeHoverRoutingTests {
     @Test func aCrossingBetweenRowsDoesNotCloseThePage() {
         // Still in the list: a crossing, not leaving. The next row's report cancels the close anyway; this is what
         // makes a slow crossing, or a pause on the edge of a row, behave the same.
-        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: true, pointerOverPreview: false, stillMoving: false))
+        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: true, pointerOverPreview: false, pointerOnPanel: false))
     }
 
     @Test func restingOnThePageKeepsIt() {
-        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: true, stillMoving: false))
+        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: true, pointerOnPanel: false))
     }
 
-    @Test func leavingTheRowsClosesIt() {
-        #expect(EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false, stillMoving: false))
+    @Test func thePanelsEmptyPartKeepsIt() {
+        // Off the rows and off the page, but still on the panel: a pause below the list, or a hand on its way to
+        // Downloads or the +. The panel is not going anywhere, so the page is not either.
+        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false, pointerOnPanel: true))
     }
 
-    @Test func aPointerOnItsWayToARowKeepsThePage() {
-        // Off the rows and off the page, but still moving: on its way somewhere, so the page waits.
-        #expect(!EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false, stillMoving: true))
+    @Test func leavingThePanelClosesIt() {
+        #expect(EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false, pointerOnPanel: false))
     }
 }
