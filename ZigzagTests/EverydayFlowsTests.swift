@@ -386,6 +386,7 @@ import WebKit
             controller.listSelect(second[1])
             manager.switchToSpace(space)
             controller.listSelect(first[1])
+            await settle()
             try await body(controller, first, second, other)
         }
     }
@@ -430,12 +431,6 @@ import WebKit
             let sidebar = controller.sidebar
             let width = sidebar.bounds.width
             let start = ProcessInfo.processInfo.systemUptime
-            // Called off: it stays.
-            sidebar.touchSwipeBegan()
-            sidebar.touchSwipeMoved(by: -width * 0.3, at: start)
-            sidebar.touchSwipeEnded(velocity: 0, cancelled: true)
-            #expect(controller.tabManager.currentSpaceID == space)
-            await expectRows(controller, ["A1", "*A2"])
             // A finger to the left past half: the next space.
             sidebar.touchSwipeBegan()
             for step in 1...6 { sidebar.touchSwipeMoved(by: -width * 0.12, at: start + Double(step) * 0.05) }
@@ -450,6 +445,12 @@ import WebKit
             #expect(controller.tabManager.currentSpaceID == space)
             await expectRows(controller, ["A1", "*A2"])
             await expectShown(first[1], in: controller, "swiped back")
+            // Called off: it stays.
+            sidebar.touchSwipeBegan()
+            sidebar.touchSwipeMoved(by: -width * 0.3, at: start + 2)
+            sidebar.touchSwipeEnded(velocity: 0, cancelled: true)
+            #expect(controller.tabManager.currentSpaceID == space)
+            await expectRows(controller, ["A1", "*A2"])
         }
     }
 
