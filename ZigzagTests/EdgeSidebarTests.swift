@@ -109,6 +109,31 @@ struct EdgeSidebarTests {
         #expect(!SidebarView(frame: .zero).backButton.tracksHoverWhileInactive)
     }
 
+    /// The AI Apps window, shown to watch or parked again, is never the window whose sidebar comes out, nor is a
+    /// private one; your windows are.
+    @Test func theAIAppsWindowNeverHasTheEdgesSidebar() throws {
+        let opened = Headless.openWindow()
+        defer { Headless.closeWindow() }
+        let profile = try #require(Library.shared.directory.headless)
+        defer {
+            if Library.shared.removeProfile(profile.id) { Library.shared.finishedRemovingProfile(profile.id) }
+        }
+        #expect(!EdgeSidebar.comesOut(for: opened))
+        Headless.unpark(opened)
+        #expect(!EdgeSidebar.comesOut(for: opened))
+        Headless.park(opened)
+        #expect(!EdgeSidebar.comesOut(for: opened))
+        if let yours = WindowManager.shared.controllers.first(where: { !$0.tabManager.isPrivate }) {
+            #expect(EdgeSidebar.comesOut(for: yours))
+        }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space, isPrivate: true)
+        defer { manager.invalidate() }
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 600, height: 400))
+        defer { controller.window?.close() }
+        #expect(!EdgeSidebar.comesOut(for: controller))
+    }
+
     // MARK: The preview
 
     /// A window with these tabs, the first selected, and the panel out for it.

@@ -201,7 +201,13 @@ final class EdgeSidebar {
         workspaceObservers.append(workspace.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.systemPutsAway() }
         })
-        if let key = WindowManager.shared.keyController, !key.tabManager.isPrivate { target = key }
+        if let key = WindowManager.shared.keyController, Self.comesOut(for: key) { target = key }
+    }
+
+    /// Whether a window's sidebar may come out at the edge: one of your windows, never a private one or the AI Apps
+    /// window, shown or parked, which WindowManager keeps out of yours too.
+    static func comesOut(for controller: BrowserWindowController) -> Bool {
+        !controller.tabManager.isPrivate && WindowManager.shared.controllers.contains { $0 === controller }
     }
 
     /// Another Space or a display change puts the panel away; a held one stays.
@@ -245,9 +251,10 @@ final class EdgeSidebar {
         target = nil
     }
 
-    /// The last browser window to become key; a private window's sidebar never comes out at the edge.
+    /// The last of your browser windows to become key; a private window's sidebar never comes out at the edge, nor
+    /// the AI Apps window's.
     func noteFocused(_ controller: BrowserWindowController) {
-        guard monitor != nil, !controller.tabManager.isPrivate, target !== controller else { return }
+        guard monitor != nil, Self.comesOut(for: controller), target !== controller else { return }
         hide(animated: false)
         target?.discardEdgeSidebar()
         target = controller
@@ -266,7 +273,7 @@ final class EdgeSidebar {
 
     private func moved() {
         guard !isShowing, !NSApp.isActive else { return }
-        if target == nil, let key = WindowManager.shared.keyController, !key.tabManager.isPrivate { target = key }
+        if target == nil, let key = WindowManager.shared.keyController, Self.comesOut(for: key) { target = key }
         guard let target, atEdge(target: target) else { return cancelDwell() }
         guard dwellTimer == nil else { return }
         let timer = Timer(timeInterval: EdgeSidebarLayout.dwell, repeats: false) { [weak self] _ in

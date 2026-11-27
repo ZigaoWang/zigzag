@@ -9,6 +9,8 @@ Settings › Appearance › Sidebar from the screen edge (#363).
 ## Bringing it out
 - With another app in front, push the pointer against the screen's edge on the sidebar's side and rest a moment → the last browser window's sidebar comes out over that app.
   Test: EdgeSidebarTests.onlyThePointerPushedAgainstTheSidebarsEdgeOpensIt
+- The last window in front is a private window or the AI Apps window, shown or hidden → the sidebar that comes out is your last other window's.
+  Test: EdgeSidebarTests.theAIAppsWindowNeverHasTheEdgesSidebar
 - Zigzag in front, or a mouse button held down → it doesn't come out.
   Test: EdgeSidebarTests.itComesOutOnlyOverAnotherAppWithNoButtonDown
 - The pointer in a screen corner, over the menu bar or over a Dock at the bottom → it doesn't come out.
