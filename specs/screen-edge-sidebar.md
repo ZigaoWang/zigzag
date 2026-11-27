@@ -59,6 +59,8 @@ Settings › Appearance › Sidebar from the screen edge (#363).
 - The page clicked into, then Esc or the pointer back on the sidebar → the page folds back and the panel keeps the keyboard; the browser window stays where it was.
   Test: EdgeSidebarTests.aPageFoldingBackGivesTheKeyboardToThePanel
   Test: EdgeSidebarTests.aPageFoldingBackUnclickedLeavesTheKeyboard
+- A menu from the panel while a page is out → the page steps aside until the menu closes, so no part of the menu is under it.
+  Test: EdgeSidebarTests.aMenuFromThePanelIsNeverUnderThePage
 - Open in Zigzag in the page's strip → the browser window comes forward on that tab. Expand → the page leaves the list for a Zigzag Mini of its own, and the panel goes.
   Test: InPageMiniHostTests.openInZigzagGivesTheBorrowedPageBackToItsTab
   Test: EdgeSidebarTests.expandingTheEdgePreviewLeavesAnIndependentMini

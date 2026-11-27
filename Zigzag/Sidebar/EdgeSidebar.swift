@@ -158,6 +158,8 @@ final class EdgeSidebar {
     private var managerToken: SignalToken?
     /// The panel's frame while a page is out.
     private var previewPanelFrame: NSRect = .zero
+    /// A menu from the panel is open: the page, a window above the panel, is ordered out so it can't cover it.
+    private var menuCoversPage = false
 
     /// The page beside the panel, if one is out.
     var pagePreview: MiniWindowController? { preview }
@@ -313,6 +315,10 @@ final class EdgeSidebar {
         // The menu's room goes with the menu; the page's room stays while a page is out.
         let frame = preview == nil ? cardPanelFrame : previewPanelFrame
         if MenuPanel.current == nil, panel.frame != frame { panel.setFrame(frame, display: true) }
+        if MenuPanel.current == nil, menuCoversPage {
+            menuCoversPage = false
+            preview?.layoutInDock()
+        }
         // The panel gets no mouse moves with another app in front, so the preview's strip follows from here.
         let point = pointer
         preview?.pointerMoved(toScreen: point)
@@ -409,7 +415,7 @@ final class EdgeSidebar {
     /// The row's page in a docked Mini beside the sidebar, folding in over the page before it. A page that isn't
     /// running shows its card instead, and stays asleep.
     private func showPreview(_ tab: Tab, in controller: BrowserWindowController) {
-        guard isShowing, let panel, let host, !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url),
+        guard isShowing, !menuCoversPage, let panel, let host, !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url),
               preview?.tab !== tab else { return }
         let live = EdgeLensPolicy.showsLivePage(isLoaded: tab.isLoaded, isAsleep: tab.isAsleep)
         let previous = preview
@@ -623,6 +629,7 @@ final class EdgeSidebar {
         activationWork = nil
         managerToken?.cancel()
         managerToken = nil
+        menuCoversPage = false
         closePreview(animated: false, panelStays: false)
         guard isShowing, let panel else { return }
         isShowing = false
@@ -648,6 +655,8 @@ final class EdgeSidebar {
         guard isShowing, let panel else { return }
         let width = max(cardPanelFrame.width + EdgeSidebarLayout.menuRoom, previewPanelFrame.width)
         panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: width, onRight: shownOnRight), display: true)
+        menuCoversPage = true
+        preview?.layoutInDock()
     }
 
     /// ⌘T with the panel clicked into: a new tab in the window, which comes forward.
@@ -781,7 +790,7 @@ extension EdgeSidebar: MiniDockHosting {
     var dockSlidesPage: Bool { true }
     var dockFollowsParentLevel: Bool { true }
     var dockPageOnRight: Bool { shownOnRight }
-    var dockIsCovered: Bool { !isShowing || host?.pageShowing != true }
+    var dockIsCovered: Bool { !isShowing || host?.pageShowing != true || menuCoversPage }
     var dockIsFullScreen: Bool { false }
 
     /// No page behind it to dim.

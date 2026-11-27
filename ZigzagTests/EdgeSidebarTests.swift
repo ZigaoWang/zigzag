@@ -448,6 +448,31 @@ struct EdgeSidebarTests {
         #expect(!panel.isKeyWindow)
     }
 
+    /// The page is a window above the panel and would cover a menu opened in it: while a menu from the panel is open
+    /// the page is ordered out, and it comes back once the menu closes.
+    @Test func aMenuFromThePanelIsNeverUnderThePage() async throws {
+        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(mini.window?.isVisible == true)
+        let (panel, host) = try panelParts()
+        let sidebar = try #require(controller.edgeSidebar)
+        // A right-click by the card's inner edge: the menu runs on into the page's room.
+        let inner = host.convert(NSPoint(x: controller.edgeSidebarOnRight ? host.cardFrame.minX + 10 : host.cardFrame.maxX - 10,
+                                         y: host.cardFrame.midY), to: nil)
+        let items: [MenuPanel.Entry] = ["Open", "Copy Link", "Close"].map { .item(.init(title: $0) {}) }
+        try #require(MenuPanel.show(items, from: sidebar.list, placement: .at(inner)) != nil)
+        let menu = try #require(MenuPanel.current)
+        #expect(EdgeSidebar.shared.isPanel(menu.window))
+        let menuOnScreen = panel.convertToScreen(menu.convert(menu.bounds, to: nil))
+        #expect(menuOnScreen.intersects(try #require(mini.window?.frame)))
+        #expect(mini.window?.isVisible == false)
+        menu.close(animated: false)
+        #expect(await until(3) { mini.window?.isVisible == true })
+        #expect(EdgeSidebar.shared.pagePreview === mini)
+    }
+
     /// Extensions hear nothing of the preview: its Mini is no window of theirs, as a Zigzag Mini of its own is.
     @Test func thePreviewIsNoWindowForExtensions() throws {
         let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a"])
