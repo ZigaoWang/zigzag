@@ -302,7 +302,9 @@ class InteractiveView: NSView {
         guard isEnabled else { return }
         // Control-click is a right-click.
         if drawsMenu, event.modifierFlags.contains(.control), let onRightClick {
-            if let menu = onRightClick(event) { showDrawnMenu(menu, at: event.locationInWindow) }
+            MenuPanel.opening(from: event) {
+                if let menu = onRightClick(event) { showDrawnMenu(menu, at: event.locationInWindow) }
+            }
             return
         }
         // A finger's two taps count too: AppKit's click from each comes as a single click.
@@ -321,7 +323,8 @@ class InteractiveView: NSView {
         if holdOpensMenu, onRightClick != nil, !TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) {
             startHoldTimer()
         }
-        if clicksOnMouseDown { onClick?(event) }
+        // A menu opening on the press (a menu button's) follows it: slide onto an item and let go to choose it.
+        if clicksOnMouseDown { MenuPanel.opening(from: event) { onClick?(event) } }
     }
 
     private func startHoldTimer() {
@@ -380,6 +383,7 @@ class InteractiveView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         if let heldMenu, MenuPanel.current === heldMenu { heldMenu.track(windowPoint: event.locationInWindow); return }
+        if MenuPanel.pressDragged(event) { return }
         guard isEnabled, let start = mouseDownEvent, !dragging else { return }
         let dx = event.locationInWindow.x - start.locationInWindow.x, dy = event.locationInWindow.y - start.locationInWindow.y
         let distance = dragsHorizontally ? abs(dx) : hypot(dx, dy)
@@ -404,6 +408,8 @@ class InteractiveView: NSView {
             releaseHeld(at: event.locationInWindow)
             return
         }
+        // The release that chooses from the menu this press opened clicks nothing else.
+        if MenuPanel.pressReleased(event) { isPressed = false; return }
         guard isEnabled, mouseDownEvent != nil else { isPressed = false; return }
         let inside = pressArea.contains(convert(event.locationInWindow, from: nil))
         isPressed = false
@@ -785,7 +791,18 @@ class InteractiveView: NSView {
 
     override func rightMouseDown(with event: NSEvent) {
         guard drawsMenu, let onRightClick else { return super.rightMouseDown(with: event) }
-        if let menu = onRightClick(event) { showDrawnMenu(menu, at: event.locationInWindow) }
+        MenuPanel.opening(from: event) {
+            if let menu = onRightClick(event) { showDrawnMenu(menu, at: event.locationInWindow) }
+        }
+    }
+
+    // Held, the right-click's menu follows the pointer; let go on an item to choose it.
+    override func rightMouseDragged(with event: NSEvent) {
+        if !MenuPanel.pressDragged(event) { super.rightMouseDragged(with: event) }
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        if !MenuPanel.pressReleased(event) { super.rightMouseUp(with: event) }
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -1816,7 +1833,6 @@ final class DropdownButton: InteractiveView {
     /// The menu follows the button's appearance, not the window's (a card in the page's look).
     var menuTakesOwnLook = false
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
-    private var openedAt: TimeInterval = 0
     private var menuOpen = false { didSet { stateDidChange(animated: false) } }
 
     static let iconSide: CGFloat = Tokens.Space.x4
@@ -1906,27 +1922,11 @@ final class DropdownButton: InteractiveView {
             items.append(.separator)
             items += actions.map { action in .item(MenuPanel.Item(title: action.title, symbol: action.symbol, action: action.run)) }
         }
-        openedAt = ProcessInfo.processInfo.systemUptime
         menuOpen = true
         MenuPanel.show(items, from: self, placement: .over(selectedIndex, textInset: Self.textInset), minWidth: bounds.width,
                        appearance: menuTakesOwnLook ? effectiveAppearance : nil) { [weak self] in
             self?.menuOpen = false
         }
-    }
-
-    // Press, drag to an item and let go: chosen in one movement, as macOS menus allow.
-    override func mouseDragged(with event: NSEvent) {
-        guard let menu = MenuPanel.current, menu.anchor === self else { return super.mouseDragged(with: event) }
-        menu.track(windowPoint: event.locationInWindow)
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        super.mouseUp(with: event)
-        guard let menu = MenuPanel.current, menu.anchor === self else { return }
-        // A quick click leaves the menu open; a press held or dragged onto an item chooses it.
-        let held = ProcessInfo.processInfo.systemUptime - openedAt > 0.35
-        let onButton = bounds.contains(convert(event.locationInWindow, from: nil))
-        if held && !onButton { menu.chooseTracked(windowPoint: event.locationInWindow) }
     }
 
     override func keyDown(with event: NSEvent) {
@@ -2344,6 +2344,8 @@ final class MenuPanel: FloatingPanelView {
         }
         menu.arrive()
         current = menu
+        // Opened by a press still down: it follows that press, unless a finger's (`TouchHold` has its own).
+        if let press = openingPress, !menu.isTouchSized, !openingForTouch { menu.beginPress(press) }
         menu.watch(window)
         NSAccessibility.post(element: menu, notification: .created)
         if let index = menu.highlighted { Announcement.post(menu.rows[index].item.title) }
@@ -2481,6 +2483,7 @@ final class MenuPanel: FloatingPanelView {
     func close(animated: Bool = true) {
         // A submenu closes with the menu it opened from.
         if parentMenu != nil { root.close(animated: animated); return }
+        endPress()
         closeChild(animated: false)
         guard Self.current === self || monitor != nil else { return }
         if let monitor { TouchPress.removeMonitor(monitor) }
@@ -2615,14 +2618,137 @@ final class MenuPanel: FloatingPanelView {
         rows.firstIndex { $0.bounds.contains($0.convert(windowPoint, from: nil)) && $0.item.isEnabled }
     }
 
-    /// The pointer moving with the button still held from the dropdown that opened it.
+    /// The pointer moving with the button still held from the press that opened it: the item under it lights, and
+    /// a submenu opens on it as on hover.
     func track(windowPoint: NSPoint) {
-        highlighted = row(at: windowPoint)
+        if let child, child.contains(windowPoint: windowPoint) {
+            keepChild()
+            child.track(windowPoint: windowPoint)
+            return
+        }
+        let index = row(at: windowPoint)
+        // Off this menu toward its open submenu's item, that item stays lit.
+        if index == nil, childIndex != nil, !bounds.contains(convert(windowPoint, from: nil)) { return }
+        guard index != highlighted else { return }
+        highlighted = index
+        scheduleSubmenu()
     }
 
     func chooseTracked(windowPoint: NSPoint) {
+        if let child, child.contains(windowPoint: windowPoint) { child.chooseTracked(windowPoint: windowPoint); return }
         if let index = row(at: windowPoint) { choose(index) }
     }
+
+    // MARK: A held press
+
+    /// The press that opened the menu, while it's still down: the mouse's right button, a two-finger click held on
+    /// the trackpad, a Control-press or a menu button's press. Moved past `pressSlop`, the item under the pointer
+    /// lights; let go on one, it's chosen; let go off the menu, it closes; let go in place, or on a line, a heading
+    /// or a dimmed item, it stays open to click, as the Mac's own menus do.
+    private struct Press {
+        var isRight: Bool
+        var start: NSPoint
+        var time: TimeInterval
+        var screenStart: NSPoint
+        var moved = false
+        var upTicks = 0
+    }
+    private var press: Press?
+    private var pressFollow: Timer?
+
+    /// How far the pointer goes before letting go chooses; a still click leaves the menu open.
+    static let pressSlop: CGFloat = 4
+    /// Let go sooner than this after the press, it was a click: the menu stays open, whatever the pointer did.
+    static let pressClick: TimeInterval = 0.15
+
+    /// The press a menu opening now comes from (`opening(from:)`).
+    private static var openingPress: NSEvent?
+
+    /// Runs `open` as the control's response to `press`: a menu it shows follows that press until it's let go.
+    static func opening(from press: NSEvent, _ open: () -> Void) {
+        let saved = openingPress
+        openingPress = [.leftMouseDown, .rightMouseDown].contains(press.type) ? press : nil
+        defer { openingPress = saved }
+        open()
+    }
+
+    /// The pointer on screen and the buttons held, as the system has them now.
+    static var pressPointer: () -> (location: NSPoint, buttons: Int) = { (NSEvent.mouseLocation, NSEvent.pressedMouseButtons) }
+
+    private func beginPress(_ event: NSEvent) {
+        let pointer = Self.pressPointer()
+        let isRight = event.type == .rightMouseDown
+        press = Press(isRight: isRight, start: event.locationInWindow, time: ProcessInfo.processInfo.systemUptime, screenStart: pointer.location)
+        // The window server can keep a press's drags and release (the title bar's band), so the pointer is read too.
+        guard pointer.buttons & (isRight ? 2 : 1) != 0 else { return }
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.followPress() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        pressFollow = timer
+    }
+
+    private func endPress() {
+        pressFollow?.invalidate()
+        pressFollow = nil
+        press = nil
+    }
+
+    private func pressMoved(to windowPoint: NSPoint, distance: CGFloat) {
+        guard press != nil else { return }
+        if distance > Self.pressSlop { press?.moved = true }
+        if press?.moved == true { track(windowPoint: windowPoint) }
+    }
+
+    private func pressLifted(at windowPoint: NSPoint) {
+        guard let press else { return }
+        endPress()
+        guard press.moved, ProcessInfo.processInfo.systemUptime - press.time >= Self.pressClick else { return }
+        if contains(windowPoint: windowPoint) { chooseTracked(windowPoint: windowPoint) } else { close() }
+    }
+
+    private func followPress() {
+        guard let press, Self.current === self, let window else { endPress(); return }
+        let pointer = Self.pressPointer()
+        let point = window.convertPoint(fromScreen: pointer.location)
+        if pointer.buttons & (press.isRight ? 2 : 1) != 0 {
+            self.press?.upTicks = 0
+            pressMoved(to: point, distance: hypot(pointer.location.x - press.screenStart.x, pointer.location.y - press.screenStart.y))
+            return
+        }
+        // Up two looks in a row and no release heard: the window server kept it.
+        self.press?.upTicks += 1
+        if press.upTicks >= 1 { pressLifted(at: point) }
+    }
+
+    /// The open menu's press, if `event` is its drag or release.
+    private static func pressed(by event: NSEvent) -> MenuPanel? {
+        guard let menu = current, let press = menu.press else { return nil }
+        let right: [NSEvent.EventType] = [.rightMouseDragged, .rightMouseUp], left: [NSEvent.EventType] = [.leftMouseDragged, .leftMouseUp]
+        return (press.isRight ? right : left).contains(event.type) ? menu : nil
+    }
+
+    /// A drag of the press that opened the open menu, from the view that has the press; true when it was the menu's.
+    static func pressDragged(_ event: NSEvent) -> Bool {
+        guard let menu = pressed(by: event), let press = menu.press else { return false }
+        let point = event.locationInWindow
+        menu.pressMoved(to: point, distance: hypot(point.x - press.start.x, point.y - press.start.y))
+        return true
+    }
+
+    /// The release of the press that opened the open menu; true when it was the menu's, and goes no further.
+    static func pressReleased(_ event: NSEvent) -> Bool {
+        guard let menu = pressed(by: event), let press = menu.press else { return false }
+        let point = event.locationInWindow
+        menu.pressMoved(to: point, distance: hypot(point.x - press.start.x, point.y - press.start.y))
+        menu.pressLifted(at: point)
+        return true
+    }
+
+    #if DEBUG
+    /// Whether the press that opened it is still being followed.
+    var debugFollowsPress: Bool { press != nil }
+    #endif
 
     // MARK: A held finger
 

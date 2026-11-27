@@ -1096,6 +1096,8 @@ final class SidebarView: NSView {
             self.delegate?.sidebarShowDownloads(from: self.downloadsButton)
         }
         // A menu, as Arc's + is: a tab, a folder or a space, which a single space has no other button for.
+        // Its menu opens as the press goes down, as a pop-up button's does.
+        newSpaceButton.clicksOnMouseDown = true
         newSpaceButton.onClick = { [weak self] _ in self?.showAddMenu() }
         address.onClick = { [weak self] _ in self?.delegate?.sidebarOpenCommandBar() }
         themeToken = Brand.themeChanged.observe { [weak self] in self?.tintDownloadsRing() }
@@ -1140,7 +1142,17 @@ final class SidebarView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        if !showBlankMenu(for: event) { super.rightMouseDown(with: event) }
+        var shown = false
+        MenuPanel.opening(from: event) { shown = showBlankMenu(for: event) }
+        if !shown { super.rightMouseDown(with: event) }
+    }
+
+    override func rightMouseDragged(with event: NSEvent) {
+        if !MenuPanel.pressDragged(event) { super.rightMouseDragged(with: event) }
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        if !MenuPanel.pressReleased(event) { super.rightMouseUp(with: event) }
     }
 
     /// The sidebar acts as the title bar: drag to move, double-click to zoom (or the system setting). Control-click is a

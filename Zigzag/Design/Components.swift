@@ -400,7 +400,6 @@ final class SplitPillButton: NSView {
     final class Segment: InteractiveView {
         fileprivate var paint: (() -> Void)?
         fileprivate var showMenu: (() -> Bool)?
-        fileprivate var openedAt: TimeInterval = 0
 
         override func stateDidChange(animated: Bool) { paint?() }
         override var offersMenu: Bool { showMenu != nil }
@@ -410,19 +409,6 @@ final class SplitPillButton: NSView {
             // Up or Down opens the chevron's menu, as a pop-up button does.
             if hasKeyboardFocus, showMenu != nil, [125, 126].contains(event.keyCode) { _ = showMenu?(); return }
             super.keyDown(with: event)
-        }
-
-        // Press the chevron, drag to an item and let go: chosen in one movement, as macOS menus allow.
-        override func mouseDragged(with event: NSEvent) {
-            guard showMenu != nil, let menu = MenuPanel.current, menu.anchor === superview else { return super.mouseDragged(with: event) }
-            menu.track(windowPoint: event.locationInWindow)
-        }
-
-        override func mouseUp(with event: NSEvent) {
-            super.mouseUp(with: event)
-            guard showMenu != nil, let menu = MenuPanel.current, menu.anchor === superview else { return }
-            let held = ProcessInfo.processInfo.systemUptime - openedAt > 0.35
-            if held && !bounds.contains(convert(event.locationInWindow, from: nil)) { menu.chooseTracked(windowPoint: event.locationInWindow) }
         }
     }
 
@@ -564,7 +550,6 @@ final class SplitPillButton: NSView {
                 self.onChoose?(index)
             })
         }
-        more.openedAt = ProcessInfo.processInfo.systemUptime
         MenuPanel.show(items, from: pill, placement: .below, minWidth: pill.bounds.width,
                        appearance: menuTakesOwnLook ? effectiveAppearance : nil)
         return true

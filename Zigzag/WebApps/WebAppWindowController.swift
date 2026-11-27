@@ -579,7 +579,15 @@ final class WebAppDragStrip: NSView {
 
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
-    override func rightMouseDown(with event: NSEvent) { showMenu(for: event) }
+    override func rightMouseDown(with event: NSEvent) { MenuPanel.opening(from: event) { showMenu(for: event) } }
+
+    override func rightMouseDragged(with event: NSEvent) {
+        if !MenuPanel.pressDragged(event) { super.rightMouseDragged(with: event) }
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        if !MenuPanel.pressReleased(event) { super.rightMouseUp(with: event) }
+    }
 
     private func showMenu(for event: NSEvent) {
         guard let entries = menuEntries?(), !entries.isEmpty else { return }
@@ -640,7 +648,15 @@ final class WebAppStripView: NSView {
     }
     #endif
 
-    override func rightMouseDown(with event: NSEvent) { showMenu(for: event) }
+    override func rightMouseDown(with event: NSEvent) { MenuPanel.opening(from: event) { showMenu(for: event) } }
+
+    override func rightMouseDragged(with event: NSEvent) {
+        if !MenuPanel.pressDragged(event) { super.rightMouseDragged(with: event) }
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        if !MenuPanel.pressReleased(event) { super.rightMouseUp(with: event) }
+    }
 
     private func showMenu(for event: NSEvent) {
         guard let entries = menuEntries?(), !entries.isEmpty else { return }
