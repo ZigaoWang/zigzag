@@ -320,6 +320,16 @@
   Test: SwipeGestureTests.aPlainPageGoesBackAndEndsClean
   Test: SwipeGestureTests.aFlickGoesShortOfTheDistance
   Test: SwipeGestureTests.aShortSwipeSpringsBackAndEndsClean
+- While the fingers are down, the arrow's ring follows how far they've gone, and the arrow fills the moment letting go would go back or forward: at the full distance, or with a flick going fast enough a third of the way. Filled, it stays filled while the fingers rest or slow down, and empties only when they come back a little from the furthest they got. Letting go goes exactly when it's filled, so a flick, a rest, then letting go still goes.
+  Test: BookmarkFolderTests.aFlickArmsAndRestingFingersKeepTheArrowAsItIs
+  Test: BookmarkFolderTests.aFlickDisarmsOnlyPastTheMarginBack
+  Test: SwipeGestureTests.aFlickArmsWithOneTapBeforeLettingGo
+  Test: SwipeGestureTests.movingBackPastTheMarginDisarmsWithNoTap
+- The trackpad taps once as the arrow fills, by distance or by a flick, and again only if it empties and fills again; fingers on the screen never tap.
+  Test: BookmarkFolderTests.swipeTapsOnceAsItArms
+  Test: BookmarkFolderTests.aFlickHoveringAtTheCutoffTapsOnce
+  Test: SwipeGestureTests.aSlowSwipeTapsOnceAtTheFullDistance
+  Test: SwipeGestureTests.touchSwipesNeverTap
 - A sideways gesture that starts where the page can scroll that way, or on a page that cancels its wheel events (a canvas, a map) → the page's for the whole gesture, even once it reaches its edge; only a new gesture there goes back. Mostly up and down, or turning sideways after starting up and down, is a scroll.
   Test: SwipeGestureTests.aSidewaysScrollerKeepsTheGestureUntilANewOneAtItsEdge
   Test: SwipeGestureTests.aPageThatCancelsWheelsNeverSwipes
