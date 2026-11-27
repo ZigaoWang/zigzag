@@ -644,8 +644,9 @@ final class SwipeNavigator {
         let page = overlay.convert(webView.bounds, from: webView)
         let frame = SwipeArrowView.frame(in: page, offset: offset, back: direction < 0)
         if arrow.frame != frame { arrow.frame = frame }
-        // The ring follows the distance; the fill shows letting go would go, by distance or a flick (#377).
-        do {
+        // The ring follows the distance. The fill shows letting go would go, by distance or a flick (#377), and only
+        // once the swipe is Zigzag's: while the page may still keep it, nothing fills or taps.
+        if state == .tracking {
             let fingers = time.map(speed(at:)) ?? 0
             let going = time != nil && SwipeDecision.going(samples, direction: direction)
             // One tap as it arms, on the trackpad only: a display has nothing to tap.
