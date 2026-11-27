@@ -72,10 +72,11 @@ final class AutoPictureInPicture {
         scheduleAway()
     }
 
-    /// After the delay: away, a regular app in front, the window out of sight; else the tab keeps waiting.
+    /// After the delay: away, a regular app in front, the window out of sight; else the tab keeps waiting. A locked
+    /// screen hides the window without leaving it: the video stays in its page for the unlock.
     private func scheduleAway() {
         scheduleLeave(keepIfNot: true) { [weak self] in
-            guard !NSApp.isActive, AutoPictureInPictureModel.isRealSwitch(to: Self.frontApp()) else { return false }
+            guard !NSApp.isActive, !ScreenLock.shared.isLocked, AutoPictureInPictureModel.isRealSwitch(to: Self.frontApp()) else { return false }
             guard let window = self?.leavingIn?.window else { return false }
             let out = AutoPictureInPictureModel.isOutOfSight(Self.sight(of: window))
             if !out { debugLog("autopip: window still in view on another display, waiting") }
