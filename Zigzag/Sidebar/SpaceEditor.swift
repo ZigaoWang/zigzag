@@ -1851,6 +1851,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// question's: the editor stays as it is under it.
     private var isAsking = false
     private var monitor: Any?
+    /// Hosted over the edge panel rather than the browser window: its close must not touch the window behind.
+    private var hostedInPanel = false
     static let width: CGFloat = 300
 
     /// `controller` is the browser window it belongs to; Settings passes nil and hosts it in its own window.
@@ -2016,6 +2018,13 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     func show(from anchor: NSView? = nil) {
         guard let controller else { return }
+        // In the edge panel the editor is a card on the panel, over whatever app is in front; the browser window
+        // behind stays where it is.
+        if let panelHost = EdgeSidebar.shared.sheetHost {
+            showOverPanel(in: panelHost, from: anchor)
+            return
+        }
+        hostedInPanel = false
         let overlay = controller.root.overlay
         // Beside the sidebar, over the page: right of it, or left of it on the right.
         let beside = controller.root.besideSidebar(width: Self.width)
@@ -2056,8 +2065,42 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         startMonitoring()
     }
 
+    /// Over the edge panel: the panel is at the screen's edge, so the editor sits in it beside what opened it, its
+    /// width the panel's rather than the window's, and the panel's window takes the typing.
+    private func showOverPanel(in host: NSView, from anchor: NSView?) {
+        hostedInPanel = true
+        let width = min(Self.width, max(Tokens.Space.x6, host.bounds.width - Tokens.Space.x2 * 2))
+        // What opened it, or the space's name when a menu bar command did.
+        var source = anchor?.window != nil && anchor?.window === host.window ? anchor : nil
+        if source == nil, let header = EdgeSidebar.shared.headerView, header.window === host.window { source = header }
+        let place = source.map { $0.convert($0.bounds, to: host) }
+        // Low in the panel (the +, a space dot) it rises from there; higher up it hangs from it.
+        let rises = place.map { Self.rises(from: $0, in: host.bounds.height) } ?? true
+        anchoredBelow = !rises
+        fitWheel(in: host.bounds.height)
+        let height = contentHeight
+        var top = place.map { rises ? $0.maxY - height : $0.minY - Tokens.Space.x2 } ?? (host.bounds.height - height) / 2
+        top = Self.clampedTop(top, height: height, in: host.bounds.height)
+        frame = NSRect(x: (host.bounds.width - width) / 2, y: top, width: width, height: height)
+        host.addSubview(self)
+        present(arrival: .pop)
+        window?.makeKey()
+        window?.makeFirstResponder(nameField)
+        // The cursor at the end, not the whole name selected: you came to change the color as often as the name. A
+        // name Zigzag made up ("Space 2") is selected instead, so typing replaces it.
+        if let editor = nameField.currentEditor() {
+            let name = nameField.stringValue
+            let placeholder = name.range(of: #"^Space \d+$"#, options: .regularExpression) != nil
+                || (1...99).contains { name == String(localized: "Space \($0)", comment: "A new space's made-up name, like “Space 2”.") }
+            editor.selectedRange = placeholder ? NSRange(location: 0, length: nameField.stringValue.utf16.count)
+                                               : NSRange(location: nameField.stringValue.utf16.count, length: 0)
+        }
+        startMonitoring()
+    }
+
     /// In Settings: dropping from the Edit button that opened it, its right edge on the button's, inside that window.
     func show(in host: NSView, below anchor: NSView) {
+        hostedInPanel = false
         let button = anchor.convert(anchor.bounds, to: host)
         let height = contentHeight
         let below = host.isFlipped ? button.maxY + Tokens.Space.x1 : button.minY - Tokens.Space.x1 - height
@@ -2109,8 +2152,11 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         needsLayout = true
     }
 
-    /// Where a question is asked from here: over the whole window, the editor under it.
-    private var sheetHost: NSView? { (controller?.window ?? window)?.contentView }
+    /// Where a question is asked from here: over the whole window, the editor under it. In the panel, over the panel.
+    private var sheetHost: NSView? {
+        if hostedInPanel { return EdgeSidebar.shared.sheetHost }
+        return (controller?.window ?? window)?.contentView
+    }
 
     private func chooseProfile(at index: Int) {
         let library = Library.shared
@@ -2169,7 +2215,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     /// Any picture, copied into Zigzag's folder at screen size.
     private func pickBackground() {
-        guard let host = controller?.window ?? window else { return }
+        let panelWindow = hostedInPanel ? EdgeSidebar.shared.sheetHost?.window : controller?.window
+        guard let host = panelWindow ?? window else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.canChooseDirectories = false
@@ -2268,9 +2315,15 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         if !cancelled { commitName() }
         if edited, !cancelled { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo(String(localized: "Edit Space", comment: "Undo action name, shown in Edit › Undo."), before: before) }
         if let controller {
-            controller.root.holdReveal = false
-            dismiss()
-            if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+            if hostedInPanel {
+                // The typing belongs to the panel: hand the keyboard back to it, never to the window behind.
+                window?.makeFirstResponder(nil)
+                dismiss()
+            } else {
+                controller.root.holdReveal = false
+                dismiss()
+                if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+            }
         } else {
             window?.makeFirstResponder(nil)
             dismiss(instantly: true)

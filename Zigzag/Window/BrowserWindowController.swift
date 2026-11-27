@@ -701,7 +701,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens the space panel beside the sidebar (or closes it, if it's already showing that space).
     func openSpaceEditor(_ spaceID: UUID, anchor: NSView? = nil) {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        // Over the edge panel while it is out: its editor is a card on the panel, not an errand in the window behind.
+        if EdgeSidebar.shared.isShowing {
+            previews.hide()
+            SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor ?? edgeSidebar?.list.headerView, in: self)
+            return
+        }
         if !root.chromeSidebarShown && !root.isSidebarFloatingVisible { root.reveal(true) }
         previews.hide()
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
@@ -3943,11 +3948,23 @@ extension BrowserWindowController: SidebarDelegate {
         revealNewFolder(made.id)
     }
 
-    /// A folder just made shows, with its name ready to type.
+    /// A folder just made shows, with its name ready to type. From the edge panel it shows in the panel's list, not
+    /// the window behind it.
     func revealNewFolder(_ id: UUID) {
         if SidebarListView.isCollapsed(tabManager.currentSpaceID) { SidebarListView.setCollapsed(tabManager.currentSpaceID, false) }
+        if EdgeSidebar.shared.isShowing, let mirror = edgeSidebar {
+            mirror.list.reload(animated: true)
+            DispatchQueue.main.async { [weak mirror] in mirror?.list.renameFolder(id) }
+            return
+        }
         sidebar.list.reload(animated: true)
         DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(id) }
+    }
+
+    /// The list that shows a folder just made or changed: the edge panel's when it is out, and the window's.
+    func reloadFolderList() {
+        sidebar.list.reload(animated: true)
+        if EdgeSidebar.shared.isShowing { edgeSidebar?.list.reload(animated: true) }
     }
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting, grouping: TabManager.Grouping) {
         moveWithUndo(tab, to: index, in: spaceID, nesting: nesting, grouping: grouping)
@@ -4443,9 +4460,13 @@ extension BrowserWindowController: SidebarDelegate {
         if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) }
     }
     func sidebarShowDownloads(from view: NSView) {
-        guard EdgeSidebar.shared.isShowing else { return DownloadsPanel.show(from: view, in: self) }
-        bringForwardForEdge()
-        showDownloads(nil)
+        // In the panel, the list opens over the panel in place: bringing the whole browser forward to show a
+        // downloads list takes the user out of what they were doing and hides the panel they asked from.
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.showDownloads(from: view, in: self)
+            return
+        }
+        DownloadsPanel.show(from: view, in: self)
     }
     /// A space dot's menu: Edit Space… opens at the dot.
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? { sidebarSpaceMenu(for: id, anchor: sidebar.dot(for: id)) }

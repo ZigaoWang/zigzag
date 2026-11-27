@@ -427,8 +427,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     static func openPreview(of tab: Tab, from browser: BrowserWindowController,
                             dockedIn edge: any MiniDockHosting, reveal: Bool = true,
                             deferPage: Bool = false) -> MiniWindowController? {
-        guard let url = tab.url, !tab.isPrivate,
-              ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        // Zigzag's own pages are pages too: the scheme handler serves them into a web view like any other, so a Mini
+        // can hold one. Which schemes preview is `EdgeLensPolicy`'s call, not this guard's.
+        guard let url = tab.url, !tab.isPrivate, EdgeLensPolicy.previews(url: url) else { return nil }
         // In a browser's page card the page is the card's; a Mini has borrowed it. The preview's page must go home
         // before it is borrowed again, even if this Mini is still folding away.
         if let old = tab.host as? MiniWindowController { old.endBorrowingNow() }
@@ -1551,6 +1552,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             return WindowManager.shared.controllers.last { $0.tabManager.isPrivate } ?? WindowManager.shared.newWindow(showCommandBar: false, isPrivate: true)
         }
         return Self.browserWindow()
+    }
+
+    /// Tab and sidebar commands that aren't this window's own (⌘1–9, the next and previous tab, spaces and the rest)
+    /// reach the browser window the page belongs to, as they do from the edge panel. The Mini's own actions answer
+    /// first, so its ⌘T, ⌘W and ⌘L stay its own.
+    override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
+        let browser = source ?? WindowManager.shared.controllers.last { $0.tabManager.isPrivate == tab.isPrivate }
+        if let browser, browser !== self, browser.responds(to: action) { return browser }
+        return super.supplementalTarget(forAction: action, sender: sender)
     }
 
     /// Moves the page, live, into a browser window as its selected tab, in the space chosen on the strip: this window

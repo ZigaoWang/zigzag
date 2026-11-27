@@ -2,10 +2,20 @@ import AppKit
 
 /// What the edge preview shows for a row.
 enum EdgeLensPolicy {
-    /// Web pages and local files are previewed; Zigzag's own pages stay in the window.
+    /// Pages the panel previews: the web, local files, and Zigzag's own pages, which are served by a scheme handler
+    /// and so are pages like any other. A page that doesn't work in the panel's little window is listed as blocked
+    /// rather than by refusing its scheme, so each one can be judged on its own.
     static func previews(url: URL?) -> Bool {
-        ["http", "https", "file"].contains(url?.scheme?.lowercased() ?? "")
+        guard let url, let scheme = url.scheme?.lowercased() else { return false }
+        if internalSchemes.contains(scheme) { return !blockedInternalPages.contains(url.host() ?? "") }
+        return ["http", "https", "file"].contains(scheme)
     }
+
+    /// Schemes Zigzag serves itself.
+    static let internalSchemes: Set<String> = ["zigzag"]
+    /// Zigzag's own pages the panel's window doesn't show well. Empty until one is found: Settings and History are
+    /// ordinary pages, so they're previewed with everything else.
+    static let blockedInternalPages: Set<String> = []
 
     /// A running page is lent to the preview; one asleep or not loaded yet shows a card, so a hover never wakes it.
     static func showsLivePage(isLoaded: Bool, isAsleep: Bool) -> Bool { isLoaded && !isAsleep }
@@ -461,7 +471,8 @@ final class EdgeSidebar {
     }
 
     /// The page folds back after a moment unless the pointer is on it, or still among the rows: a crossing from one row
-    /// to the next is not leaving them. `evenOnRows`: the row under the pointer has no page to show.
+    /// to the next is not leaving them. `evenOnRows`: the row under the pointer has no page to show, so the pointer
+    /// being on a row is not a reason to keep one out.
     private func schedulePreviewClose(evenOnRows: Bool = false) {
         closeWork?.cancel()
         closeWork = nil
@@ -471,7 +482,15 @@ final class EdgeSidebar {
                 guard let self else { return }
                 self.closeWork = nil
                 let point = self.pointer
-                if self.pointerIsOnPage(point) || (!evenOnRows && self.rowNear(point) != nil) { return }
+                // The sidebar's own leave rule decides whether the panel stays; a page doesn't go before the panel
+                // does. Off the rows and off the page, but still where the panel keeps itself open: the page waits
+                // rather than closing and coming back a moment later.
+                let overRows = evenOnRows ? false : self.rowNear(point) != nil
+                let kept = evenOnRows ? false
+                    : self.panel.map { EdgeSidebarLayout.keeps(at: point, panel: $0.frame) } ?? false
+                guard EdgeHoverRouting.closesAfterNilHover(pointerOverRows: overRows,
+                                                           pointerOverPreview: self.pointerIsOnPage(point),
+                                                           panelKept: kept) else { return }
                 self.closePreview()
             }
         }
@@ -607,6 +626,9 @@ final class EdgeSidebar {
         host.onRight = onRight
         host.cardWidth = target.edgeSidebarWidth
         host.set(container)
+        // The panel's next responder is the browser's controller, so its menu items and actions reach the same
+        // browser the panel shows: without it a nonactivating panel swallows every key that isn't ⌘T.
+        panel.nextResponder = target
         generation += 1
         cardPanelFrame = EdgeSidebarLayout.frame(in: visible, width: host.cardWidth + host.inset, onRight: onRight)
         shownVisible = visible
@@ -666,6 +688,13 @@ final class EdgeSidebar {
         preview?.layoutInDock()
     }
 
+    /// Downloads from the panel: the list in the panel's window, over the mirror's lane, not in the window behind.
+    func showDownloads(from anchor: NSView, in controller: BrowserWindowController) {
+        guard isShowing, let host, let target else { return }
+        DownloadsPanel.show(from: anchor, in: controller, host: host, lane: host.cardFrame,
+                            receding: target.edgeSidebar.map { [$0.list] } ?? [])
+    }
+
     /// ⌘T with the panel clicked into: a new tab in the window, which comes forward.
     func newTab() { target?.newTabFromEdge() }
 
@@ -675,6 +704,12 @@ final class EdgeSidebar {
         target.bringForwardForEdge()
         target.revealSidebarForEdge()
     }
+
+    /// Where a sheet belongs while the panel is in use: over the panel, above its cards, not in the window behind.
+    var sheetHost: NSView? { isShowing ? host?.overlay : nil }
+
+    /// The panel's space name, where an editor opens when a menu bar command started it.
+    var headerView: NSView? { isShowing ? target?.edgeSidebar?.list.headerView : nil }
 
     /// A sideways scroll over the panel's sidebar changes space, as in the window.
     private func intercept(_ event: NSEvent) -> Bool {
@@ -729,6 +764,10 @@ final class EdgeSidebarPanel: NSPanel {
             EdgeSidebar.shared.newTab()
             return true
         }
+        // Everything else that the menu bar answers, answered the same way it is in the window: the panel's next
+        // responder is the browser's controller, so its menu items act on the same browser. A nonactivating panel gets
+        // no key equivalents from the menu bar by itself, which is why they all went dead.
+        if NSApp.mainMenu?.performKeyEquivalent(with: event) == true { return true }
         return super.performKeyEquivalent(with: event)
     }
 }
@@ -741,6 +780,15 @@ final class EdgeSidebarHost: NSView {
     var cardWidth: CGFloat = 0 { didSet { placeCard() } }
     /// A page is out beside the card.
     var pageShowing = false
+    /// The panel as a place for sheets and cards: they open here, over the card, not in the browser behind.
+    let overlay = PassthroughView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        addSubview(overlay)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
 
@@ -761,12 +809,13 @@ final class EdgeSidebarHost: NSView {
             self.container = container
             container.autoresizingMask = []
         }
-        if container.superview !== self { addSubview(container) }
+        if container.superview !== self { addSubview(container, positioned: .below, relativeTo: overlay) }
         placeCard()
     }
 
     func placeCard() {
         container?.frame = cardFrame
+        overlay.frame = bounds
     }
 
     override func layout() {
