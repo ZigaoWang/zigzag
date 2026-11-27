@@ -499,6 +499,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         }
     }
 
+    /// What the count beside the field says ("2 of 3", "No matches").
+    var debugCount: String { countLabel.stringValue }
+
     /// Where the bar is, and which PDF it last searched (`panestate`).
     var debugFrame: String { isVisible ? "\(NSStringFromRect(panel.frame)) pdf=\(searchedPDF?.url.lastPathComponent ?? "-")" : "hidden" }
 

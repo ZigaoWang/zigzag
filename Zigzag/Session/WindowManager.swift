@@ -639,6 +639,8 @@ final class WindowManager {
     #if DEBUG
     /// Tests that keep more than one session in a run: the one copy per run is a launch rule (#433).
     func forgetKeptSessionForTesting() { keptPreviousSession = false }
+    /// Tests that close a whole window: what it left for ⇧⌘T goes, so the next test starts with nothing to reopen.
+    func forgetClosedForTesting() { closedWindows.removeAll(); orphanedClosedTabs.removeAll() }
     #endif
 
     /// Windows closed this session, newest last, to bring back with ⇧⌘N's neighbor, Reopen Closed Window.

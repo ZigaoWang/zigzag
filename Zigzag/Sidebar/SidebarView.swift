@@ -1958,6 +1958,10 @@ final class SidebarView: NSView {
 
     /// A switch in progress: the pane bringing the new space in, and the swap to make once it's home.
     private var handOff: (pane: SpacePane, work: DispatchWorkItem)?
+    #if DEBUG
+    /// A space switch is still sliding its list in.
+    var debugIsHandingOff: Bool { handOff != nil }
+    #endif
 
     /// The swap: the list takes the space the pane brought in (or `showing`, when another switch is already on its
     /// way and the list has to stand in for the space on screen), in the same place and scrolled the same, and the pane
