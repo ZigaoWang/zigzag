@@ -1094,8 +1094,9 @@ extension SyncLibrary {
             let settings = SettingsView(pane: .general)
             settings.frame = NSRect(x: 0, y: 0, width: 900, height: 700)
             window.contentView?.addSubview(settings)
-            for (name, status, isOn, hasCopy) in SyncSettingsRows.everyStatus {
-                settings.syncRows.show(status, isOn: isOn, hasCopy: hasCopy)
+            let tooBig = SyncSettingsRows.everyTooBig.map { ($0.name, ICloudSync.Status.synced(Date()), true, true, $0.tooBig) }
+            for (name, status, isOn, hasCopy, big) in SyncSettingsRows.everyStatus.map({ ($0.name, $0.status, $0.isOn, $0.hasCopy, SyncTooBig()) }) + tooBig {
+                settings.syncRows.show(status, isOn: isOn, hasCopy: hasCopy, tooBig: big)
                 settings.needsLayout = true
                 settings.layoutSubtreeIfNeeded()
                 let rows = settings.syncRows
@@ -1138,6 +1139,58 @@ extension SyncLibrary {
         #expect(a.sent == sentA && b.sent == sentB)
     }
 
+    @Test func preferencesTooBigTogetherStillSyncTheRestAndSaySo() throws {
+        // Each under the 200 KB a value may take, over 900 KB together.
+        func sites(_ n: Int) -> [String] { (0..<n).map { "site-\($0)-with-a-long-name.example.com" } }
+        let boosts = SettingValue.data(Data(repeating: 66, count: 140_000))
+        let dark = SettingValue.array(sites(4_400).map { .string($0) })
+        let icons = SettingValue.dictionary(Dictionary(uniqueKeysWithValues: sites(3_800).map { ($0, SettingValue.string("star")) }))
+        let banners = SettingValue.array(sites(4_000).map { .string("banner-" + $0) })
+        let zoom = SettingValue.dictionary(Dictionary(uniqueKeysWithValues: sites(4_000).map { ($0, SettingValue.double(1.25)) }))
+        let big = ["SiteBoosts": boosts, "DarkPagesOnSites": dark, "SiteIcons": icons, "CookieBannersHandledSites": banners, "ZoomLevels": zoom]
+        for value in big.values { #expect(!SyncPreferences.isTooBig(value)) }
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal")], settings: big.merging(["ReaderSize": .int(18)]) { a, _ in a }))
+        a.sync()
+        let own = big.mapValues { _ in SettingValue.array([.string("b.example")]) }
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal")], settings: own), clock: a.clock)
+        b.sync(); a.sync(); b.sync()
+        // The settings record fits, and what's in it arrives.
+        let record = try #require(cloud.records[SyncName.settings])
+        #expect(record.payload.count <= SyncSession.largestPayload)
+        #expect(b.library.settings["ReaderSize"] == .int(18))
+        // What didn't fit stays on A as it is, isn't replaced by B's, and A says so; B's own stays B's.
+        let kept = a.session.tooBig.settings
+        #expect(!kept.isEmpty && kept.isSubset(of: Set(big.keys)))
+        for key in kept { #expect(a.library.settings[key] == big[key] && b.library.settings[key] == own[key], "\(key)") }
+        for key in Set(big.keys).subtracting(kept) { #expect(b.library.settings[key] == big[key], "\(key)") }
+        #expect(SyncSettingsRows.describe(.synced(a.clock), hasCopy: true, tooBig: a.session.tooBig).detail.isEmpty == false)
+        #expect(SyncSettingsRows.describe(.synced(a.clock), hasCopy: true, tooBig: b.session.tooBig).detail.isEmpty)
+        // Nothing is asked again and again, and later edits keep syncing.
+        let sentA = a.sent
+        a.session.localChanged(); a.sync()
+        #expect(a.sent == sentA)
+        a.edit { $0.settings["ReaderSize"] = .int(20) }
+        a.sync(); b.sync()
+        #expect(b.library.settings["ReaderSize"] == .int(20))
+    }
+
+    @Test func aRemovalsRecordTooBigKeepsItsNewestNotes() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        // Thousands removed lately, more than one record holds.
+        let old = Dictionary(uniqueKeysWithValues: (0..<20_000).map { (SyncName.page(UUID()), a.clock - Double(20_000 - $0)) })
+        a.session.updateState { $0.base[SyncName.removals] = SyncItem(.removals(SyncRemovals(names: old)), modified: a.clock) }
+        let page = try #require(pageName(a, "b"))
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeAll { $0.url.lastPathComponent == "b" } } }
+        a.sync(); b.sync()
+        let record = try #require(cloud.records[SyncName.removals])
+        #expect(record.payload.count <= SyncSession.largestPayload)
+        guard case .removals(let removals) = SyncBody.decode(type: record.type, payload: record.payload) else { Issue.record("not removals"); return }
+        #expect(removals.names[page] != nil)
+        #expect(a.session.tooBig.isEmpty)
+        #expect(b.library.urls(in: "Personal") == ["a"])
+    }
+
     @Test func aRecordTooBigForICloudIsntSentAndStaysHere() {
         let huge = Bookmark(url: URL(string: "data:text/plain," + String(repeating: "a", count: 1_000_000))!, title: "Huge")
         let cloud = FakeCloud()
@@ -1149,6 +1202,9 @@ extension SyncLibrary {
         a.sync(); a.session.localChanged(); a.sync()
         #expect(a.sent == sent)
         #expect(a.library.titles(in: "Personal") == ["a", "Huge"])
+        // Said under the switch.
+        #expect(a.session.tooBig.kinds == [.page: 1])
+        #expect(!SyncSettingsRows.describe(.synced(a.clock), hasCopy: true, tooBig: a.session.tooBig).detail.isEmpty)
     }
 
     @Test func aThousandPinnedPagesSyncQuickly() {

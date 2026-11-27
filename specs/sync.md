@@ -112,8 +112,12 @@
   Test: SyncTests.aFavoriteRemovedOnPurposeDoesntComeBackWithItsProfileLater
 - A preference too big for iCloud (long styles for many sites) → stays on this Mac and isn't replaced by another Mac's; the rest still sync.
   Test: SyncTests.aPreferenceTooBigForICloudStaysOnThisMac
-- A pinned page too big for iCloud (a long data: address) → stays on this Mac and isn't sent, without asking iCloud again and again.
+- Preferences too big together for iCloud's one record (each under 200 KB, styles, dark pages and icons for thousands of sites) → the biggest stay on this Mac, as one too big alone does, until the rest fit; the rest sync, and later changes keep syncing. Under Last synced, Settings says some settings are too big for iCloud and stay on this Mac. Nothing is dropped without a sign.
+  Test: SyncTests.preferencesTooBigTogetherStillSyncTheRestAndSaySo
+- A pinned page too big for iCloud (a long data: address) → stays on this Mac and isn't sent, without asking iCloud again and again; under Last synced, Settings says how many of what stay on this Mac.
   Test: SyncTests.aRecordTooBigForICloudIsntSentAndStaysHere
+- Thousands removed within 30 days, more removal notes than one record holds → the newest notes go up and the oldest are left out, so removals keep syncing; an old note left out only guards less against a restored Mac bringing that one back.
+  Test: SyncTests.aRemovalsRecordTooBigKeepsItsNewestNotes
 - Nothing changed → nothing is sent.
   Test: SyncTests.onceSettledNothingMoreIsSent
 - A thousand pinned pages → sync without a wait, and one edit sends one record.

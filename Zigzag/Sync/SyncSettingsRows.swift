@@ -108,10 +108,12 @@ final class SyncSettingsRows {
     }
 
     /// The status line and its button for what sync is doing now. Removals held come first, with what else is going on.
-    static func describe(_ status: ICloudSync.Status, hasCopy: Bool, now: Date = Date()) -> (text: String, detail: String, action: String?, second: String?) {
+    /// `tooBig`: what stays on this Mac because it's too big for iCloud, said under Last synced.
+    static func describe(_ status: ICloudSync.Status, hasCopy: Bool, now: Date = Date(), tooBig: SyncTooBig = SyncTooBig()) -> (text: String, detail: String, action: String?, second: String?) {
         guard case .removalsHeld(let counts, let other) = status else {
             let shown = describeOne(status, hasCopy: hasCopy, now: now)
-            return (shown.text, shown.detail, shown.action, nil)
+            let syncing = switch status { case .synced, .syncing: true; default: false }
+            return (shown.text, syncing ? Words.sentences(shown.detail, describe(tooBig)) : shown.detail, shown.action, nil)
         }
         let held = String(localized: "Removed on this Mac at once: \(SyncKind.list(counts))",
                           comment: "Status under Sync with iCloud in Settings › General, and a toast, when many spaces, pinned tabs or favorites went missing at once at launch or when sync was turned on (an old copy of the library put back, say). The placeholder lists them, like “16 pinned tabs and 1 space”.")
@@ -122,9 +124,26 @@ final class SyncSettingsRows {
         case .notSignedIn, .otherAccount, .restricted, .full, .offline, .notEntitled, .failed: besides = describeOne(other, hasCopy: hasCopy, now: now).text
         default: break
         }
-        return (held, Words.sentences(besides, explanation),
+        return (held, Words.sentences(Words.sentences(besides, explanation), describe(tooBig)),
                 String(localized: "Restore", comment: "Button beside “Removed on this Mac at once” in Settings › General: brings them back from iCloud."),
                 String(localized: "Remove Everywhere", comment: "Button beside “Removed on this Mac at once” in Settings › General: removes them from iCloud and the other Macs too, after asking."))
+    }
+
+    /// What stays on this Mac because it's too big for iCloud, or nil when nothing does.
+    static func describe(_ tooBig: SyncTooBig) -> String? {
+        guard !tooBig.isEmpty else { return nil }
+        let settings = !tooBig.settings.isEmpty || tooBig.other
+        guard !tooBig.kinds.isEmpty else {
+            return String(localized: "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs.",
+                          comment: "Under “Last synced” in Settings › General › Sync with iCloud, when preferences together are more than an iCloud record holds (styles or icons for thousands of sites, say).")
+        }
+        let list = SyncKind.list(tooBig.kinds)
+        if settings {
+            return String(localized: "Too big for iCloud, so kept on this Mac only: \(list), and some settings. Everything else syncs.",
+                          comment: "Under “Last synced” in Settings › General › Sync with iCloud. The placeholder lists pinned tabs or favorites too big for an iCloud record (a very long data: address, say), like “1 pinned tab”; preferences are too big as well.")
+        }
+        return String(localized: "Too big for iCloud, so kept on this Mac only: \(list). Everything else syncs.",
+                      comment: "Under “Last synced” in Settings › General › Sync with iCloud. The placeholder lists pinned tabs or favorites too big for an iCloud record (a very long data: address, say), like “1 pinned tab”.")
     }
 
     /// Asked before Remove Everywhere: how many of what.
@@ -186,11 +205,11 @@ final class SyncSettingsRows {
         }
     }
 
-    func refresh() { show(sync.status, isOn: sync.isOn, hasCopy: sync.hasCopy) }
+    func refresh() { show(sync.status, isOn: sync.isOn, hasCopy: sync.hasCopy, tooBig: sync.tooBig) }
 
     /// The rows for a status: the switch, the line under it and its button.
-    func show(_ status: ICloudSync.Status, isOn: Bool, hasCopy: Bool) {
-        let shown = Self.describe(status, hasCopy: hasCopy)
+    func show(_ status: ICloudSync.Status, isOn: Bool, hasCopy: Bool, tooBig: SyncTooBig = SyncTooBig()) {
+        let shown = Self.describe(status, hasCopy: hasCopy, tooBig: tooBig)
         toggle.isOn = isOn
         let was = (statusRow.isAvailable, statusRow.titleText, statusRow.detailText, action.isHidden, secondAction.isHidden)
         statusRow.isAvailable = !shown.text.isEmpty
@@ -216,6 +235,12 @@ final class SyncSettingsRows {
         ("not entitled", .notEntitled, true, false), ("backup failed", .backupFailed, false, false), ("failed", .failed("The request timed out."), true, true),
         ("removals held", .removalsHeld([.page: 16, .space: 1], .synced(Date())), true, true),
         ("removals held, offline", .removalsHeld([.page: 16, .folder: 2], .offline), true, true),
+    ]
+
+    /// What's too big for iCloud, as the line can say it, for the layout tests and pictures.
+    static let everyTooBig: [(name: String, tooBig: SyncTooBig)] = [
+        ("settings too big", SyncTooBig(settings: ["SiteBoosts"])), ("pins too big", SyncTooBig(kinds: [.page: 1])),
+        ("pins and settings too big", SyncTooBig(settings: ["SiteIcons"], kinds: [.page: 2, .favorite: 1])),
     ]
     #endif
 }

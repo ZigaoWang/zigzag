@@ -81,9 +81,29 @@ enum SyncPreferences {
     /// iCloud takes a record up to 1 MB.
     static let largestValue = 200_000
 
-    static func isTooBig(_ value: SettingValue?) -> Bool {
-        guard let value else { return false }
-        return ((try? JSONEncoder().encode(value))?.count ?? 0) > largestValue
+    static func isTooBig(_ value: SettingValue?) -> Bool { size(value) > largestValue }
+
+    /// All of them together take up to this much of their record; beyond it, the biggest stay on this Mac.
+    static let largestTotal = 700_000
+
+    /// What a value takes in the record.
+    static func size(_ value: SettingValue?) -> Int {
+        guard let value else { return 0 }
+        return (try? JSONEncoder().encode(value))?.count ?? 0
+    }
+
+    /// The preferences that stay on this Mac, by key: one bigger than `largestValue`, and, when together they're
+    /// bigger than `largestTotal`, the biggest until the rest fit. The same values always give the same keys, so what
+    /// stays here isn't replaced by another Mac's either.
+    static func staysHere(_ settings: [String: SettingValue]) -> Set<String> {
+        let sizes = settings.filter { owner($0.key).carried }.map { (key: $0.key, size: size($0.value)) }
+        var result = Set(sizes.filter { $0.size > largestValue }.map(\.key))
+        var total = sizes.filter { !result.contains($0.key) }.reduce(0) { $0 + $1.size + $1.key.utf8.count + 40 }
+        for item in sizes.sorted(by: { ($0.size, $0.key) > ($1.size, $1.key) }) where total > largestTotal && !result.contains(item.key) {
+            result.insert(item.key)
+            total -= item.size + item.key.utf8.count + 40
+        }
+        return result
     }
 
     /// The search engine, kept in the library, travels as one more preference.
@@ -146,6 +166,8 @@ enum SyncMapping {
         var emptyFolders: Set<UUID>
         /// A folder that just got its first pages keeps the place it had: the library should be laid out again.
         var needsLayout = false
+        /// Preferences too big for iCloud, by key, that stay on this Mac (`SyncPreferences.staysHere`).
+        var staysHere: Set<String> = []
     }
 
     // MARK: Waiting for a parent
@@ -350,10 +372,19 @@ enum SyncMapping {
             current[SyncPreferences.renamed(key, aliases.server)] = value
         }
         if library.searchEngine != .fromExtension { current[SyncPreferences.searchEngineKey] = .string(library.searchEngine.rawValue) }
-        for (key, value) in current {
-            // Too big to send: iCloud keeps what it has, and this Mac its own.
-            if SyncPreferences.isTooBig(value) { if let entry = earlier[key] { values[key] = entry }; continue }
+        let staysHere = SyncPreferences.staysHere(library.settings)
+        export.staysHere = staysHere
+        let tooBig = Set(staysHere.map { SyncPreferences.renamed($0, aliases.server) })
+        var room = SyncPreferences.largestTotal
+        for (key, value) in current where !tooBig.contains(key) {
             values[key] = earlier[key].flatMap { $0.value == value ? $0 : nil } ?? .init(value: value, modified: changed(key))
+            room -= SyncPreferences.size(value) + key.utf8.count + 40
+        }
+        // Too big to send: iCloud keeps what it has, where that fits, and this Mac its own.
+        for key in tooBig.sorted() where current[key] != nil {
+            guard let entry = earlier[key] else { continue }
+            let size = SyncPreferences.size(entry.value) + key.utf8.count + 40
+            if size <= room { values[key] = entry; room -= size }
         }
         // A preference set back to its default is sent as unset; the search engine chosen from an extension stays as it was.
         for (key, entry) in earlier where values[key] == nil {
@@ -566,8 +597,9 @@ enum SyncMapping {
         contents.directory = directory
         result.library.contents = contents
 
-        // Preferences
+        // Preferences; one too big for iCloud stays as it is here.
         if let settings {
+            let staysHere = SyncPreferences.staysHere(library.settings)
             for (key, entry) in settings.values {
                 if key == SyncPreferences.searchEngineKey {
                     if case .string(let raw)? = entry.value, let engine = SearchEngine(rawValue: raw), engine != .fromExtension,
@@ -578,7 +610,7 @@ enum SyncMapping {
                 }
                 let local = SyncPreferences.renamed(key, aliases.local)
                 let owner = SyncPreferences.owner(local)
-                guard owner.carried, !(owner.profile.map(kept.contains) ?? false), !SyncPreferences.isTooBig(library.settings[local]) else { continue }
+                guard owner.carried, !(owner.profile.map(kept.contains) ?? false), !staysHere.contains(local) else { continue }
                 if local == "SiteIcons" {
                     // Picture icons set here stay.
                     let images: [String: SettingValue] = if case .dictionary(let d)? = library.settings[local] {

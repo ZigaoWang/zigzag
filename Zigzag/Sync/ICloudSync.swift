@@ -59,6 +59,9 @@ final class ICloudSync {
 
     var isOn: Bool { UserDefaults.standard.bool(forKey: Self.enabledKey) }
 
+    /// What stays on this Mac because it's too big for iCloud.
+    var tooBig: SyncTooBig { session?.tooBig ?? SyncTooBig() }
+
     /// iCloud has a copy from this Mac, so Remove from iCloud… still means something while sync is off.
     static let copyKey = "SyncWithICloudCopy"
     var hasCopy: Bool { UserDefaults.standard.bool(forKey: Self.copyKey) }
@@ -304,6 +307,7 @@ final class ICloudSync {
             self?.noteLastSynced()
         }
         session.onTookICloud = { [weak self] in self?.tellTookICloud() }
+        session.onTooBig = { [weak self] in self?.changed.send() }
         session.onHeld = { [weak self] in
             self?.changed.send()
             if self?.session?.state.heldRemovals != nil { self?.tellHeld() }

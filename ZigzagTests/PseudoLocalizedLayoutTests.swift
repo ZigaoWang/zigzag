@@ -207,12 +207,13 @@ import Testing
     @Test(arguments: [1040, 560] as [CGFloat]) func syncWithICloudFits(width: CGFloat) {
         pseudo {
             var found: [String] = []
-            for (name, status, isOn, hasCopy) in SyncSettingsRows.everyStatus {
+            let tooBig = SyncSettingsRows.everyTooBig.map { ($0.name, ICloudSync.Status.synced(Date()), true, true, $0.tooBig) }
+            for (name, status, isOn, hasCopy, big) in SyncSettingsRows.everyStatus.map({ ($0.name, $0.status, $0.isOn, $0.hasCopy, SyncTooBig()) }) + tooBig {
                 let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)
                 window.isReleasedWhenClosed = false
                 defer { window.close() }
                 let rows = SyncSettingsRows()
-                rows.show(status, isOn: isOn, hasCopy: hasCopy)
+                rows.show(status, isOn: isOn, hasCopy: hasCopy, tooBig: big)
                 let group = FormGroup()
                 group.add(rows.row)
                 group.add(rows.statusRow)

@@ -3298,6 +3298,89 @@
         }
       }
     },
+    "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud, when preferences together are more than an iCloud record holds (styles or icons for thousands of sites, say).",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einige Einstellungen sind zu groß für iCloud und bleiben auf diesem Mac. Alles andere wird synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algunos ajustes son demasiado grandes para iCloud y se quedan en este Mac. Todo lo demás se sincroniza."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certains réglages sont trop volumineux pour iCloud et restent sur ce Mac. Tout le reste est synchronisé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alcune impostazioni sono troppo grandi per iCloud e restano su questo Mac. Tutto il resto viene sincronizzato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一部の設定はiCloudには大きすぎるため、このMacに残ります。それ以外はすべて同期されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일부 설정은 iCloud에 비해 너무 커서 이 Mac에 남습니다. 나머지는 모두 동기화됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sommige instellingen zijn te groot voor iCloud en blijven op deze Mac. Al het andere wordt gesynchroniseerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niektóre ustawienia są za duże dla iCloud i zostają na tym Macu. Cała reszta jest synchronizowana."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alguns ajustes são grandes demais para o iCloud e ficam neste Mac. Todo o resto é sincronizado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Некоторые настройки слишком велики для iCloud и остаются на этом Mac. Всё остальное синхронизируется."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bazı ayarlar iCloud için çok büyük, bu yüzden bu Mac’te kalır. Geri kalan her şey eşzamanlanır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分设置对 iCloud 来说太大，因此保留在这台 Mac 上。其他内容都会同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分設定對 iCloud 來說太大，因此保留在這台 Mac 上。其他內容都會同步。"
+          }
+        }
+      }
+    },
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too." : {
       "comment" : "Explanation under “Removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it. The rest keeps syncing.",
       "localizations" : {
@@ -3875,6 +3958,172 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這台 Mac 上的資料庫比上次同步時的舊，因此已還原為 iCloud 中的版本。"
+          }
+        }
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud. The placeholder lists pinned tabs or favorites too big for an iCloud record (a very long data: address, say), like “1 pinned tab”; preferences are too big as well.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zu groß für iCloud, daher nur auf diesem Mac: %@ und einige Einstellungen. Alles andere wird synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que no cabe en iCloud se queda solo en este Mac: %@ y algunos ajustes. Todo lo demás se sincroniza."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui ne tient pas dans iCloud reste seulement sur ce Mac : %@ et certains réglages. Tout le reste est synchronisé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciò che non entra in iCloud resta solo su questo Mac: %@ e alcune impostazioni. Tutto il resto viene sincronizzato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudには大きすぎるため、このMacにだけ残る項目：%@と一部の設定。それ以外はすべて同期されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 비해 너무 커서 이 Mac에만 남는 항목: %@ 및 일부 설정. 나머지는 모두 동기화됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat niet in iCloud past, blijft alleen op deze Mac: %@ en sommige instellingen. Al het andere wordt gesynchroniseerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To, co nie mieści się w iCloud, zostaje tylko na tym Macu: %@ oraz niektóre ustawienia. Cała reszta jest synchronizowana."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que não cabe no iCloud fica só neste Mac: %@ e alguns ajustes. Todo o resto é sincronizado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хранится только на этом Mac, так как слишком велико для iCloud: %@ и некоторые настройки. Всё остальное синхронизируется."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud için çok büyük olduğundan yalnızca bu Mac’te kalanlar: %@ ve bazı ayarlar. Geri kalan her şey eşzamanlanır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "因为对 iCloud 来说太大，只保留在这台 Mac 上：%@和部分设置。其他内容都会同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "因為對 iCloud 來說太大，只保留在這台 Mac 上：%@和部分設定。其他內容都會同步。"
+          }
+        }
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@. Everything else syncs." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud. The placeholder lists pinned tabs or favorites too big for an iCloud record (a very long data: address, say), like “1 pinned tab”.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zu groß für iCloud, daher nur auf diesem Mac: %@. Alles andere wird synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que no cabe en iCloud se queda solo en este Mac: %@. Todo lo demás se sincroniza."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui ne tient pas dans iCloud reste seulement sur ce Mac : %@. Tout le reste est synchronisé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciò che non entra in iCloud resta solo su questo Mac: %@. Tutto il resto viene sincronizzato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudには大きすぎるため、このMacにだけ残る項目：%@。それ以外はすべて同期されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 비해 너무 커서 이 Mac에만 남는 항목: %@. 나머지는 모두 동기화됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat niet in iCloud past, blijft alleen op deze Mac: %@. Al het andere wordt gesynchroniseerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To, co nie mieści się w iCloud, zostaje tylko na tym Macu: %@. Cała reszta jest synchronizowana."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que não cabe no iCloud fica só neste Mac: %@. Todo o resto é sincronizado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хранится только на этом Mac, так как слишком велико для iCloud: %@. Всё остальное синхронизируется."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud için çok büyük olduğundan yalnızca bu Mac’te kalanlar: %@. Geri kalan her şey eşzamanlanır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "因为对 iCloud 来说太大，只保留在这台 Mac 上：%@。其他内容都会同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "因為對 iCloud 來說太大，只保留在這台 Mac 上：%@。其他內容都會同步。"
           }
         }
       }
