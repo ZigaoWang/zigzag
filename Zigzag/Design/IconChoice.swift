@@ -420,6 +420,8 @@ final class IconPickerPanel: FloatingPanelView {
     private var monitor: Any?
     private let pad = Tokens.Space.x3
     static weak var current: IconPickerPanel?
+    /// The row it was opened beside, if any.
+    private(set) weak var row: NSView?
     /// How wide it is: the grid and its padding.
     var preferredWidth: CGFloat { IconGrid.width + pad * 2 }
 
@@ -472,6 +474,7 @@ final class IconPickerPanel: FloatingPanelView {
 
     /// Beside the sidebar, level with the row it's for.
     func show(beside row: NSView, in overlay: NSView, x: CGFloat) {
+        self.row = row
         let rowFrame = row.convert(row.bounds, to: overlay)
         // Opens away from the sidebar edge, left or right.
         show(at: NSPoint(x: x, y: rowFrame.minY - Tokens.Space.x2), in: overlay, growsFrom: CGPoint(x: x < rowFrame.minX ? 1 : 0, y: 0.1))

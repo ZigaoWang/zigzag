@@ -382,3 +382,191 @@ struct SidebarEdgeEventTests {
         }
     }
 }
+
+/// The floating sidebar while a menu from it is open: it stays out, as the Dock does, and once the menu is gone it
+/// follows the pointer again.
+@MainActor
+struct SidebarMenuHoldTests {
+    private func floating(short: Bool = false, _ body: (BrowserWindowController, BrowserRootView) throws -> Void) rethrows {
+        let saved = UserDefaults.standard.object(forKey: BrowserRootView.shortFloatingKey)
+        defer { UserDefaults.standard.set(saved, forKey: BrowserRootView.shortFloatingKey) }
+        UserDefaults.standard.set(short, forKey: BrowserRootView.shortFloatingKey)
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        manager.select(manager.newTab(url: URL(string: "about:blank"), spaceID: space))
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.setSidebarVisible(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        root.reveal(true)
+        root.layoutSubtreeIfNeeded()
+        defer { root.debugEdgePointer(nil); MenuPanel.current?.close(animated: false) }
+        try body(controller, root)
+    }
+
+    /// Long past the slide, a look at the pointer and another a moment later, as the timer takes them.
+    private func settle(_ root: BrowserRootView) {
+        let later = ProcessInfo.processInfo.systemUptime + 5
+        root.followPointer(at: later)
+        root.followPointer(at: later + 1)
+    }
+
+    private var outside: NSPoint { NSPoint(x: 700, y: 300) }
+    private func inside(_ root: BrowserRootView) -> NSPoint { NSPoint(x: root.sidebarContainer.frame.midX, y: root.sidebarContainer.frame.midY) }
+
+    private func rowMenu(_ controller: BrowserWindowController) throws -> MenuPanel {
+        let tab = try #require(controller.tabManager.selectedTab)
+        let row = try #require(controller.sidebar.list.tabRow(tab.id))
+        let menu = SidebarMenus.tabMenu(for: tab, controller: controller)
+        return try #require(MenuPanel.show(menu: menu, from: row, placement: .at(row.convert(NSPoint(x: 60, y: row.bounds.midY), to: nil))))
+    }
+
+    @Test func aRowMenuKeepsItOutWithThePointerAway() throws {
+        try floating { controller, root in
+            _ = try rowMenu(controller)
+            root.debugEdgePointer(outside)
+            settle(root)
+            #expect(root.isSidebarFloatingVisible)
+            root.reveal(false)
+            #expect(root.isSidebarFloatingVisible, "nothing else sends it back while the menu is open")
+        }
+    }
+
+    @Test func closedWithThePointerAwayItGoesBack() throws {
+        try floating { controller, root in
+            let menu = try rowMenu(controller)
+            root.debugEdgePointer(outside)
+            settle(root)
+            menu.close(animated: false)
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func closedWithThePointerOnItItStays() throws {
+        try floating { controller, root in
+            let menu = try rowMenu(controller)
+            root.debugEdgePointer(outside)
+            settle(root)
+            root.debugEdgePointer(inside(root))
+            menu.close(animated: false)
+            settle(root)
+            #expect(root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func escAndAnItemChosenLetItGo() throws {
+        try floating { controller, root in
+            root.debugEdgePointer(outside)
+            let menu = try rowMenu(controller)
+            menu.debugKey(53)
+            #expect(MenuPanel.current == nil)
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+        try floating { controller, root in
+            root.debugEdgePointer(outside)
+            var chosen = false
+            let entries: [MenuPanel.Entry] = [.item(MenuPanel.Item(title: "Copy Link") { chosen = true })]
+            let menu = try #require(MenuPanel.show(entries, from: controller.sidebar, placement: .at(NSPoint(x: 60, y: 300))))
+            settle(root)
+            #expect(root.isSidebarFloatingVisible)
+            menu.debugKey(125)
+            menu.debugKey(36)
+            #expect(chosen)
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func theWindowLosingTheKeyboardClosesTheMenuAndLetsItGo() throws {
+        try floating { controller, root in
+            root.debugEdgePointer(outside)
+            _ = try rowMenu(controller)
+            NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: controller.window)
+            #expect(MenuPanel.current == nil)
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func aMenuFromThePageDoesNotHoldIt() throws {
+        try floating { controller, root in
+            root.debugEdgePointer(outside)
+            let entries: [MenuPanel.Entry] = [.item(MenuPanel.Item(title: "Copy Link") {})]
+            _ = try #require(MenuPanel.show(entries, from: root.card, placement: .at(NSPoint(x: 600, y: 300))))
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func anAppKitMenuFromItHoldsItUntilItEnds() throws {
+        try floating { _, root in
+            let menu = NSMenu()
+            menu.addItem(withTitle: "Copy", action: nil, keyEquivalent: "")
+            root.debugEdgePointer(inside(root))
+            NotificationCenter.default.post(name: NSMenu.didBeginTrackingNotification, object: menu)
+            root.debugEdgePointer(outside)
+            settle(root)
+            #expect(root.isSidebarFloatingVisible)
+            NotificationCenter.default.post(name: NSMenu.didEndTrackingNotification, object: menu)
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func anAppKitMenuFromElsewhereDoesNotHoldIt() throws {
+        try floating { _, root in
+            let menu = NSMenu()
+            root.debugEdgePointer(outside)
+            NotificationCenter.default.post(name: NSMenu.didBeginTrackingNotification, object: menu)
+            defer { NotificationCenter.default.post(name: NSMenu.didEndTrackingNotification, object: menu) }
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func theShorterSidebarIsHeldTheSameWay() throws {
+        try floating(short: true) { controller, root in
+            let menu = try rowMenu(controller)
+            root.debugEdgePointer(outside)
+            settle(root)
+            #expect(root.isSidebarFloatingVisible)
+            menu.close(animated: false)
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func theIconPickerBesideARowHoldsItUntilItCloses() throws {
+        try floating { controller, root in
+            root.debugEdgePointer(outside)
+            let tab = try #require(controller.tabManager.selectedTab)
+            controller.chooseIcon(for: tab)
+            let picker = try #require(IconPickerPanel.current)
+            settle(root)
+            #expect(root.isSidebarFloatingVisible)
+            picker.close()
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+
+    @Test func renamingARowHoldsItUntilTheNameIsIn() throws {
+        try floating { controller, root in
+            root.debugEdgePointer(outside)
+            let tab = try #require(controller.tabManager.selectedTab)
+            controller.sidebar.list.beginRenaming(tab: tab.id)
+            try #require(controller.window?.firstResponder is NSTextView)
+            settle(root)
+            #expect(root.isSidebarFloatingVisible)
+            controller.window?.makeFirstResponder(nil)
+            settle(root)
+            #expect(!root.isSidebarFloatingVisible)
+        }
+    }
+}

@@ -834,7 +834,19 @@ final class BrowserRootView: SpaceFrameView {
     var holdReveal = false
     /// Also keeps it open: a panel that came out of it (the site panel, downloads) is still showing.
     var keepsRevealed: (() -> Bool)?
-    private var isHeld: Bool { holdReveal || keepsRevealed?() == true }
+    private var isHeld: Bool { holdReveal || keepsRevealed?() == true || sidebarHoldsItself }
+    /// What came out of the sidebar is still showing: a menu, its icon picker, or a name typed in a row.
+    var sidebarHoldsItself: Bool {
+        if let anchor = MenuPanel.current?.anchor, anchor.isDescendant(of: sidebarContainer) { return true }
+        if sidebarMenu != nil { return true }
+        if let row = IconPickerPanel.current?.row, row.isDescendant(of: sidebarContainer) { return true }
+        if let editor = window?.firstResponder as? NSTextView, editor.isFieldEditor,
+           (editor.delegate as? NSView)?.isDescendant(of: sidebarContainer) == true { return true }
+        return false
+    }
+    /// An AppKit menu opened from the floating sidebar, while it tracks.
+    private weak var sidebarMenu: NSMenu?
+    private var menuTrackingTokens: [NSObjectProtocol] = []
     /// The other way round: something floats over the window where the sidebar would slide in (the command bar, a
     /// panel opened from the bar above the page), so the pointer at the edge leaves the sidebar hidden rather than
     /// sliding it in under that. Asking for it outright (`reveal`) still brings it out.
@@ -908,6 +920,13 @@ final class BrowserRootView: SpaceFrameView {
         }
         shortFloatingToken = NotificationCenter.default.addObserver(forName: Self.shortFloatingChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.needsLayout = true }
+        }
+        for name in [NSMenu.didBeginTrackingNotification, NSMenu.didEndTrackingNotification] {
+            menuTrackingTokens.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] note in
+                nonisolated(unsafe) let menu = note.object as? NSMenu
+                let began = note.name == NSMenu.didBeginTrackingNotification
+                MainActor.assumeIsolated { self?.menuTracking(menu, began: began) }
+            })
         }
         // Questions arriving or answered toggle the glow.
         attentionToken = PendingQuestions.changed.observe { [weak self] _ in self?.needsLayout = true }
@@ -2739,24 +2758,37 @@ final class BrowserRootView: SpaceFrameView {
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
         if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
         if let shortFloatingToken { NotificationCenter.default.removeObserver(shortFloatingToken) }
+        menuTrackingTokens.forEach(NotificationCenter.default.removeObserver)
         if let touchListener { TouchPress.stopListening(touchListener) }
         grabberHideWork?.cancel()
         grabberRevealWork?.cancel()
     }
 
-    private func followPointer() {
+    /// One look at the pointer while the sidebar floats; `now` for tests.
+    func followPointer(at now: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         // A drag on the edge is not the pointer leaving: the band reaches past the card, and the width follows it.
         guard !isDraggingSidebarEdge else { return }
         guard let point = pointer, !chromeSidebarShown, sidebarRevealed else { watchPointer(false); return }
         let wasLeaving = edgeReveal.isLeaving
         let held = isHeld || isTouchHeld || NSEvent.pressedMouseButtons != 0
-        if edgeReveal.follow(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone, held: held) {
+        if edgeReveal.follow(at: point, time: now, in: edgeZone, held: held) {
             let zone = edgeZone
             Self.edgeLog.notice("tuck at x=\(Int(point.x), privacy: .public) y=\(Int(point.y), privacy: .public) keeps=\(zone.keeps(at: point), privacy: .public) past=\(zone.isPast(point), privacy: .public) sidebar=\(Int(zone.sidebar.minX), privacy: .public)-\(Int(zone.sidebar.maxX), privacy: .public) active=\(NSApp.isActive, privacy: .public)")
             reveal(false)
         } else if edgeReveal.isLeaving != wasLeaving {
             pacePointer()
         }
+    }
+
+    /// An AppKit menu began or ended tracking: one opened over the floating sidebar holds it until it ends.
+    func menuTracking(_ menu: NSMenu?, began: Bool) {
+        guard let menu else { return }
+        if !began {
+            if menu === sidebarMenu { sidebarMenu = nil }
+            return
+        }
+        guard sidebarMenu == nil, isSidebarFloatingVisible, let point = pointer else { return }
+        if sidebarContainer.frame.contains(point) { sidebarMenu = menu }
     }
 
     func reveal(_ show: Bool) {
