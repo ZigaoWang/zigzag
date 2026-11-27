@@ -1865,7 +1865,7 @@ extension SyncLibrary {
         #expect(a.saves.isEmpty && cloud.records.isEmpty)
     }
 
-    @Test func aResetASaveFindsFirstIsMergedAgainNotTurnedOff() {
+    @Test func aResetASaveFindsFirstIsMergedAgainNotTurnedOff() async throws {
         // Gone by the user's hand (iCloud's data deleted in System Settings): removed. Gone while off here: merged afresh.
         // Otherwise a reset and a removal elsewhere both leave the zone not found, and the database's changes say which.
         #expect(ICloudSync.zoneGone(userDeleted: true, resumed: false) == .removed)
@@ -1873,24 +1873,31 @@ extension SyncLibrary {
         #expect(ICloudSync.zoneGone(userDeleted: false, resumed: false) == .askWhy)
         #expect(ICloudSync.isReset(.encryptedDataReset))
         #expect(!ICloudSync.isReset(.deleted) && !ICloudSync.isReset(.purged) && !ICloudSync.isReset(nil))
-        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
-        // iCloud's copy is reset (its keys), and A's save finds the zone gone before any fetch does.
-        cloud.removeZone()
-        var asked = 0
-        a.session.onZoneGone = { asked += 1 }
-        a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("c")) } }
-        a.sync()
-        // It asks why before doing anything; nothing here is lost or turned off meanwhile.
-        #expect(asked > 0 && a.session.state.merged)
-        #expect(a.library.urls(in: "Personal") == ["a", "b", "c"])
-        // A reset: merged again as a first sync, with nothing twice.
-        a.session.startOver()
-        cloud.makeZoneAgain()
-        a.sync()
-        b.session.startOver()
-        b.sync(); a.sync()
-        for mac in [a, b] { #expect(mac.library.urls(in: "Personal") == ["a", "b", "c"]) }
-        #expect(cloud.records.keys.filter { $0.hasPrefix("page.") }.count == 3)
+        for (reason, isReset) in [(CKDatabase.DatabaseChange.Deletion.Reason.encryptedDataReset, true), (.deleted, false)] {
+            let cloud = FakeCloud()
+            let fake = FakeICloud(cloud, library: Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+            let (sync, done) = makeSync(fake)
+            defer { done() }
+            sync.turnOn()
+            #expect(await settled { isSynced(sync) })
+            // The zone goes, and this Mac's next save finds it gone before any fetch does.
+            cloud.removeZone(reason: reason)
+            let engine = try #require(fake.engines.last)
+            fake.host.library.editSpace("Personal") { $0.bookmarks.append(Sample.page("c")) }
+            engine.session.localChanged()
+            engine.send()
+            if isReset {
+                // A reset: merged again as a first sync, sync still on, nothing twice, nothing lost.
+                #expect(await settled { pages(cloud) == ["a", "b", "c"] }, "\(sync.status) \(pages(cloud))")
+                #expect(sync.isOn && fake.engines.count == 2)
+                #expect(cloud.records.values.filter { $0.type == SyncBody.spaceType }.count == 1)
+            } else {
+                // Removed elsewhere: sync turns off here and says so, keeping everything, and the zone isn't made again.
+                #expect(await settled { !sync.isOn }, "\(sync.status)")
+                #expect(sync.status == .removedElsewhere && cloud.zoneRemoved && cloud.records.isEmpty)
+            }
+            #expect(fake.host.library.urls(in: "Personal") == ["a", "b", "c"])
+        }
     }
 
     @Test func aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing() async throws {
