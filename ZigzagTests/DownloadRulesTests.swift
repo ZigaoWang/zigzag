@@ -254,7 +254,7 @@ struct DownloadRuleTests {
     }
 
     @Test func aFileTokenIsBytesInABody() throws {
-        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("sample.torrent")
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString).torrent")
         try Data("d4:infod4:name6:samplee".utf8).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         let values = HandoffValues(link: video, file: file)
@@ -267,7 +267,7 @@ struct DownloadRuleTests {
 
     @Test func anxmlrpcBodyCarriesTheFileAsBase64() throws {
         // rTorrent reads the binary type; base64 sent as a string is a path it can't open.
-        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("sample2.torrent")
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString).torrent")
         try Data("d4:info".utf8).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         let body = DownloadHandoff.xmlRPC(method: "load.raw_start",
@@ -294,7 +294,7 @@ struct DownloadRuleTests {
     }
 
     @Test func aFileTooLargeToSendIsRefusedRatherThanRead() throws {
-        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("big.bin")
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString).bin")
         try Data(count: FileRaw.limit + 1).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         let raw = FileRaw(file)
@@ -304,7 +304,7 @@ struct DownloadRuleTests {
 
     @Test func aJsonBodyCarriesTheBytesAsBase64Text() throws {
         // JSON has no binary type, so the same token goes as base64 text: aria2.addTorrent takes it that way.
-        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("sample3.torrent")
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString).torrent")
         try Data("d4:info".utf8).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         let values = HandoffValues(link: video, file: file)
@@ -312,6 +312,45 @@ struct DownloadRuleTests {
         let ready = DownloadHandoff.jsonReady(filled ?? []) as? [Any]
         #expect(ready?.count == 2)
         #expect(ready?[1] as? String == Data("d4:info".utf8).base64EncodedString())
+    }
+
+    @Test func onlyAServicesParametersReadTheFile() throws {
+        // A script, an Open URL template or a folder never reads the download, however large it is.
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString).torrent")
+        try Data("d4:info".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let values = HandoffValues(link: video, file: file)
+        #expect(DownloadTokens.expand("{file_raw}", with: values) == "")
+        #expect(DownloadTokens.expand("{file_raw}", with: values, query: true) == "")
+        // Inside a longer parameter it is base64 text.
+        let filled = DownloadHandoff.parameters(#"["data:{file_raw}"]"#, values: values, secret: "")
+        #expect(filled?.first as? String == "data:" + Data("d4:info".utf8).base64EncodedString())
+    }
+
+    @Test func aFileTokenInsideTextStillSaysWhenThereIsNoFile() {
+        let template = #"["data:{file_raw}"]"#
+        #expect(DownloadHandoff.fileRaw(for: template, values: HandoffValues(link: video))?.problem == .noFile)
+        #expect(DownloadHandoff.fileRaw(for: #"["{link}"]"#, values: HandoffValues(link: video)) == nil)
+    }
+
+    @Test func aFolderIsNotAFileToSend() {
+        let raw = FileRaw(URL(fileURLWithPath: NSTemporaryDirectory()))
+        #expect(raw.problem == .unreadable)
+        #expect(raw.base64 == nil)
+    }
+
+    @Test func endpointCredentialsKeepAnyPasswordAndOnlyTheirAddress() throws {
+        let endpoint = "https://daemon.example:8080/RPC2"
+        // An empty password, a line break and a trailing space all come back as typed.
+        for pair in [(user: "me", password: ""), (user: "me", password: "a\nb "), (user: "", password: "token")] {
+            let stored = try #require(HandoffSecrets.stored(pair, endpoint: endpoint))
+            let back = HandoffSecrets.credentials(from: stored, endpoint: endpoint)
+            #expect(back?.user == pair.user)
+            #expect(back?.password == pair.password)
+            // Another address never gets them.
+            #expect(HandoffSecrets.credentials(from: stored, endpoint: "https://elsewhere.example/RPC2") == nil)
+        }
+        #expect(HandoffSecrets.stored((user: "", password: ""), endpoint: endpoint) == nil)
     }
 
     @Test func anEndpointHandsItsCredentialsOver() {

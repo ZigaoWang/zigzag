@@ -553,13 +553,13 @@ enum DownloadHandoff {
             return .failed(String(localized: "The service’s address isn’t valid.", comment: "Why a download rule failed: the JSON-RPC endpoint can't be made into a URL."))
         }
         let method = action.rpcMethod
-        guard let parameters = parameters(action.rpcParameters, values: values, secret: secret) else {
+        // Up to 16 MB, read off the main thread. A rule that sends the file but has none says so rather than send
+        // nothing, which the service would refuse with something far less clear.
+        let template = action.rpcParameters
+        let fileRaw = await Task.detached { Self.fileRaw(for: template, values: values) }.value
+        if let problem = fileRaw?.problem { return .failed(message(for: problem)) }
+        guard let parameters = parameters(action.rpcParameters, values: values, secret: secret, fileRaw: fileRaw) else {
             return .failed(String(localized: "The parameters aren’t valid JSON.", comment: "Why a download rule failed: the JSON-RPC parameters don't parse."))
-        }
-        // A rule that sends the file itself, asked to for a handoff that has no file: say so rather than send nothing,
-        // which the service would refuse with something far less clear.
-        if let raw = firstFileRaw(in: parameters), let problem = raw.problem {
-            return .failed(message(for: problem))
         }
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -594,18 +594,9 @@ enum DownloadHandoff {
         }
     }
 
-    /// The first `{file_raw}` in a rule's parameters, wherever it sits.
-    private static func firstFileRaw(in parameters: [Any]) -> FileRaw? {
-        for parameter in parameters {
-            if let raw = parameter as? FileRaw { return raw }
-            if let list = parameter as? [Any], let raw = firstFileRaw(in: list) { return raw }
-            if let map = parameter as? [String: Any] {
-                for value in map.values {
-                    if let raw = firstFileRaw(in: [value]) { return raw }
-                }
-            }
-        }
-        return nil
+    /// The saved file's bytes, read once and only when the parameters use `{file_raw}`.
+    nonisolated static func fileRaw(for template: String, values: HandoffValues) -> FileRaw? {
+        template.contains("{file_raw}") ? FileRaw(values.file) : nil
     }
 
     /// What to tell someone whose rule asked for bytes it doesn't have.
@@ -630,31 +621,28 @@ enum DownloadHandoff {
         return node
     }
 
-    /// Parsed from the rule's JSON. aria2 and rTorrent want the token first; added only when a secret is kept and the
-    /// template hasn't placed it.
-    /// A rule's parameters, parsed once and then filled in: the template is JSON, so it is read as JSON first and
-    /// each string in it is substituted after. Substituting first and parsing after would mean every token had to be
-    /// escaped for the body, and `{file_raw}` could only ever be text.
-    static func parameters(_ template: String, values: HandoffValues, secret: String) -> [Any]? {
-        let data = Data(template.utf8)
-        guard let parsed = try? JSONSerialization.jsonObject(with: data) else { return nil }
-        return filled(parsed, values: values, secret: secret) as? [Any]
+    /// The rule's JSON, parsed first and then filled in string by string, so no value has to be escaped for the body
+    /// and `{file_raw}` on its own stays `FileRaw`. `fileRaw` is read here when not given.
+    static func parameters(_ template: String, values: HandoffValues, secret: String, fileRaw: FileRaw? = nil) -> [Any]? {
+        guard let parsed = try? JSONSerialization.jsonObject(with: Data(template.utf8)) else { return nil }
+        let raw = fileRaw ?? self.fileRaw(for: template, values: values)
+        return filled(parsed, values: values, secret: secret, fileRaw: raw) as? [Any]
     }
 
-    /// The same structure with every token replaced. A string that is exactly a token with a value of its own keeps
-    /// that value, so `{file_raw}` reaches the body as the file's bytes rather than as a string.
-    private static func filled(_ node: Any, values: HandoffValues, secret: String) -> Any {
+    private static func filled(_ node: Any, values: HandoffValues, secret: String, fileRaw: FileRaw?) -> Any {
         if let text = node as? String {
-            return DownloadTokens.substitute(text, with: values, secret: secret)
+            return DownloadTokens.substitute(text, with: values, secret: secret, fileRaw: fileRaw)
         }
         if let list = node as? [Any] {
-            return list.map { filled($0, values: values, secret: secret) }
+            return list.map { filled($0, values: values, secret: secret, fileRaw: fileRaw) }
         }
         if let map = node as? [String: Any] {
-            return map.mapValues { filled($0, values: values, secret: secret) }
+            return map.mapValues { filled($0, values: values, secret: secret, fileRaw: fileRaw) }
         }
         return node
     }
+
+    /// aria2 and rTorrent want the token first; added only when a secret is kept and the template hasn't placed it.
 
     static func jsonParameters(_ parameters: [Any], method: String, secret: String) -> [Any] {
         guard !secret.isEmpty, method.hasPrefix("aria2.") || method.hasPrefix("system.") || method.hasPrefix("torrent.") else { return parameters }

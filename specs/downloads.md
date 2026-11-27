@@ -61,6 +61,12 @@
   Test: DownloadRuleTests.aRuleThatSendsBytesSaysSoWhenThereAreNone
 - `{file_raw}` on a file past 16 MB → refused by size without reading it, since a rule may catch something far bigger than a metafile.
   Test: DownloadRuleTests.aFileTooLargeToSendIsRefusedRatherThanRead
+- `{file_raw}` anywhere but a JSON-RPC or XML-RPC rule's parameters → empty, so a script, an Open URL template or a folder never reads the file.
+  Test: DownloadRuleTests.onlyAServicesParametersReadTheFile
+  Test: DownloadRuleTests.aFileTokenInsideTextStillSaysWhenThereIsNoFile
+- A JSON-RPC or XML-RPC rule's username and password → kept in the Keychain with the address they were entered for and sent as `Authorization: Basic`; an address with `user:pass@` has them moved there.
+  Test: DownloadRuleTests.endpointCredentialsKeepAnyPasswordAndOnlyTheirAddress
+  Test: DownloadRuleTests.anEndpointHandsItsCredentialsOver
 - Send to rTorrent → catches `.torrent` files and hands over the metafile itself with `load.raw_start`, so a tracker's cookie-based passkey works.
   Test: DownloadRuleTests.theRTorrentPresetSendsTheMetafileItself
 - A rule saved before Hand off existed → keeps handing off its URL.

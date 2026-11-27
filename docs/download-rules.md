@@ -100,7 +100,7 @@ An Open URL template, a script's arguments and a service's parameters may use:
 | `{space}` | The name of the space the tab is in. |
 | `{file}` | The saved file's path, for a File handoff. Empty for a URL handoff. |
 | `{file_url}` | The saved file as a `file://` URL, for a File handoff. Empty for a URL handoff. |
-| `{file_raw}` | The saved file's own bytes, base64, for a File handoff. Sent as the XML-RPC binary type in an XML-RPC rule and as base64 text in a JSON-RPC one, which is how rTorrent's `load.raw_start` and a torrent client that takes the metafile itself want it. Refused past 16 MB. |
+| `{file_raw}` | The saved file's own bytes, base64, for a File handoff. Sent as the XML-RPC binary type in an XML-RPC rule and as base64 text in a JSON-RPC one, which is how rTorrent's `load.raw_start` and a torrent client that takes the metafile itself want it. Filled in only in a service's parameters, and refused past 16 MB. |
 
 A script also gets `ZIGZAG_LINK`, `ZIGZAG_REFERRER`, `ZIGZAG_FILENAME`, `ZIGZAG_MIME`, `ZIGZAG_SPACE`,
 `ZIGZAG_COOKIES` and `ZIGZAG_COOKIE_HEADER` where they apply. A File handoff also sets `ZIGZAG_FILE` and

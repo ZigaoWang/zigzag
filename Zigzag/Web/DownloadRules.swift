@@ -629,7 +629,6 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
 
 // MARK: - Values a token stands for
 
-/// Token values for one handoff. Cookies are filled only when a rule needs them, since reading the store is slow.
 /// A saved file's bytes, base64, as a service that loads the metafile itself wants them. It stays a value of its own
 /// rather than text so an XML-RPC body can send it as `<base64>`: sending base64 as `<string>` is not the same thing to
 /// rTorrent, which expects the binary type there.
@@ -652,13 +651,20 @@ nonisolated struct FileRaw: Equatable, Sendable {
 
     init(_ file: URL?) {
         guard let file else { problem = .noFile; return }
-        let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0
+        // Only a regular file: a folder or a pipe at the path would fail or never end.
+        guard let size = (try? file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]))
+            .flatMap({ $0.isRegularFile == true ? $0.fileSize : nil }) else { problem = .unreadable; return }
         if size > Self.limit { problem = .tooLarge(size); return }
-        guard let data = try? Data(contentsOf: file) else { problem = .unreadable; return }
+        // Reads no more than the limit, even if the file grew since its size was read.
+        guard let handle = try? FileHandle(forReadingFrom: file) else { problem = .unreadable; return }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: Self.limit + 1) ?? Data() else { problem = .unreadable; return }
+        if data.count > Self.limit { problem = .tooLarge(data.count); return }
         base64 = data.base64EncodedString()
     }
 }
 
+/// Token values for one handoff. Cookies are filled only when a rule needs them, since reading the store is slow.
 nonisolated struct HandoffValues: Equatable, Sendable {
     var link: URL
     /// The saved file, only when a File handoff has finished downloading one.
@@ -735,8 +741,10 @@ nonisolated enum DownloadTokens {
     /// Fills tokens in one pass, so a value that contains `{link}` or `{secret}` isn't expanded again. `query`
     /// encodes each value as one query value so a filename can't add parameters. `{path}`, `{query}` and
     /// `{encoded_link}` are already encoded and aren't encoded twice.
+    /// `fileRaw` is the saved file's bytes, given only for a service's parameters; everywhere else `{file_raw}` is
+    /// empty, so no other template reads the file.
     static func expand(_ template: String, with values: HandoffValues, secret: String = "",
-                       query: Bool = false) -> String {
+                       query: Bool = false, fileRaw: FileRaw? = nil) -> String {
         func value(_ text: String) -> String { query ? queryValue(text) : text }
         // Already encoded: never percent-encoded again.
         func part(_ text: String) -> String { text }
@@ -753,10 +761,8 @@ nonisolated enum DownloadTokens {
             // Only a File handoff has one; a URL handoff leaves both empty.
             "{file}": value(values.file?.path ?? ""),
             "{file_url}": value(values.file?.absoluteString ?? ""),
-            // The file's bytes, base64, for a service that loads a metafile itself rather than by path: rTorrent's
-            // load.raw_start. Inside a longer string it is text; on its own in a parameter it stays `FileRaw`, so an
-            // XML-RPC body can send it as <base64> (`substitute`).
-            "{file_raw}": values.file.flatMap { try? Data(contentsOf: $0) }?.base64EncodedString() ?? "",
+            // Inside a longer parameter it is base64 text; on its own it stays `FileRaw` (`substitute`).
+            "{file_raw}": fileRaw?.base64 ?? "",
             "{secret}": value(secret),
             // Address parts, e.g. `https://bing.com{path}` sends a google.com match to the same page on bing.com.
             // Already percent-encoded.
@@ -784,15 +790,10 @@ nonisolated enum DownloadTokens {
 
     /// One value already read out of a rule's JSON, with the token it is filled in. A string that is exactly a token
     /// with a value of its own keeps that value, so `{file_raw}` reaches an RPC body as bytes rather than as text.
-    static func substitute(_ node: Any, with values: HandoffValues, secret: String = "") -> Any {
+    static func substitute(_ node: Any, with values: HandoffValues, secret: String = "", fileRaw: FileRaw? = nil) -> Any {
         guard let text = node as? String else { return node }
-        if let typed = typedValue(of: text, with: values, secret: secret) { return typed }
-        return expand(text, with: values, secret: secret)
-    }
-
-    /// The value a string stands for, when it is exactly a token that has one of its own rather than text.
-    static func typedValue(of text: String, with values: HandoffValues, secret: String = "") -> Any? {
-        text == "{file_raw}" ? FileRaw(values.file) : nil
+        if text == "{file_raw}", let fileRaw { return fileRaw }
+        return expand(text, with: values, secret: secret, fileRaw: fileRaw)
     }
 }
 
