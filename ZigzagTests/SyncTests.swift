@@ -943,6 +943,42 @@ extension SyncLibrary {
         #expect(SyncPreferences.owner("PasswordsManager").carried == false)
     }
 
+    @Test func aSyncedPreferenceTakesEffectAsAChangeHereDoes() throws {
+        // Every carried preference is either read where it's used or has its setter's effect done on a synced write.
+        let carried = SyncPreferences.keys.union(SyncPreferences.profileKeys.map(\.rawValue))
+        let listed = SyncedPreferenceEffects.readWhenUsed.union(SyncedPreferenceEffects.keysWithEffects)
+        #expect(listed == carried, "\(carried.symmetricDifference(listed).sorted())")
+        #expect(SyncedPreferenceEffects.readWhenUsed.isDisjoint(with: SyncedPreferenceEffects.keysWithEffects))
+        // Through the write sync uses, as another Mac's change arrives.
+        let keys = ["SiteBoosts", "borderlessPage", "DarkPagesOnSites", "FullScreenFills", "TranslateNeverSites", "DevelopmentSites", "BlockAdsAndTrackers"]
+        let saved = keys.map { ($0, UserDefaults.standard.object(forKey: $0)) }
+        defer { for (key, value) in saved { if let value { UserDefaults.standard.set(value, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } } }
+        var seen: [String: Int] = [:]
+        let tokens = [SiteCompatibility.changed.observe { seen["compatibility", default: 0] += 1 },
+                      ContentBlocker.changed.observe { seen["blocker", default: 0] += 1 },
+                      DarkPages.changed.observe { seen["dark", default: 0] += 1 },
+                      PageFullScreen.changed.observe { seen["full screen", default: 0] += 1 },
+                      PageTranslator.choicesChanged.observe { seen["translate", default: 0] += 1 },
+                      DeveloperTools.changed.observe { seen["developer", default: 0] += 1 }]
+        let observer = NotificationCenter.default.addObserver(forName: BrowserRootView.borderlessChanged, object: nil, queue: nil) { _ in
+            MainActor.assumeIsolated { seen["borderless", default: 0] += 1 }
+        }
+        defer { NotificationCenter.default.removeObserver(observer); _ = tokens }
+        let site = "sync-effects.example"
+        let boosts = SettingValue.data(try JSONEncoder().encode([site: SiteBoost(compatible: true)]))
+        let changes: [String: SettingValue?] = ["SiteBoosts": boosts, "borderlessPage": .bool(false), "DarkPagesOnSites": .array([.string(site)]),
+                                                "FullScreenFills": .string("window"), "TranslateNeverSites": .array([.string(site)]),
+                                                "DevelopmentSites": .array([.string(site)]), "BlockAdsAndTrackers": .bool(false)]
+        AppSyncHost.writePreferences(changes)
+        #expect(SiteCompatibility.isOn(site: site))
+        for effect in ["compatibility", "blocker", "dark", "full screen", "translate", "developer", "borderless"] {
+            #expect(seen[effect] == 1, "\(effect): \(seen[effect] ?? 0)")
+        }
+        // The same values again change nothing, and do nothing.
+        AppSyncHost.writePreferences(changes)
+        #expect(seen.values.allSatisfy { $0 == 1 }, "\(seen)")
+    }
+
     @Test func permissionsPasswordFillingAndCookieClearingStayOnEachMac() {
         let work = UUID()
         for key in ["SitePermissions", "SitePermissionActions", "SiteAsksBeforeDownloads", "JavaScriptOnSites",

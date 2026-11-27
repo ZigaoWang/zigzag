@@ -921,7 +921,104 @@ final class AppSyncHost: SyncHost {
         for key in Set(before.settings.keys).union(synced.settings.keys) where before.settings[key] != synced.settings[key] {
             changes[key] = .some(synced.settings[key])
         }
-        if !changes.isEmpty { SyncPreferences.write(changes, to: .standard) }
+        if !changes.isEmpty { Self.writePreferences(changes) }
+    }
+}
+
+// MARK: - What a synced preference does
+
+/// A preference sync writes takes effect as the same change made here does: what its own setter does besides saving
+/// it (telling windows, open pages, the content blocker or extensions) is done too, once per write.
+enum SyncedPreferenceEffects {
+    /// Carried preferences whose setters only save them: read each time they're used, so nothing more is needed.
+    static let readWhenUsed: Set<String> = [
+        "AskBeforeQuitting", "LaunchChoice", "DownloadsAskWhere", "FormsAutofill", "NewSpacesGetOwnProfile", "OpensExternalLinksInMini",
+        "CaptureMode", "CardFinish", "sidebarDoubleClickNewTab", "ShowLinkAddressOnHover", "ReduceMotion", "ControlTabOrder",
+        "NestsOpenedLinks", "ArchiveTabsAfter", "SleepsBusyTabs", "NewTabPlace", "NewTabPlaceOtherwise", "PictureInPictureFollowsTabs",
+        "PictureInPictureWhenLeaving", "SwipeBetweenPages", "OffersToPinWanderedPage", "InPageMini", "SearchSuggestions",
+        "CustomSearchTemplate", "pdfTwoPages", "ProtectsIPFromWebRTC", "JavaScriptAllowed", "JavaScriptOffSites", "CookieBanners",
+        "CookieBannersHandledSites", "CookieBannersLeftSites", "TranslateInto", "TranslateOffers", "ReaderFace", "ReaderSize",
+        "ReaderTheme", "ReaderWidth", "ZoomLevels", "UserAgentSites", "KeepAwakeSites",
+    ]
+
+    private struct Effect {
+        var keys: Set<String>
+        var run: (_ changed: Set<String>, _ before: [String: SettingValue?]) -> Void
+    }
+
+    private static func post(_ name: Notification.Name) { NotificationCenter.default.post(name: name, object: nil) }
+
+    /// The rest, each with what its setter does.
+    private static let effects: [Effect] = [
+        Effect(keys: ["borderlessPage"]) { _, _ in post(BrowserRootView.borderlessChanged) },
+        Effect(keys: ["addressBarPlace", "addressAbovePage"]) { _, _ in post(BrowserRootView.addressPlaceChanged) },
+        Effect(keys: ["sidebarOnRight"]) { _, _ in post(BrowserRootView.sidebarSideChanged) },
+        Effect(keys: [BrowserRootView.shortFloatingKey]) { _, _ in post(BrowserRootView.shortFloatingChanged) },
+        Effect(keys: [SidebarView.pinnedTilesKey]) { _, _ in post(SidebarView.pinnedTilesChanged) },
+        Effect(keys: ["LargeSpaceNames"]) { _, _ in post(SpaceHeaderView.styleChanged) },
+        Effect(keys: ["FavoritesPerRow"]) { _, _ in post(FavoritesView.perRowChanged) },
+        Effect(keys: ["DefaultZoom"]) { _, before in ZoomLevels.defaultZoomChanged(from: ZoomLevels.defaultZoom(before["DefaultZoom"] ?? nil)) },
+        Effect(keys: ["DarkPages", "DarkPagesPureBlack", "DarkPagesOnSites", "DarkPagesOffSites", "DarkPagesForcedSites"]) { _, _ in DarkPages.refreshAll() },
+        Effect(keys: [EdgeSidebar.defaultsKey]) { _, _ in EdgeSidebar.shared.setOn(EdgeSidebar.isOn) },
+        Effect(keys: ["WindowsShareTabs"]) { _, _ in WindowManager.shared.tabSharingChanged() },
+        Effect(keys: ["FullScreenFills", "FullScreenPageSites", "FullScreenScreenSites"]) { _, _ in PageFullScreen.changed.send() },
+        Effect(keys: ["ShortcutOverrides"]) { _, _ in Shortcuts.reapply() },
+        Effect(keys: ["TranslateAlways", "TranslateNever", "TranslateNeverSites"]) { _, _ in PageTranslator.choicesChanged.send() },
+        Effect(keys: ["SiteIcons"]) { _, _ in SiteIcons.refreshTabs() },
+        Effect(keys: ["DeveloperTools", "DeveloperToolsInBar", "DevelopmentSites", "DeveloperPageSizes"]) { _, _ in DeveloperTools.changed.send() },
+        // Compatibility mode, zaps and styles: extensions and the content blocker are told, and open pages of each site
+        // that changed get its zaps and style again.
+        Effect(keys: [SiteBoosts.key]) { _, before in
+            SiteCompatibility.apply()
+            for site in changedSites(before[SiteBoosts.key] ?? nil) { PageBoosts.refreshOpenTabs(site: site) }
+        },
+        // Told once: compatibility mode tells the blocker too.
+        Effect(keys: ["BlockAdsAndTrackers", "AdsAllowedSites"]) { changed, _ in
+            if !changed.contains(SiteBoosts.key) { ContentBlocker.changed.send() }
+        },
+        Effect(keys: [ProfileKey.extensionsOffSites.rawValue]) { changed, _ in
+            guard !changed.contains(SiteBoosts.key), #available(macOS 15.4, *) else { return }
+            for profile in Profiles.shared.all {
+                guard let host = profile.startedExtensions else { continue }
+                for id in profile.installs.installedIDs { host.applySiteAccess(id) }
+            }
+        },
+    ]
+
+    /// Every carried preference with an effect.
+    static var keysWithEffects: Set<String> { effects.reduce([]) { $0.union($1.keys) } }
+
+    /// After sync wrote `changed`, which held `before`.
+    static func apply(changed: Set<String>, before: [String: SettingValue?]) {
+        // A profile's own preference counts as its kind.
+        let kinds = Set(changed.map { key in SyncPreferences.profileKeys.first { key.hasPrefix($0.rawValue + ".") }?.rawValue ?? key })
+        for effect in effects where !effect.keys.isDisjoint(with: kinds) { effect.run(kinds, before) }
+    }
+
+    /// The sites whose zaps, style or compatibility mode differ from what they were.
+    private static func changedSites(_ before: SettingValue?) -> Set<String> {
+        func boosts(_ value: SettingValue?) -> [String: SiteBoost] {
+            guard case .data(let data)? = value else { return [:] }
+            return (try? JSONDecoder().decode([String: SiteBoost].self, from: data)) ?? [:]
+        }
+        let old = boosts(before), new = SiteBoosts.all
+        return Set(old.keys).union(new.keys).filter { old[$0] != new[$0] }
+    }
+}
+
+extension AppSyncHost {
+    /// Preferences from another Mac, written as they came, then each takes effect as the same change made here does.
+    /// One already as it is here changes nothing and does nothing.
+    static func writePreferences(_ changes: [String: SettingValue?]) {
+        let defaults = UserDefaults.standard
+        var before: [String: SettingValue?] = [:]
+        for (key, value) in changes where SyncPreferences.owner(key).carried {
+            let current = defaults.object(forKey: key).flatMap(SettingValue.init)
+            if current != value { before[key] = .some(current) }
+        }
+        guard !before.isEmpty else { return }
+        SyncPreferences.write(changes.filter { before[$0.key] != nil }, to: defaults)
+        SyncedPreferenceEffects.apply(changed: Set(before.keys), before: before)
     }
 }
 

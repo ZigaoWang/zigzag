@@ -92,6 +92,18 @@ enum Shortcuts {
         if saved != overrides { overrides = saved }
     }
 
+    /// Your shortcuts changed in the defaults (on another Mac, through Sync with iCloud): items you didn't change get
+    /// their shipped keys back, then yours are applied, as at launch.
+    static func reapply() {
+        let saved = renamed(overrides)
+        for item in allItems {
+            guard let id = id(item), let shipped = defaults[id] else { continue }
+            write(saved[id] ?? shipped, to: item)
+        }
+        apply()
+        changed.send(())
+    }
+
     /// Items whose action was renamed, old id to new: what you gave the old one stays yours.
     static let renamedIDs = ["terminate:#0": "quitFromMenu:#0"]
 
