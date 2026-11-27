@@ -603,23 +603,26 @@ struct BookmarkFolderTests {
         var arming = SwipeArming(), taps = 0
         for (index, speed) in [440, 460, 440, 460, 445, 455, 440].enumerated() {
             let progress = 0.35 + CGFloat(index) * 0.02
-            if arming.step(progress: progress, flicks: SwipeDecision.commits(progress: progress, speed: CGFloat(speed))) { taps += 1 }
+            if arming.step(progress: progress, speed: CGFloat(speed), going: true) { taps += 1 }
             if index > 0 { #expect(arming.armed) }
         }
         #expect(taps == 1)
-        let goes = arming.release(progress: 0.47, speed: 0)
+        // Let go still going: it goes. Stopped first: it springs back, as in Safari.
+        var going = arming, stopped = arming
+        let goes = going.release(progress: 0.47, speed: 440), backs = !stopped.release(progress: 0.47, speed: 0)
         #expect(goes)
+        #expect(backs)
     }
 
     @Test func aFlickDisarmsOnlyPastTheMarginBack() {
         var arming = SwipeArming()
-        let armed = arming.step(progress: 0.5, flicks: true)
+        let armed = arming.step(progress: 0.5, speed: 900, going: true)
         #expect(armed)
-        // Back a little, slow: still armed.
-        let near = arming.step(progress: 0.4)
+        // Back a little, still moving quickly: still armed.
+        let near = arming.step(progress: 0.4, speed: 400, going: false)
         #expect(!near && arming.armed)
         // Past the margin from the furthest: empty, no tap, and letting go doesn't go.
-        let past = arming.step(progress: 0.34)
+        let past = arming.step(progress: 0.34, speed: 400, going: false)
         #expect(!past && !arming.armed)
         let goes = arming.release(progress: 0.34, speed: 0)
         #expect(!goes)
@@ -642,7 +645,7 @@ struct BookmarkFolderTests {
 
     /// What the arrow shows (ring, filled) after each scroll of `deltas`, one every 8 ms toward back, then at each of
     /// `rest` later moments with no new events, the taps, and whether letting go at the end navigates, as SwipeNavigator
-    /// does: each scroll's speed can arm it as a flick, and a moment with no event is only redrawn.
+    /// does: each scroll's speed can arm it as a flick, and while a flick has it filled, it looks again as time passes.
     private func replay(_ deltas: [CGFloat], rest: [TimeInterval], distance: CGFloat = 200)
         -> (shown: [(ring: CGFloat, filled: Bool)], taps: Int, goes: Bool) {
         var arming = SwipeArming(), dx: CGFloat = 0, now: TimeInterval = 1, taps = 0
@@ -653,29 +656,28 @@ struct BookmarkFolderTests {
             dx += delta
             samples.append((now, dx))
             let speed = SwipeDecision.speed(samples, at: now, direction: -1)
-            let flicks = SwipeDecision.going(samples, direction: -1) && SwipeDecision.commits(progress: dx / distance, speed: speed)
-            if arming.step(progress: dx / distance, flicks: flicks) { taps += 1 }
+            if arming.step(progress: dx / distance, speed: speed, going: SwipeDecision.going(samples, direction: -1)) { taps += 1 }
             shown.append((min(dx / distance, 1), arming.armed))
         }
         let last = now
         for wait in rest {
             now = last + wait
+            if arming.step(progress: dx / distance, speed: SwipeDecision.speed(samples, at: now, direction: -1), going: false) { taps += 1 }
             shown.append((min(dx / distance, 1), arming.armed))
         }
         let goes = arming.release(progress: dx / distance, speed: SwipeDecision.speed(samples, at: now, direction: -1))
         return (shown, taps, goes)
     }
 
-    @Test func aFlickArmsAndRestingFingersKeepTheArrowAsItIs() {
+    @Test func aFlickFillsOnlyWhileTheFingersKeepGoing() {
         // The tester's swipe: fast to about halfway, a zero-delta scroll or two, then the fingers rest (#377).
         let fast = replay(Array(repeating: 12, count: 9) + [0, 0], rest: [0.05, 0.1, 0.5, 1.5])
-        let moved = fast.shown[8]
-        // The flick filled it, with one tap, and resting never empties it.
-        #expect(moved.filled)
+        // The flick filled it, with one tap, and a zero-delta scroll mid-flick doesn't empty it.
+        #expect(fast.shown[8].filled && fast.shown[10].filled)
         #expect(fast.taps == 1)
-        #expect(fast.shown.dropFirst(8).allSatisfy { $0.ring == moved.ring && $0.filled })
-        // Shown filled, let go after resting: it navigates, as the arrow said.
-        #expect(fast.goes)
+        // Resting short of the distance empties it, with no tap, and letting go springs back, as in Safari.
+        #expect(fast.shown.suffix(2).allSatisfy { !$0.filled && $0.ring == fast.shown[8].ring })
+        #expect(!fast.goes)
         // Slow to halfway: never filled, and letting go doesn't navigate.
         let slow = replay(Array(repeating: 2, count: 50), rest: [0.5])
         #expect(slow.shown.allSatisfy { !$0.filled })
@@ -691,6 +693,10 @@ struct BookmarkFolderTests {
         #expect(!back.goes)
         // A flick let go while still moving goes, though it never reached the distance.
         #expect(replay(Array(repeating: 12, count: 9), rest: []).goes)
+        // An ordinary swipe to about a third, a pause, then letting go: back home.
+        let paused = replay(Array(repeating: 7, count: 10), rest: [0.3])
+        #expect(paused.shown[9].filled && !(paused.shown.last?.filled ?? true))
+        #expect(!paused.goes)
     }
 
     @Test func swipeScriptLooksPastShadowRoots() throws {
@@ -1832,11 +1838,61 @@ struct SwipeGestureTests {
         try drag(page, steps: 10, dx: 6)
         #expect(swipe.isTracking && swipe.isArmed)
         #expect(taps == 1)
-        // Resting, then letting go: still armed, and it goes.
-        _ = swipe.handle(try scroll(phase: 4, after: 0.5))
+        // Letting go while still moving: it goes, with no second tap.
+        _ = swipe.handle(try scroll(phase: 4, after: 0.004))
         #expect(swipe.isCarryingOn)
         #expect(taps == 1)
         swipe.pageArrived()
+        _ = host
+    }
+
+    @Test mutating func aPauseShortOfTheDistanceSpringsBack() async throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        var taps = 0
+        swipe.tap = { taps += 1 }
+        // An ordinary swipe to a third of the way, armed while it's moving.
+        try drag(page, steps: 10, dx: 6)
+        #expect(swipe.isArmed && taps == 1)
+        // The fingers stop: the arrow empties by itself, with no tap.
+        let stopped = ProcessInfo.processInfo.systemUptime
+        now = stopped
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(!swipe.isArmed)
+        // Letting go now springs back, as in Safari and Chrome.
+        _ = swipe.handle(try scroll(phase: 4, after: ProcessInfo.processInfo.systemUptime - stopped))
+        #expect(!swipe.isCarryingOn)
+        #expect(swipe.isClean)
+        #expect(taps == 1)
+        _ = host
+    }
+
+    @Test mutating func noTapWhileThePageMayStillKeepTheSwipe() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        var taps = 0
+        swipe.tap = { taps += 1 }
+        // A quick flick in the page's first moments, nothing sideways under the pointer: the arrow leans in while the
+        // page may still keep it.
+        _ = swipe.handle(try scroll(phase: 1, dx: 14))
+        swipe.debugHeard(left: false, right: false)
+        for _ in 0..<4 { _ = swipe.handle(try scroll(phase: 2, dx: 14)) }
+        #expect(swipe.isShowing && !swipe.isTracking)
+        #expect(!swipe.isArmed && taps == 0)
+        // The page keeps it: no tap ever came for a swipe that was never Zigzag's.
+        swipe.pageAnswered(kept: true, at: Date().timeIntervalSince1970 * 1000 + 1000)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(!swipe.isCarryingOn && taps == 0)
+        // Left to Zigzag, the same flick taps once as it becomes the swipe's.
+        _ = swipe.handle(try scroll(phase: 1, dx: 14))
+        swipe.debugHeard(left: false, right: false)
+        for _ in 0..<4 { _ = swipe.handle(try scroll(phase: 2, dx: 14)) }
+        swipe.pageAnswered(kept: false, at: Date().timeIntervalSince1970 * 1000 + 1000)
+        _ = swipe.handle(try scroll(phase: 2, dx: 14))
+        #expect(swipe.isTracking && swipe.isArmed && taps == 1)
+        _ = swipe.handle(try scroll(phase: 8))
         _ = host
     }
 
