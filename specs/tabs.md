@@ -12,6 +12,7 @@
   Test: TabCloseSelectionTests.aClosedPinnedPageOrFavoriteStaysInTheSidebar
   Test: TabCloseSelectionTests.aClosedPinnedPageInAFolderOrSplitStaysInTheSidebar
   Test: PinnedGroupTests.aClosedPinStaysInAFoldedSectionUntilYouLeaveTheSpace
+  Test: ShutFolderClosedPinTests.aClosedPageStaysUnderItsShutFolderUntilYouLeaveTheSpace
 - ⌘W on the last tab of a space → the space's most recent page, else the space shows empty.
   Test: TabCloseSelectionTests.closingTheLastTabGoesToTheSpacesRecentPageElseEmpty
 - Close a tab → its page is let go at once, so WebKit can end its process; ⇧⌘T loads it again with its history.
