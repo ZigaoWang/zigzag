@@ -215,8 +215,9 @@ final class SyncSession {
     var onHeld: (() -> Void)?
     /// Called when a Library.json older than what was last synced was laid out from iCloud again, and that changed it.
     var onTookICloud: (() -> Void)?
-    /// Called when a save finds the zone gone after the first sync: removed from iCloud on another Mac.
-    var onRemovedElsewhere: (() -> Void)?
+    /// Called when a save or a removal finds the zone gone after the first sync: removed from iCloud on another Mac,
+    /// or iCloud's copy reset. Never made again from here meanwhile.
+    var onZoneGone: (() -> Void)?
     /// Called when the server's version of something is needed before it can be sent again.
     var onNeedsFetch: (() -> Void)?
     /// Called while the first sync waits for another Mac's to finish going up: read again on the retry schedule.
@@ -893,7 +894,7 @@ final class SyncSession {
         case .gone:
             deleted([name])
         case .zoneMissing:
-            if state.merged { onRemovedElsewhere?() } else { deleted([name]) }
+            if state.merged { onZoneGone?() } else { deleted([name]) }
         }
     }
 
@@ -955,8 +956,8 @@ final class SyncSession {
             }
             decideGone(name)
         case .zoneMissing:
-            // After the first sync it was removed, never made again from here.
-            if state.merged { onRemovedElsewhere?(); return }
+            // After the first sync it was removed or reset, never made again from here.
+            if state.merged { onZoneGone?(); return }
             state.systemFields = [:]
             state.unsent.formUnion(state.base.keys)
             queue((Array(state.base.keys), []))

@@ -165,6 +165,8 @@
   Test: SyncTests.aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing
   Test: SyncTests.aZoneRemovedAfterTheFirstSyncIsRemovedElsewhereNotTriedAgain
   Test: SyncTests.aSaveFindingTheZoneGoneNeverMakesItAgain
+- The library found gone by a save, a removal or a fetch's error, before iCloud's own note of why → deleted in System Settings, sync turns off at once; otherwise Zigzag reads the database's changes first: iCloud's copy reset (its keys) merges again as a first sync, as when a fetch finds the reset, and a removal, or no note at all, turns sync off. Nothing on this Mac changes meanwhile, and the zone isn't made again until that's known.
+  Test: SyncTests.aResetASaveFindsFirstIsMergedAgainNotTurnedOff
 - Something changed on another Mac while Zigzag is open here → iCloud's push fetches it within seconds; pushes for other apps are ignored.
   Test: SyncTests.onlyZigzagsOwnPushesFromICloudFetch
 - Zigzag quits in the middle of a fetch → what the fetch brought is saved with how far it read, and arrives at the next launch; nothing is skipped.

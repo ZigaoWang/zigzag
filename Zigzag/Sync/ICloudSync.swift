@@ -312,7 +312,7 @@ final class ICloudSync {
             self?.changed.send()
             if self?.session?.state.heldRemovals != nil { self?.tellHeld() }
         }
-        session.onRemovedElsewhere = { [weak self] in self?.zoneDeleted(reset: false) }
+        session.onZoneGone = { [weak self] in self?.zoneGone(userDeleted: false) }
         session.onWaiting = { [weak self] in self?.retry.failed(nil) }
         session.onStartedOver = { [weak self] in
             self?.engine?.stop()
@@ -609,12 +609,53 @@ final class ICloudSync {
         Task { await connect() }
     }
 
-    /// Our zone isn't in iCloud. Before the first sync that's an empty iCloud; after it, the zone was removed.
+    /// Our zone isn't in iCloud. Before the first sync that's an empty iCloud; after it, the zone was removed or reset.
     fileprivate func zoneMissing(_ error: Error) {
+        zoneGone(userDeleted: Self.isUserDeleted(error))
+    }
+
+    enum ZoneGone: Equatable { case reset, removed, askWhy }
+
+    /// What the zone found gone after the first sync, by a fetch, a save or a removal, means. Deleted by the user
+    /// (iCloud's data deleted in System Settings): removed. Gone while sync was off here: merged afresh, as sync was
+    /// just turned on. Otherwise iCloud's copy reset and Remove from iCloud on another Mac both leave it not found,
+    /// and the database's own changes say which (`isReset`).
+    static func zoneGone(userDeleted: Bool, resumed: Bool) -> ZoneGone {
+        if userDeleted { return .removed }
+        return resumed ? .reset : .askWhy
+    }
+
+    /// The database's note of the zone's deletion: iCloud's copy reset (its keys) merges again; removed, deleted in
+    /// System Settings, or no note at all, sync turns off.
+    static func isReset(_ reason: CKDatabase.DatabaseChange.Deletion.Reason?) -> Bool { reason == .encryptedDataReset }
+
+    static func isUserDeleted(_ error: Error) -> Bool {
+        guard let error = error as? CKError else { return false }
+        if error.code == .userDeletedZone { return true }
+        return error.partialErrorsByItemID?.values.contains { isUserDeleted($0) } == true
+    }
+
+    /// A zone found gone is decided once: what a question still on its way finds changes nothing after.
+    private var zoneDecisions = 0
+    private var askingWhyZoneGone = false
+
+    fileprivate func zoneGone(userDeleted: Bool) {
         guard let session, session.state.merged else { return }
-        // Gone while sync was off here: merged afresh, as sync was just turned on.
-        if session.state.resumed { zoneDeleted(reset: true); return }
-        zoneDeleted(reset: false)
+        switch Self.zoneGone(userDeleted: userDeleted, resumed: session.state.resumed) {
+        case .reset: zoneDeleted(reset: true)
+        case .removed: zoneDeleted(reset: false)
+        case .askWhy:
+            guard !askingWhyZoneGone, let engine else { return }
+            askingWhyZoneGone = true
+            let decided = zoneDecisions
+            Task {
+                let reason = await engine.zoneDeletion()
+                askingWhyZoneGone = false
+                // The database's changes, read meanwhile, may have decided it already.
+                guard self.session === session, zoneDecisions == decided else { return }
+                zoneDeleted(reset: Self.isReset(reason))
+            }
+        }
     }
 
     static func isZoneGone(_ error: Error) -> Bool {
@@ -624,6 +665,7 @@ final class ICloudSync {
     }
 
     fileprivate func zoneDeleted(reset: Bool) {
+        zoneDecisions += 1
         if reset {
             // iCloud's copy was reset (its encryption keys): this Mac's library goes up again, merged as on a first sync.
             session?.startOver()
@@ -842,6 +884,9 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
     private(set) var serialization: Data?
     /// When the engine's current fetch started.
     private var fetchStarted: Date?
+    /// While `zoneDeletion` asks, the zone's deletion the database's changes bring, kept for it to decide.
+    private var askingWhy = false
+    private var deletion: CKDatabase.DatabaseChange.Deletion.Reason?
     private static let log = Logger(subsystem: "wang.zigao.zigzag", category: "sync")
 
     init(container: CKContainer, session: SyncSession, owner: ICloudSync) {
@@ -909,6 +954,15 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         if let all { session.readAll(all, startedAt: started) }
         if session.state.merged { session.fetchFinished() }
     }
+    /// Why the zone is gone, as the database's changes say, or nil when they say nothing.
+    func zoneDeletion() async -> CKDatabase.DatabaseChange.Deletion.Reason? {
+        askingWhy = true
+        deletion = nil
+        defer { askingWhy = false }
+        try? await engine?.fetchChanges()
+        return deletion
+    }
+
     func sendChanges() async throws {
         guard let engine, hasPending(engine) else { return }
         try await engine.sendChanges()
@@ -974,11 +1028,12 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             }
         case .fetchedDatabaseChanges(let changes):
             for deletion in changes.deletions where deletion.zoneID == ICloudSync.zoneID {
-                owner?.zoneDeleted(reset: deletion.reason == .encryptedDataReset)
+                if askingWhy { self.deletion = deletion.reason; return }
+                owner?.zoneDeleted(reset: ICloudSync.isReset(deletion.reason))
                 return
             }
         case .didFetchRecordZoneChanges(let fetched):
-            if fetched.zoneID == ICloudSync.zoneID, let error = fetched.error, ICloudSync.isZoneGone(error) { owner?.zoneMissing(error) }
+            if fetched.zoneID == ICloudSync.zoneID, let error = fetched.error, ICloudSync.isZoneGone(error), !askingWhy { owner?.zoneMissing(error) }
         case .fetchedRecordZoneChanges(let changes):
             let records = changes.modifications.map(\.record).filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(Self.remote)
             session.fetched(records, deleted: changes.deletions.filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(\.recordID.recordName),
@@ -995,6 +1050,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
                     if let server = failure.error.serverRecord { session.saveFailed(name, .conflict(Self.remote(server))) } else { session.saveFailed(name, .conflictUnread) }
                 case .zoneNotFound, .userDeletedZone:
                     if !session.state.merged { syncEngine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: ICloudSync.zoneID))]) }
+                    // Deleted by the user, it's removed; not found, it may be a reset, and the database is asked.
+                    if session.state.merged, failure.error.code == .userDeletedZone { owner?.zoneGone(userDeleted: true); return }
                     session.saveFailed(name, .zoneMissing)
                     if session.state.merged { return }
                 case .unknownItem:
@@ -1014,6 +1071,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
                 case .unknownItem:
                     session.deleteFailed(id.recordName, .gone)
                 case .zoneNotFound, .userDeletedZone:
+                    if session.state.merged, error.code == .userDeletedZone { owner?.zoneGone(userDeleted: true); return }
                     session.deleteFailed(id.recordName, .zoneMissing)
                     if session.state.merged { return }
                 case .networkFailure, .networkUnavailable, .zoneBusy, .serviceUnavailable, .notAuthenticated, .operationCancelled, .requestRateLimited:
