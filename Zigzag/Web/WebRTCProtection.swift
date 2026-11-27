@@ -45,8 +45,18 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
     }
 
     /// Allow or Block, never Ask, since nothing asks first.
+    /// Allow, Don't Allow, or Ask, like every other permission (#545): Ask is what a site with nothing kept reads, so
+    /// its row can offer the same three as the rest.
     static func choice(origin: String, in tab: Tab?) -> PermissionChoice {
-        allows(protectionOn: isOn, kept: SitePermissions.webRTC(origin: origin), here: tab?.webRTCHere[origin]) ? .allow : .block
+        if let here = tab?.webRTCHere[origin] { return here ? .allow : .block }
+        if let kept = SitePermissions.webRTC(origin: origin) { return kept ? .allow : .block }
+        // Protection off: nothing to ask about, since every page gets it.
+        return isOn ? .ask : .allow
+    }
+
+    /// Ask: forgets the kept answer so the next attempt asks again, as the other permissions' Ask does.
+    static func forget(origin: String) {
+        SitePermissions.setChoice(.ask, for: .webRTC, origin: origin)
     }
 
     /// Kept for the site, or in a private window for `tab` only. The site's pages in `tab` reload now; other tabs
@@ -112,6 +122,59 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return }
         controller.addUserScript(WKUserScript(source: marker + "\n" + script, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
         controller.add(shared, contentWorld: .page, name: messageName)
+        // Every connection the page makes, so a Block can close the ones that are up (#545). It passes the real
+        // constructor through unchanged, so an allowed site sees no difference.
+        if !controller.userScripts.contains(where: { $0.source.hasPrefix(trackerMarker) }) {
+            controller.addUserScript(WKUserScript(source: trackerMarker + "\n" + tracker, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: false, in: .page))
+        }
+    }
+
+    private static let trackerMarker = "/* zigzag webrtc peers */"
+    /// Records each `RTCPeerConnection` the page makes on `window.__zigzagPeers`, without changing what it returns.
+    private static let tracker = """
+    (() => {
+      const P = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+      if (!P) return;
+      if (window.__zigzagPeers && window.__zigzagPeers.__zigzagTracking) return;
+      const peers = [];
+      peers.__zigzagTracking = true;
+      window.__zigzagPeers = peers;
+      const Wrapped = function (...args) {
+        const peer = new P(...args);
+        try { peers.push(peer); } catch (e) {}
+        return peer;
+      };
+      Wrapped.prototype = P.prototype;
+      try { Object.defineProperty(Wrapped, 'name', { value: 'RTCPeerConnection' }); } catch (e) {}
+      window.RTCPeerConnection = Wrapped;
+      if (window.webkitRTCPeerConnection) window.webkitRTCPeerConnection = Wrapped;
+    })();
+    """
+
+    /// For a page that is open now: close the connections that are up and refuse new ones until the page loads again,
+    /// where the kept Block keeps it out. Measured against WebKit: the preference alone does nothing to a loaded page,
+    /// and this does (`closed: true`, `canMakeAnother: false`).
+    private static let revokeScript = """
+    (() => {
+      for (const peer of (window.__zigzagPeers || [])) { try { peer.close(); } catch (e) {} }
+      window.__zigzagPeers = [];
+      const refuse = function () {
+        throw new DOMException('WebRTC is blocked for this site.', 'NotAllowedError');
+      };
+      try {
+        window.RTCPeerConnection = refuse;
+        if (window.webkitRTCPeerConnection) window.webkitRTCPeerConnection = refuse;
+      } catch (e) {}
+      return true;
+    })();
+    """
+
+    /// Takes WebRTC away from a page that has it now. A page that never had it is left alone.
+    static func revoke(in tab: Tab) {
+        guard isAvailable, let webView = tab.webView else { return }
+        webView.evaluateJavaScript(revokeScript) { _, _ in }
+        Diagnostics.note("WebRTC", site: SiteOrigin.of(webView.url).map(SiteOrigin.label), "revoked on the open page", isPrivate: tab.isPrivate)
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -171,12 +234,19 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         if bringingForward { controller.window?.makeKeyAndOrderFront(nil) }
         let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, answerKey: origin, what: "WebRTC", symbol: "phone.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use WebRTC for calls", comment: "A site's permission question, without its question mark: WebRTC is off for the site (Settings › Privacy › Protect IP address from WebRTC), and it tried to start a call. WebRTC is a name: keep it as it is."),
-                                                actions: [.deny, PermissionAction(id: "allow", title: String(localized: "Allow and Reload", comment: "Button on the question to use WebRTC for calls on a site: allows it for the site and reloads the page."), isDeny: false, isProminent: true)],
-                                                canRemember: false)
+                                                actions: [.deny, .allow],
+                                                canRemember: true,
+                                                rememberTitle: String(localized: "Remember for this site", comment: "Checkbox on the question to use WebRTC for calls on a site: keeps the answer for the site, so it isn't asked again."))
         switch answer?.action {
-        case "allow": return origin
-        // Kept as Block, as in Site Controls.
-        case "deny": keep(false, origin: origin, in: tab)
+        case "allow":
+            // Remembered for the site, or for the tab in a private window; otherwise the answer holds for this page
+            // only and a reload asks again, as every other permission does.
+            if answer?.remember != true { tab.permissionAnswers.note(true, key: origin, kind: kind) }
+            return origin
+        case "deny":
+            if answer?.remember == true { keep(false, origin: origin, in: tab) }
+            else { tab.permissionAnswers.note(false, key: origin, kind: kind) }
+            return nil
         // Put away (×, Esc, navigated): not asked again until relaunch.
         default: putAway.insert(origin)
         }

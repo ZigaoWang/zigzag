@@ -5302,10 +5302,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
 
             if let origin {
-                let permissions = SitePermission.allCases.filter {
-                    SitePermissions.hasDecision($0, origin: origin) || permissionsChangedHere.contains("\(origin)|\($0.rawValue)")
-                }
-                for permission in permissions {
+                for permission in SitePermissions.rows(origin: origin, recentlyChanged: permissionsChangedHere) {
                     // Open apps names the app the site always opens, in one sentence.
                     var detail: String?
                     if permission == .apps {

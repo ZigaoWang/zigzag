@@ -62,13 +62,14 @@ struct WebRTCProtectionTests {
     @Test func itsRowInSiteControls() async throws {
         guard WebRTCProtection.isAvailable else { return }
         try await withDefaults {
-            #expect(SitePermission.webRTC.choices == [.allow, .block])
+            // Like every other permission now: Ask is one of its choices, and a site with nothing kept reads Ask.
+            #expect(SitePermission.webRTC.choices == PermissionChoice.allCases)
             #expect(SitePermission.camera.choices == PermissionChoice.allCases)
-            // On: every site shows the row, Block until allowed.
+            // On: every site shows the row, Ask until chosen.
             WebRTCProtection.isOn = true
             #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.webRTC])
             #expect(SitePermissions.shown(origin: site, isPrivate: true) == [.webRTC])
-            #expect(SitePermissions.choice(.webRTC, origin: site) == .block)
+            #expect(SitePermissions.choice(.webRTC, origin: site) == .ask)
             SitePermissions.setChoice(.allow, for: .webRTC, origin: site)
             #expect(SitePermissions.choice(.webRTC, origin: site) == .allow)
             // Off: only sites with a kept choice show the row.

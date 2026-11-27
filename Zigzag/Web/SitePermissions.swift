@@ -72,6 +72,9 @@ struct PagePermissionAnswers {
 
 /// Per-origin permission answers (see `SiteOrigin`), stored as an action id under "origin|subject". One-time answers
 /// live in `PagePermissionAnswers`.
+///
+/// A site that isn't remembered answers per page load, so the page that is open now holds a grant the site's kept
+/// answer doesn't: `LivePermissions` is what takes such a grant away without a reload.
 enum SitePermissions {
     /// Bool-only store, so older builds can still read it and won't wipe it on write.
     private static let key = "SitePermissions"
@@ -82,6 +85,9 @@ enum SitePermissions {
     static var defaults: UserDefaults = .standard
     /// A site's kept answer changed, from Site Controls, a question or Settings.
     static let changed = Signal<Void>()
+    /// The same change, saying what and where, for the open pages a change has to reach at once (#545). Sent after
+    /// every write that can change what a page is allowed: a kept choice, a forgotten one, or a site reset.
+    static let choiceChanged = Signal<(SitePermission, String)>()
 
     /// The store as read once for a pass over every tab (`reading`), instead of again for each.
     private static var held: [String: String]?
@@ -183,6 +189,10 @@ enum SitePermissions {
             remember(answer.action, subject: subject, origin: origin)
         } else if let tab {
             tab.permissionAnswers.note(answer.action, key: origin, kind: pageSubject ?? subject)
+        }
+        // Allowed: say where to take it back (#545). Blocking needs no note; the page simply doesn't get it.
+        if answer.action != "deny" {
+            PermissionToast.show(subject, remembered: answer.remember && !keepsNothing, origin: origin, tab: tab)
         }
         return answer.action != "deny"
     }
@@ -356,6 +366,7 @@ enum SitePermissions {
         var now = stored
         for k in keys(["location"], on: origin) { now[k] = nil }
         stored = now
+        choiceChanged.send((.location, origin))
     }
 
     /// "Ask again" for the camera and microphone only: location, notifications and apps to open each have their own
@@ -364,6 +375,8 @@ enum SitePermissions {
         var now = stored
         for k in keys(["camera", "microphone", "cameraAndMicrophone"], on: origin) { now[k] = nil }
         stored = now
+        choiceChanged.send((.camera, origin))
+        choiceChanged.send((.microphone, origin))
     }
 
     /// Notifications: nil until the site has asked and you've answered.
@@ -482,6 +495,15 @@ enum SitePermissions {
 
     static func hasAsked(_ permission: SitePermission, origin: String) -> Bool { asked.contains("\(origin)|\(permission.rawValue)") }
 
+    /// A site's permissions in Settings › Privacy › Sites: the ones with an answer kept, and those the editor was
+    /// just changed to. A permission a site never asked for has nothing to show.
+    static func rows(origin: String, recentlyChanged: Set<String>) -> [SitePermission] {
+        SitePermission.allCases.filter {
+            hasDecision($0, origin: origin) || recentlyChanged.contains("\(origin)|\($0.rawValue)")
+        }
+    }
+
+
     /// The answers a permission is kept under on a site's page: its own, and those of frames from elsewhere on it.
     /// Apps to open also count the one app a site was told Always Open to ("origin|app:zoommtg").
     private static func keys(for permission: SitePermission, on origin: String) -> [String] {
@@ -493,8 +515,8 @@ enum SitePermissions {
     /// Whether anything is kept for `permission` on the site's page.
     static func hasDecision(_ permission: SitePermission, origin: String) -> Bool { !keys(for: permission, on: origin).isEmpty }
 
-    /// Site Controls state: Ask with nothing kept, Allow when every kept answer is yes, else Block. WebRTC is never
-    /// Ask; with nothing kept it follows the setting.
+    /// Site Controls state: Ask with nothing kept, Allow when every kept answer is yes, else Block. WebRTC reads its
+    /// own kept answer, and Ask when the protection is on with nothing kept.
     static func choice(_ permission: SitePermission, origin: String) -> PermissionChoice {
         if permission == .webRTC { return WebRTCProtection.choice(origin: origin, in: nil) }
         let now = stored
@@ -516,6 +538,8 @@ enum SitePermissions {
         stored = now
         if permission == .notifications, choice != .allow { WebNotifications.shared.removeAll(origin: origin) }
         if permission == .apps { ExternalLinks.forgetAnswers(origin: origin) }
+        // The page that is open now has to feel it, not just the next one (#545).
+        choiceChanged.send((permission, origin))
     }
 
     /// Rows Site Controls shows for a site: anything asked this session or kept. No notifications or pop-ups in
@@ -545,6 +569,8 @@ enum SitePermissions {
         asked = asked.filter { !$0.hasPrefix(origin + "|") }
         WebNotifications.shared.removeAll(origin: origin)
         ExternalLinks.forgetAnswers(origin: origin)
+        // Nothing is kept for the site now: every open page of it loses what that kept away.
+        for permission in SitePermission.allCases { choiceChanged.send((permission, origin)) }
     }
 
     #if DEBUG
@@ -793,7 +819,7 @@ enum SitePermission: String, CaseIterable {
     }
 
     /// WebRTC can't be asked about (a page has it at load or not), so only Allow or Block.
-    var choices: [PermissionChoice] { self == .webRTC ? [.allow, .block] : PermissionChoice.allCases }
+    var choices: [PermissionChoice] { PermissionChoice.allCases }
 
     /// The one kind a choice made in Site Controls is kept as.
     var primaryKind: String { rawValue }

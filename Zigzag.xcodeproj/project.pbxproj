@@ -12,6 +12,12 @@
 		C5E205C75B78676838E7A67B /* HelperProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DCAC029985B8485280EC93A /* HelperProbe.swift */; };
 		04ED955E9964B0EBEE95A893 /* HelperLifetime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4918D8BAD599CEF14063B226 /* HelperLifetime.swift */; };
 		A1853A4215FC47C73BF1B030 /* HelperLifetime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4918D8BAD599CEF14063B226 /* HelperLifetime.swift */; };
+		F2A3E9AC0FF6000000000011 /* LivePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000012 /* LivePermissions.swift */; };
+		F2A3E9AC0FF6000000000061 /* PermissionToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000062 /* PermissionToast.swift */; };
+		F2A3E9AC0FF6000000000013 /* LivePermissionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000014 /* LivePermissionsTests.swift */; };
+		F2A3E9AC0FF6000000000043 /* LocationRevokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000044 /* LocationRevokeTests.swift */; };
+		F2A3E9AC0FF6000000000053 /* WebRTCChoiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000054 /* WebRTCChoiceTests.swift */; };
+		F2A3E9AC0FF6000000000073 /* PermissionToastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000074 /* PermissionToastTests.swift */; };
 		77A198DFB4E445EE2C61702E /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3099C3E94756F3E4F4C4782 /* SyncTests.swift */; };
 		C752A99327423A4601F37275 /* SyncSettingsRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD1F8636E632A6F45792C2E /* SyncSettingsRows.swift */; };
 		5AD599D69B04D697EC40293B /* SyncSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D866549DC3C6AFB95B08014 /* SyncSession.swift */; };
@@ -724,6 +730,12 @@
 		05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperLifetimeTests.swift; sourceTree = "<group>"; };
 		9DCAC029985B8485280EC93A /* HelperProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperProbe.swift; sourceTree = "<group>"; };
 		4918D8BAD599CEF14063B226 /* HelperLifetime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperLifetime.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000012 /* LivePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePermissions.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000062 /* PermissionToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionToast.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000014 /* LivePermissionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePermissionsTests.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000044 /* LocationRevokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationRevokeTests.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000054 /* WebRTCChoiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCChoiceTests.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000074 /* PermissionToastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionToastTests.swift; sourceTree = "<group>"; };
 		D3099C3E94756F3E4F4C4782 /* SyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncTests.swift; sourceTree = "<group>"; };
 		3DD1F8636E632A6F45792C2E /* SyncSettingsRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsRows.swift; sourceTree = "<group>"; };
 		7D866549DC3C6AFB95B08014 /* SyncSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSession.swift; sourceTree = "<group>"; };
@@ -1820,6 +1832,8 @@
 				22C40998589E0487B4AEBBBE /* SiteJavaScript.swift */,
 				C0EDE9B03469438CA8A4EFB8 /* SiteUserAgents.swift */,
 				CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */,
+				F2A3E9AC0FF6000000000012 /* LivePermissions.swift */,
+				F2A3E9AC0FF6000000000062 /* PermissionToast.swift */,
 				BBBD3598C3CAC25C5334760E /* StrictTransport.swift */,
 				5B92A13A0C322891D0B40426 /* SwipeNavigation.swift */,
 				1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */,
@@ -1984,6 +1998,10 @@
 				2E64961A922BEEA0BBBB7EA4 /* TestScratch.swift */,
 				05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */,
 				60823191217F3C0F87144EA5 /* AccessibilityTests.swift */,
+				F2A3E9AC0FF6000000000014 /* LivePermissionsTests.swift */,
+				F2A3E9AC0FF6000000000044 /* LocationRevokeTests.swift */,
+				F2A3E9AC0FF6000000000054 /* WebRTCChoiceTests.swift */,
+				F2A3E9AC0FF6000000000074 /* PermissionToastTests.swift */,
 				FFDAD5641E480BF83AE887CA /* XPIPackageTests.swift */,
 				FF8B61EA3ED59212399D4BA4 /* FirefoxSurfaceTests.swift */,
 				FF38357DDDD3FEBE61157B80 /* FirefoxManifestTests.swift */,
@@ -2747,6 +2765,8 @@
 				5E551C00C0FFEE0000000001 /* SessionCookies.swift in Sources */,
 				F2A3E9AC0FF5000000000001 /* FramePacing.swift in Sources */,
 				F2A3E9AC0FF6000000000001 /* PageLocation.swift in Sources */,
+				F2A3E9AC0FF6000000000011 /* LivePermissions.swift in Sources */,
+				F2A3E9AC0FF6000000000061 /* PermissionToast.swift in Sources */,
 				DE827B38247BCF992C71E954 /* KeptCookiesSheet.swift in Sources */,
 				CF63705B985B423D3B9EC482 /* Library.swift in Sources */,
 				4CE83D681448A928D6D537D2 /* SavePath.swift in Sources */,
@@ -2960,6 +2980,10 @@
 				E44933E8A74D5389CD1576AE /* TestScratch.swift in Sources */,
 				8EDD98C71A9B2D031C21E2CC /* HelperLifetimeTests.swift in Sources */,
 				8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */,
+				F2A3E9AC0FF6000000000013 /* LivePermissionsTests.swift in Sources */,
+				F2A3E9AC0FF6000000000043 /* LocationRevokeTests.swift in Sources */,
+				F2A3E9AC0FF6000000000053 /* WebRTCChoiceTests.swift in Sources */,
+				F2A3E9AC0FF6000000000073 /* PermissionToastTests.swift in Sources */,
 				FFFBC7AE9229B53B119F8200 /* FirefoxInstallTests.swift in Sources */,
 				C4E47500A0B1C2D3E4F50002 /* ChromeExtensionAddressTests.swift in Sources */,
 				FF59F27CC6FDECF72DCB1FB4 /* FirefoxManifestTests.swift in Sources */,

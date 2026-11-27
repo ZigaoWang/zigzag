@@ -1462,6 +1462,16 @@ final class Tab: NSObject {
         webView?.setMicrophoneCaptureState(.none) { }
     }
 
+    /// A kept Block for the device: the stream ends now, and the page asks again on its next load, where the kept
+    /// answer refuses it without a question.
+    func stopCamera() {
+        webView?.setCameraCaptureState(.none) { }
+    }
+
+    func stopMicrophone() {
+        webView?.setMicrophoneCaptureState(.none) { }
+    }
+
     // MARK: Snapshots
 
     /// Retakes the page's picture. `keep: false` only refreshes it in memory (a preview being watched, every second)

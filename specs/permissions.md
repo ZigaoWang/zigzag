@@ -3,6 +3,9 @@
 ## Questions
 - A site asks for notifications, the camera, the microphone, your location, your screen or to open an app → a card at the top of its page, Don't Allow first and the main yes last.
   Test: PermissionPromptTests.denyComesFirstAndTheProminentYesLast
+- A site asks to use WebRTC with Protect IP address from WebRTC on → the same card as the rest, Don't Allow and Allow with Remember, and the page reloads into its answer. Allow takes effect on that reload; a page that already has `RTCPeerConnection` can't be handed it back.
+  Test: WebRTCChoiceTests.aFreshSiteReadsAsk
+  Test: WebRTCChoiceTests.aKeptChoiceReadsBack
 - A page calls `Notification.requestPermission()` → it gets a promise of the answer, never an error, even as it loads.
   Test: WebNotificationsTests.askingReturnsAPromise
 - Camera and microphone → two questions, one answer each; a call that wants both gets them only if both are allowed.
@@ -41,6 +44,22 @@
   Test: SiteControlsPermissionTests.aFrameFromElsewhereOnlyFollowsBlock
 - Always allow on an app question → that one app; Don't Allow stays with its app; a Block for the site covers every app.
   Test: SiteControlsPermissionTests.anAnsweredDenyStaysWithItsApp
+
+## Changes while a page is open
+- A permission changed in Site Controls → the page that is open gets the change at once, without a reload: a Block ends the camera and microphone, fails a location watch, closes WebRTC's calls and refuses its constructor, and takes notifications away; an Allow hands the right back the same way.
+  Test: LivePermissionsTests.whatCanBeCutLive
+  Test: LivePermissionsTests.aBlockReachesThePagesOfThatSiteOnly
+  Test: LivePermissionsTests.allowingAgainReachesThePageWithoutAReload
+- A kept answer changing → leaves the answer kept for the site alone, so the next load is already what you chose, with no question.
+  Test: LivePermissionsTests.changingAKeptAnswerSaysWhatChanged
+- A permission allowed → one line over the page saying where it can be changed: "Camera allowed. You can change this in Site Controls."
+  Test: PermissionToastTests.aRememberedAnswerSaysItCanBeChanged
+- Allowed for this page only → the line says so, where it can be changed, and that the page asks again next time.
+  Test: PermissionToastTests.aPageOnlyAnswerSaysItCanBeChanged
+- A private window → says nothing, since it keeps nothing.
+- WebRTC in Site Controls → Ask, Allow or Block, like every other permission, and its choice reaches the open page the same way.
+  Test: WebRTCChoiceTests.itsRowOffersAskLikeEveryOtherPermission
+  Test: WebRTCChoiceTests.backToAskForgetsTheKeptChoice
 
 ## Private windows
 - Answer in a private window → nothing is kept for the site, Remember or not.

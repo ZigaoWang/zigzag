@@ -1191,8 +1191,9 @@ final class SitePanel: FloatingPanelView {
             for permission in SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate) {
                 let choices = permission.choices
                 let now = choice(permission, origin: origin)
-                // WebRTC applies at load: choosing reloads (`WebRTCProtection.choose`); private windows keep it per
-                // tab.
+                // A change applies to the page that is open now, without a reload: choosing Allow or Block here
+                // reaches it through `SitePermissions.choiceChanged`, which `LivePermissions` turns into the cut or
+                // the grant the permission allows.
                 permissionRows.append(.choice(permission.title, options: choices.map(\.title), selected: choices.firstIndex(of: now) ?? 0) { [weak self] index in
                     if permission == .webRTC {
                         WebRTCProtection.choose(choices[index] == .allow, origin: origin, in: tab)

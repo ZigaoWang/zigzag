@@ -6,6 +6,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- A permission changed in Site Controls now reaches the page that is open, without a reload: a Block ends the camera and microphone, stops a location watch, closes WebRTC's calls and takes notifications away, and an Allow hands the right back the same way, so the page keeps its state. A permission just allowed says in one line where it can be changed.
+- WebRTC asks like every other permission and is remembered per site, with Don't Allow first and Remember on the answer, instead of being a separate protection with its own dialog and only Allow or Block. A Block still closes the calls that are up.
 - The mini player shows Previous and Next when the site offers them, as YouTube does in a playlist, so you can move on without going back to the page. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 
 ### Fixed

@@ -101,6 +101,54 @@ final class PageLocation: NSObject, CLLocationManagerDelegate {
         api.setProvider(manager, Self.provider)
     }
 
+    /// Takes your location away from one page that has it now (#545). The provider is the whole process pool's, so it
+    /// can't say which page asked; the page's own `navigator.geolocation` can. Every call fails until the page loads
+    /// again, where WebKit's per-page decision refuses a kept Block without asking.
+    private static let revokeScript = """
+    (() => {
+      const deny = function (success, failure) {
+        const error = { code: 1, message: 'Location is blocked for this site.', PERMISSION_DENIED: 1,
+                        POSITION_UNAVAILABLE: 2, TIMEOUT: 3 };
+        if (typeof failure === 'function') { try { failure(error); } catch (e) {} }
+        return 0;
+      };
+      try {
+        navigator.geolocation.getCurrentPosition = function (success, failure) { deny(success, failure); };
+        navigator.geolocation.watchPosition = function (success, failure) { return deny(success, failure); };
+        navigator.geolocation.clearWatch = function () {};
+      } catch (e) {}
+      return true;
+    })();
+    """
+
+    /// Takes the guard back off a page that is open now: the page's own `navigator.geolocation` works again without
+    /// waiting for a reload. WebKit's per-page decision is untouched; the kept answer gets here through
+    /// `LivePermissions`.
+    private static let allowScript = """
+    (() => {
+      try {
+        delete navigator.geolocation.getCurrentPosition;
+        delete navigator.geolocation.watchPosition;
+        delete navigator.geolocation.clearWatch;
+      } catch (e) {}
+      return true;
+    })();
+    """
+
+    /// Gives a page that is open now its location back, for a site just switched to Allow.
+    func allow(origin: String, in tab: Tab) {
+        guard let webView = tab.webView else { return }
+        webView.evaluateJavaScript(Self.allowScript) { _, _ in }
+        Diagnostics.note("Location", site: SiteOrigin.label(origin), "allowed on the open page", isPrivate: tab.isPrivate)
+    }
+
+    /// Applies the guard to a page that is open now, and stops the device if that page was the one watching.
+    func revoke(origin: String, in tab: Tab) {
+        guard let webView = tab.webView else { return }
+        webView.evaluateJavaScript(Self.revokeScript) { _, _ in }
+        Diagnostics.note("Location", site: SiteOrigin.label(origin), "revoked on the open page", isPrivate: tab.isPrivate)
+    }
+
     /// What a page's ask gets, as Core Location stands: macOS asks you, the page gets an error, or it gets positions.
     enum Answer: Equatable { case ask, fail, update }
 

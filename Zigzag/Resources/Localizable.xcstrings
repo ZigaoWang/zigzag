@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ allowed for this page. You can change this in Site Controls." : {
+      "comment" : "Toast after a permission is allowed for this page only. The placeholder is the permission's name, like Camera.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ allowed for this page. You can change this in Site Controls."
+          }
+        }
+      }
+    },
+    "%@ allowed. You can change this in Site Controls." : {
+      "comment" : "Toast after a permission is allowed for a site and remembered. The placeholder is the permission's name, like Camera.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ allowed. You can change this in Site Controls."
+          }
+        }
+      }
+    },
     "%@ are saved first, then passed to %@" : {
       "comment" : "A File handoff in a sentence: what it catches is downloaded first, then given to the script. The placeholders are the two parts.",
       "localizations" : {
@@ -143765,6 +143787,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "替你拒絕網站彈出式視窗要的 Cookie，只需隱藏的彈出式視窗則直接隱藏。絕不替你同意。"
+          }
+        }
+      }
+    },
+    "Screen Sharing" : {
+      "comment" : "Name of the screen-sharing permission, in the toast after it is allowed.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screen Sharing"
           }
         }
       }
