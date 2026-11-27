@@ -354,3 +354,12 @@
   Test: IMECommitTests.aCancelledCompositionLeavesLaterTextAlone
   Test: IMECommitTests.aClickOrANewPageForgetsTheComposition
   Test: IMECommitTests.aFieldLeavesOtherTextOverMarkedLettersAlone
+
+## Slow loads in Report a Problem
+- A page whose server doesn't answer for 10 seconds, or that shows nothing after 30 → Help › Report a Problem lists it with its site, the step it's stuck in ("waiting for the server", "receiving the page") and how long each step took, never the page's address.
+  Test: LoadTimingsTests.aServerThatNeverAnswersIsNotedAsWaitingForIt
+  Test: LoadTimingsTests.eachStepIsSaidInSeconds
+- A page that loads normally → nothing is noted.
+  Test: LoadTimingsTests.aNormalLoadNotesNothing
+- A private window's page → never timed or noted.
+  Test: LoadTimingsTests.aPrivateWindowsLoadIsNeverTimed

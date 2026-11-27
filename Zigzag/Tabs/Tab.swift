@@ -939,6 +939,7 @@ final class Tab: NSObject {
     /// `keepingSettings`: the page may come back as it was (a sleep), so the Settings view stays for it: building one
     /// again costs the whole first-open time (#357).
     private func tearDown(_ webView: BrowserWebView, keepingSettings: Bool = false) {
+        loadTimings.forget()
         dropSessionScript(from: webView)
         Autofill.shared.forget(webView)
         // Tabs that shared the rule keep their images.
@@ -1130,6 +1131,8 @@ final class Tab: NSObject {
     private var ownHistoryTarget: URL?
     /// Download policy for its pages (same as pop-up windows').
     private let downloads = DownloadPolicy()
+    /// When each step of its loads came, for Report a Problem when one stalls (#548).
+    let loadTimings = LoadTimings()
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
 
@@ -2226,6 +2229,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
         let response = navigationResponse.response
+        if navigationResponse.isForMainFrame { loadTimings.responded() }
         // A redirect may land on another origin: the door follows the address that is really going to be shown.
         if navigationResponse.isForMainFrame, navigationResponse.canShowMIMEType, let landed = response.url {
             localReceivers = LocalReceiverShim.sync(webView, tab: self, origin: SiteOrigin.of(landed),
@@ -2465,6 +2469,7 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        loadTimings.started(navigation, url: webView.url, isPrivate: isPrivate)
         // A link preview from the page that's going has nothing left to describe, and a hover from it during the
         // load must not bring the preview back.
         hoveredLinkChanged(nil)
@@ -2475,8 +2480,13 @@ extension Tab: WKNavigationDelegate {
         if Passkeys.available { Passkeys.endRequests(in: webView) {} }
     }
 
+    func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+        loadTimings.redirected(navigation, to: webView.url)
+    }
+
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         Freezes.mark("page start")
+        loadTimings.committed(navigation)
         isLeavingPage = false
         // A page swiped away from is replaced: the new one shows in place.
         (webView as? BrowserWebView)?.swipeNavigator.pageArrived()
@@ -2580,6 +2590,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         Freezes.mark("page loaded")
+        loadTimings.finished(navigation)
         // Back, Forward and reload end here too, even where the address stays the same.
         navigatedSinceSave = true
         // The page is all here now: what the developer tools put into it is too.
@@ -2638,9 +2649,12 @@ extension Tab: WKNavigationDelegate {
 
     /// A failure after the page started showing (a stalled image, a dropped connection near the end) leaves the
     /// page as it is: you may be reading it. Only a page that never arrived gets the error page.
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        loadTimings.failed(navigation, error: error as NSError)
+    }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        loadTimings.failed(navigation, error: error as NSError)
         isLeavingPage = false
         // A swipe's page that never came: the one still showing goes back in place.
         (webView as? BrowserWebView)?.swipeNavigator.pageArrived()
