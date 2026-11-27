@@ -15789,12 +15789,6 @@
         }
       }
     },
-    "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Niektóre ustawienia są za duże dla iCloud i zostają na tym Macu. Cała reszta jest synchronizowana."
-      }
-    },
     "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs.": {
       "stringUnit": {
         "state": "translated",
@@ -15817,6 +15811,18 @@
       "stringUnit": {
         "state": "translated",
         "value": "Biblioteka tego Maca była starszą kopią, więc Zigzag zaktualizował ją z iCloud. Starsza kopia jest zapisana w folderze „Backups” Zigzaga."
+      }
+    },
+    "Settings are too big to sync from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ustawienia są za duże, by synchronizować je z tego Maca. Przypięte karty i przestrzenie nadal się synchronizują."
+      }
+    },
+    "Some of what syncs is too big to send from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Część synchronizowanych danych jest za duża, by wysłać ją z tego Maca. Przypięte karty i przestrzenie nadal się synchronizują."
       }
     }
   },

@@ -120,15 +120,14 @@
   Test: SyncTests.aFavoriteRemovedOnPurposeDoesntComeBackWithItsProfileLater
 - A preference too big for iCloud (long styles for many sites) → stays on this Mac and isn't replaced by another Mac's; the rest still sync.
   Test: SyncTests.aPreferenceTooBigForICloudStaysOnThisMac
-- Preferences too big together for iCloud's one record (each under 200 KB, styles, dark pages and icons for thousands of sites) → first what iCloud doesn't have yet (this Mac's own additions), then what grew here since iCloud's version, the biggest first, stay on this Mac until the rest fit; only this Mac's own values choose which, and what another Mac changed is taken as usual, a smaller value included. One that stays here keeps iCloud's entry as it is, or is left out of the record when iCloud has none, and is never sent as unset, so no other Mac loses its value; another Mac's own value of it stays that Mac's. Two Macs' additions meeting (both offline, then merged) still fit: what didn't go up stays on the Mac it came from, and a record still too big when it's sent is trimmed the same way rather than refused again and again. The rest sync, later changes keep syncing both ways, and nothing goes up again and again. Under Last synced, Settings says some settings are too big for iCloud and stay on this Mac. Nothing is dropped without a sign.
-  Test: SyncTests.preferencesTooBigTogetherStillSyncTheRestAndSaySo
-  Test: SyncTests.aPreferenceThatStaysHereIsNeverRemovedElsewhere
-  Test: SyncTests.twoMacsOverTheLimitTogetherStillFitAndKeepSyncing
+- Preferences too big together for iCloud's one record (each under 200 KB, styles, dark pages and icons for thousands of sites) → the preferences' record isn't sent from this Mac; nothing is trimmed, sent as unset or removed because of it, and every Mac keeps its values. Pinned tabs, spaces, folders and favorites keep syncing, and other Macs' preference changes still arrive here, a smaller value included. Under Last synced, Settings says: Settings are too big to sync from this Mac. Pins and spaces still sync. Once they fit again, the next change goes up as usual, and what other Macs changed meanwhile isn't undone by older values from here.
+  Test: SyncTests.settingsOverTheLimitArentSentAndPinsStillSync
+  Test: SyncTests.twoMacsOverTheLimitTogetherLoseNothing
   Test: SyncTests.aSmallerValueFromAnotherMacIsTakenWhileOverTheLimit
 - A pinned page too big for iCloud (a long data: address) → stays on this Mac and isn't sent, without asking iCloud again and again; under Last synced, Settings says how many of what stay on this Mac.
   Test: SyncTests.aRecordTooBigForICloudIsntSentAndStaysHere
-- Thousands removed within 30 days, more removal notes than one record holds → the newest notes go up and the oldest are left out, so removals keep syncing; an old note left out only guards less against a restored Mac bringing that one back.
-  Test: SyncTests.aRemovalsRecordTooBigKeepsItsNewestNotes
+- Thousands removed within 30 days, more removal notes than one record holds (or site rules bigger than a record) → that record isn't sent from this Mac, and Settings says some of what syncs is too big to send; the removals themselves, pins and spaces still sync.
+  Test: SyncTests.aRemovalsRecordTooBigIsntSentAndRemovalsStillArrive
 - Nothing changed → nothing is sent.
   Test: SyncTests.onceSettledNothingMoreIsSent
 - A thousand pinned pages → sync without a wait, and one edit sends one record.

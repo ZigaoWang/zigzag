@@ -14799,12 +14799,6 @@
         }
       }
     },
-    "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "일부 설정은 iCloud에 비해 너무 커서 이 Mac에 남습니다. 나머지는 모두 동기화됩니다."
-      }
-    },
     "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs.": {
       "stringUnit": {
         "state": "translated",
@@ -14827,6 +14821,18 @@
       "stringUnit": {
         "state": "translated",
         "value": "이 Mac의 라이브러리가 이전 사본이어서 Zigzag가 iCloud에서 최신 상태로 업데이트했습니다. 이전 사본은 Zigzag의 ‘Backups’ 폴더에 저장되어 있습니다."
+      }
+    },
+    "Settings are too big to sync from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "설정이 너무 커서 이 Mac에서 동기화할 수 없습니다. 고정된 탭과 스페이스는 계속 동기화됩니다."
+      }
+    },
+    "Some of what syncs is too big to send from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "동기화할 항목 중 일부가 너무 커서 이 Mac에서 보낼 수 없습니다. 고정된 탭과 스페이스는 계속 동기화됩니다."
       }
     }
   },

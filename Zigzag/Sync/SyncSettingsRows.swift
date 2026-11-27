@@ -132,10 +132,14 @@ final class SyncSettingsRows {
     /// What stays on this Mac because it's too big for iCloud, or nil when nothing does.
     static func describe(_ tooBig: SyncTooBig) -> String? {
         guard !tooBig.isEmpty else { return nil }
-        let settings = !tooBig.settings.isEmpty || tooBig.other
+        let settings = tooBig.settings || tooBig.other
         guard !tooBig.kinds.isEmpty else {
-            return String(localized: "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs.",
-                          comment: "Under “Last synced” in Settings › General › Sync with iCloud, when preferences together are more than an iCloud record holds (styles or icons for thousands of sites, say).")
+            if tooBig.settings {
+                return String(localized: "Settings are too big to sync from this Mac. Pins and spaces still sync.",
+                              comment: "Under “Last synced” in Settings › General › Sync with iCloud, when this Mac's preferences together are more than an iCloud record holds (styles or icons for thousands of sites, say), so they aren't sent; pinned tabs, spaces, folders and favorites still sync, and other Macs' settings still arrive.")
+            }
+            return String(localized: "Some of what syncs is too big to send from this Mac. Pins and spaces still sync.",
+                          comment: "Under “Last synced” in Settings › General › Sync with iCloud, when a record that isn't one pinned tab or space (the site rules, or the list of what was removed lately) is more than iCloud takes, so it isn't sent; pinned tabs, spaces, folders and favorites still sync.")
         }
         let list = SyncKind.list(tooBig.kinds)
         if settings {
@@ -239,8 +243,8 @@ final class SyncSettingsRows {
 
     /// What's too big for iCloud, as the line can say it, for the layout tests and pictures.
     static let everyTooBig: [(name: String, tooBig: SyncTooBig)] = [
-        ("settings too big", SyncTooBig(settings: ["SiteBoosts"])), ("pins too big", SyncTooBig(kinds: [.page: 1])),
-        ("pins and settings too big", SyncTooBig(settings: ["SiteIcons"], kinds: [.page: 2, .favorite: 1])),
+        ("settings too big", SyncTooBig(settings: true)), ("rules too big", SyncTooBig(other: true)), ("pins too big", SyncTooBig(kinds: [.page: 1])),
+        ("pins and settings too big", SyncTooBig(settings: true, kinds: [.page: 2, .favorite: 1])),
     ]
     #endif
 }

@@ -3298,85 +3298,168 @@
         }
       }
     },
-    "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs." : {
-      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud, when preferences together are more than an iCloud record holds (styles or icons for thousands of sites, say).",
+    "Settings are too big to sync from this Mac. Pins and spaces still sync." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud, when this Mac's preferences together are more than an iCloud record holds (styles or icons for thousands of sites, say), so they aren't sent; pinned tabs, spaces, folders and favorites still sync, and other Macs' settings still arrive.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Einige Einstellungen sind zu groß für iCloud und bleiben auf diesem Mac. Alles andere wird synchronisiert."
+            "value" : "Die Einstellungen sind zu groß, um von diesem Mac synchronisiert zu werden. Fixierte Tabs und Spaces werden weiter synchronisiert."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Algunos ajustes son demasiado grandes para iCloud y se quedan en este Mac. Todo lo demás se sincroniza."
+            "value" : "Los ajustes son demasiado grandes para sincronizarse desde este Mac. Las pestañas fijadas y los espacios se siguen sincronizando."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Certains réglages sont trop volumineux pour iCloud et restent sur ce Mac. Tout le reste est synchronisé."
+            "value" : "Les réglages sont trop volumineux pour être synchronisés depuis ce Mac. Les onglets épinglés et les espaces restent synchronisés."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alcune impostazioni sono troppo grandi per iCloud e restano su questo Mac. Tutto il resto viene sincronizzato."
+            "value" : "Le impostazioni sono troppo grandi per essere sincronizzate da questo Mac. I pannelli fissati e gli spazi continuano a sincronizzarsi."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一部の設定はiCloudには大きすぎるため、このMacに残ります。それ以外はすべて同期されます。"
+            "value" : "設定が大きすぎるため、このMacからは同期できません。固定タブとスペースは引き続き同期されます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "일부 설정은 iCloud에 비해 너무 커서 이 Mac에 남습니다. 나머지는 모두 동기화됩니다."
+            "value" : "설정이 너무 커서 이 Mac에서 동기화할 수 없습니다. 고정된 탭과 스페이스는 계속 동기화됩니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sommige instellingen zijn te groot voor iCloud en blijven op deze Mac. Al het andere wordt gesynchroniseerd."
+            "value" : "De instellingen zijn te groot om vanaf deze Mac te synchroniseren. Vastgezette tabbladen en spaces worden nog steeds gesynchroniseerd."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niektóre ustawienia są za duże dla iCloud i zostają na tym Macu. Cała reszta jest synchronizowana."
+            "value" : "Ustawienia są za duże, by synchronizować je z tego Maca. Przypięte karty i przestrzenie nadal się synchronizują."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alguns ajustes são grandes demais para o iCloud e ficam neste Mac. Todo o resto é sincronizado."
+            "value" : "Os ajustes são grandes demais para sincronizar a partir deste Mac. As abas fixadas e os espaços continuam sincronizando."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Некоторые настройки слишком велики для iCloud и остаются на этом Mac. Всё остальное синхронизируется."
+            "value" : "Настройки слишком велики для синхронизации с этого Mac. Закреплённые вкладки и пространства по-прежнему синхронизируются."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bazı ayarlar iCloud için çok büyük, bu yüzden bu Mac’te kalır. Geri kalan her şey eşzamanlanır."
+            "value" : "Ayarlar bu Mac’ten eşzamanlanamayacak kadar büyük. Sabitlenmiş sekmeler ve Space’ler eşzamanlanmaya devam ediyor."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "部分设置对 iCloud 来说太大，因此保留在这台 Mac 上。其他内容都会同步。"
+            "value" : "设置太大，无法从这台 Mac 同步。已固定标签页和空间仍会同步。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "部分設定對 iCloud 來說太大，因此保留在這台 Mac 上。其他內容都會同步。"
+            "value" : "設定太大，無法從這台 Mac 同步。已固定分頁和空間仍會同步。"
+          }
+        }
+      }
+    },
+    "Some of what syncs is too big to send from this Mac. Pins and spaces still sync." : {
+      "comment" : "Under “Last synced” in Settings › General › Sync with iCloud, when a record that isn't one pinned tab or space (the site rules, or the list of what was removed lately) is more than iCloud takes, so it isn't sent; pinned tabs, spaces, folders and favorites still sync.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Teil dessen, was synchronisiert wird, ist zu groß, um von diesem Mac gesendet zu werden. Fixierte Tabs und Spaces werden weiter synchronisiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte de lo que se sincroniza es demasiado grande para enviarse desde este Mac. Las pestañas fijadas y los espacios se siguen sincronizando."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une partie de ce qui est synchronisé est trop volumineuse pour être envoyée depuis ce Mac. Les onglets épinglés et les espaces restent synchronisés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte di ciò che viene sincronizzato è troppo grande per essere inviata da questo Mac. I pannelli fissati e gli spazi continuano a sincronizzarsi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期する内容の一部が大きすぎるため、このMacからは送信できません。固定タブとスペースは引き続き同期されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화할 항목 중 일부가 너무 커서 이 Mac에서 보낼 수 없습니다. 고정된 탭과 스페이스는 계속 동기화됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een deel van wat er wordt gesynchroniseerd is te groot om vanaf deze Mac te versturen. Vastgezette tabbladen en spaces worden nog steeds gesynchroniseerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Część synchronizowanych danych jest za duża, by wysłać ją z tego Maca. Przypięte karty i przestrzenie nadal się synchronizują."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte do que é sincronizado é grande demais para ser enviada deste Mac. As abas fixadas e os espaços continuam sincronizando."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Часть синхронизируемых данных слишком велика для отправки с этого Mac. Закреплённые вкладки и пространства по-прежнему синхронизируются."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eşzamanlananların bir kısmı bu Mac’ten gönderilemeyecek kadar büyük. Sabitlenmiş sekmeler ve Space’ler eşzamanlanmaya devam ediyor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分同步内容太大，无法从这台 Mac 发送。已固定标签页和空间仍会同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分同步內容太大，無法從這台 Mac 傳送。已固定分頁和空間仍會同步。"
           }
         }
       }

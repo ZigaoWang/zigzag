@@ -449,22 +449,6 @@ struct SyncRemovals: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         names = (try? c.decodeIfPresent([String: Date].self, forKey: .names)) ?? [:]
     }
-
-    /// How much of its record the notes may take.
-    static let largest = 800_000
-
-    /// The newest notes that fit in one record: thousands removed at once can't stop it going up. An older note
-    /// left out only guards less against a Mac restored from a backup bringing that one back.
-    static func fitting(_ names: [String: Date]) -> [String: Date] {
-        var total = names.reduce(0) { $0 + $1.key.utf8.count + 24 }
-        guard total > largest else { return names }
-        var kept = names
-        for (name, _) in names.sorted(by: { ($0.value, $0.key) < ($1.value, $1.key) }) where total > largest {
-            kept[name] = nil
-            total -= name.utf8.count + 24
-        }
-        return kept
-    }
 }
 
 // MARK: Order

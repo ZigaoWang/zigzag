@@ -15178,12 +15178,6 @@
         }
       }
     },
-    "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Certains réglages sont trop volumineux pour iCloud et restent sur ce Mac. Tout le reste est synchronisé."
-      }
-    },
     "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs.": {
       "stringUnit": {
         "state": "translated",
@@ -15206,6 +15200,18 @@
       "stringUnit": {
         "state": "translated",
         "value": "La bibliothèque de ce Mac était une copie plus ancienne, alors Zigzag l’a mise à jour depuis iCloud. La copie plus ancienne est enregistrée dans le dossier « Backups » de Zigzag."
+      }
+    },
+    "Settings are too big to sync from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Les réglages sont trop volumineux pour être synchronisés depuis ce Mac. Les onglets épinglés et les espaces restent synchronisés."
+      }
+    },
+    "Some of what syncs is too big to send from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Une partie de ce qui est synchronisé est trop volumineuse pour être envoyée depuis ce Mac. Les onglets épinglés et les espaces restent synchronisés."
       }
     }
   },

@@ -15129,12 +15129,6 @@
         }
       }
     },
-    "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs.": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Bazı ayarlar iCloud için çok büyük, bu yüzden bu Mac’te kalır. Geri kalan her şey eşzamanlanır."
-      }
-    },
     "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs.": {
       "stringUnit": {
         "state": "translated",
@@ -15157,6 +15151,18 @@
       "stringUnit": {
         "state": "translated",
         "value": "Bu Mac’in kitaplığı daha eski bir kopyaydı, bu yüzden Zigzag onu iCloud’dan güncelledi. Eski kopya, Zigzag’in “Backups” klasöründe saklanıyor."
+      }
+    },
+    "Settings are too big to sync from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ayarlar bu Mac’ten eşzamanlanamayacak kadar büyük. Sabitlenmiş sekmeler ve Space’ler eşzamanlanmaya devam ediyor."
+      }
+    },
+    "Some of what syncs is too big to send from this Mac. Pins and spaces still sync.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Eşzamanlananların bir kısmı bu Mac’ten gönderilemeyecek kadar büyük. Sabitlenmiş sekmeler ve Space’ler eşzamanlanmaya devam ediyor."
       }
     }
   },
