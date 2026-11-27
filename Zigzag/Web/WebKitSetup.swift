@@ -119,6 +119,7 @@ enum WebKitSetup {
             FramePacing.attach(to: configuration.userContentController)
             configuration.userContentController.addUserScript(PageVideos.script)
             configuration.userContentController.add(PageVideos.shared, contentWorld: .defaultClient, name: PageVideos.messageName)
+            MediaSessionActions.attach(to: configuration.userContentController)
             configuration.userContentController.addUserScript(SwipeAnswers.script)
             configuration.userContentController.addUserScript(PageState.script)
             // The same note of what was a password, in the world AI apps read pages in (#214).

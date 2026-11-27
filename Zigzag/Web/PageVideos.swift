@@ -285,6 +285,81 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
     }
 }
 
+/// A page's own previous and next, as it sets them through the Media Session API
+/// (`navigator.mediaSession.setActionHandler('previoustrack' / 'nexttrack')`), for the mini player's Previous and
+/// Next buttons, as Safari's and Chrome's picture in picture windows offer them (#565). WebKit keeps a page's handlers
+/// where no other world can read them, so a script in the page's own world notes them as the page sets them and runs
+/// them when asked; the page's calls go through unchanged. Each frame has its own.
+final class MediaSessionActions: NSObject, WKScriptMessageHandler {
+    static let shared = MediaSessionActions()
+    static let messageName = "zigzagMediaSession"
+
+    enum Action: String, CaseIterable, Sendable {
+        case previous = "previoustrack"
+        case next = "nexttrack"
+    }
+
+    /// A frame of the page set or took away one of the two.
+    let changed = Signal<WKWebView>()
+
+    static let script = WKUserScript(source: """
+    (() => {
+      const key = Symbol.for('zigzag.mediaSession');
+      if (window[key] || typeof MediaSession === 'undefined' || !MediaSession.prototype.setActionHandler) return;
+      const watched = ['previoustrack', 'nexttrack'];
+      const handlers = new Map();
+      const apply = Reflect.apply;
+      const tell = () => { try { window.webkit.messageHandlers.\(messageName).postMessage(true); } catch (e) {} };
+      MediaSession.prototype.setActionHandler = new Proxy(MediaSession.prototype.setActionHandler, {
+        apply(target, self, args) {
+          const result = apply(target, self, args);
+          const action = args[0], handler = args[1];
+          if (watched.includes(action)) {
+            const had = handlers.has(action);
+            if (typeof handler === 'function') handlers.set(action, handler); else handlers.delete(action);
+            if (had !== handlers.has(action)) tell();
+          }
+          return result;
+        }
+      });
+      Object.defineProperty(window, key, { value: Object.freeze({
+        actions: () => watched.filter((a) => handlers.has(a)),
+        run: (action) => {
+          const handler = handlers.get(action);
+          if (!handler) return false;
+          try { apply(handler, undefined, [{ action }]); } catch (e) {}
+          return true;
+        },
+      }) });
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+
+    static func attach(to controller: WKUserContentController) {
+        controller.addUserScript(script)
+        controller.add(shared, contentWorld: .page, name: messageName)
+    }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == Self.messageName, let webView = message.webView else { return }
+        changed.send(webView)
+    }
+
+    /// Which of the two the frame (nil: the page itself) has now. Asked without a user gesture: it reaches page code.
+    func actions(in frame: WKFrameInfo?, of webView: WKWebView) async -> Set<Action> {
+        let source = "const s = window[Symbol.for('zigzag.mediaSession')]; return s ? s.actions() : [];"
+        let list = (try? await webView.runOwnScript(source, asFunction: true, in: frame, world: .page)) as? [Any] ?? []
+        return Set(list.compactMap { ($0 as? String).flatMap(Action.init(rawValue:)) })
+    }
+
+    /// Runs the page's own handler, as a press of yours: it may start the next video. Returns whether it had one.
+    @discardableResult
+    func run(_ action: Action, in frame: WKFrameInfo?, of webView: WKWebView) async -> Bool {
+        let source = "const s = window[Symbol.for('zigzag.mediaSession')]; return s ? s.run(action) : false;"
+        let result = try? await webView.callAsyncJavaScript(source, arguments: ["action": action.rawValue], in: frame, contentWorld: .page)
+        return result as? Bool ?? false
+    }
+}
+
 /// Whether a tab plays sound, from what WebKit says (`_isPlayingAudio`) and whether a video or audio on the page plays
 /// with its sound on. WebKit goes on saying a page plays sound once a video or audio whose sound goes through Web Audio
 /// is paused (TikTok's player), for as long as the page keeps its audio context running. So a sound that started with
