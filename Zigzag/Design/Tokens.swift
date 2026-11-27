@@ -1130,6 +1130,14 @@ enum Tokens {
             #endif
         }()
 
+        /// How far `layer` is drawn along x by its "slide" still running: what's on screen, or, for one added since the
+        /// screen was last drawn, where it starts (the screen still shows the slide before it). Nil with none.
+        static func shownSlide(_ layer: CALayer) -> CGFloat? {
+            guard let slide = layer.animation(forKey: "slide") else { return nil }
+            if slide.beginTime == 0, let from = (slide as? CABasicAnimation)?.fromValue as? CGFloat { return from }
+            return layer.presentation()?.value(forKeyPath: "transform.translation.x") as? CGFloat
+        }
+
         /// Slides a view horizontally into its current (final) position from `offset` points away, on the
         /// render server. Returns how long the slide takes, 0 if it was skipped.
         /// `velocity`: how fast the view is already moving, in points per second (positive is rightward), so a slide
@@ -1140,10 +1148,7 @@ enum Tokens {
             guard let layer = view.layer, fromKeyboard || !isKeyboardDriven, !reduceMotion else { return 0 }
             // Interrupting a slide carries on from where it is on screen, not from where it was headed.
             var offset = offset
-            if layer.animation(forKey: "slide") != nil,
-               let shown = layer.presentation()?.value(forKeyPath: "transform.translation.x") as? CGFloat {
-                offset += shown
-            }
+            if let shown = shownSlide(layer) { offset += shown }
             guard abs(offset) > 0.5 else { layer.removeAnimation(forKey: "slide"); return 0 }
             let animation: CABasicAnimation
             if let bounce = curve.bounce {

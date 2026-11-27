@@ -2001,8 +2001,7 @@ final class SidebarView: NSView {
 
     /// How far a view is drawn from its frame by a slide still running.
     private static func shownSlide(_ view: NSView) -> CGFloat {
-        guard let layer = view.layer, layer.animation(forKey: "slide") != nil else { return 0 }
-        return layer.presentation()?.value(forKeyPath: "transform.translation.x") as? CGFloat ?? 0
+        view.layer.flatMap(Tokens.Motion.shownSlide) ?? 0
     }
 
     /// Moves a view from `from` to `to` (offsets from where it stands) on the same curve and in the same time as

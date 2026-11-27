@@ -878,6 +878,57 @@ struct TouchMovesTests {
         #expect(switched == [1])
     }
 
+    /// A slide added since the screen was last drawn is where it starts; one already drawn, where it is on screen.
+    @Test func aSlideNotYetDrawnIsWhereItStarts() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100), styleMask: [.borderless],
+                              backing: .buffered, defer: false)
+        window.contentView?.wantsLayer = true
+        let layer = CALayer()
+        try #require(window.contentView?.layer).addSublayer(layer)
+        let slide = CABasicAnimation(keyPath: "transform.translation.x")
+        slide.fromValue = CGFloat(-40)
+        slide.toValue = CGFloat(0)
+        slide.duration = 5
+        CATransaction.begin()
+        layer.add(slide, forKey: "slide")
+        #expect(Tokens.Motion.shownSlide(layer) == -40)
+        CATransaction.commit()
+        CATransaction.flush()
+        // Drawn: it has its start time, and is read from the screen from now on.
+        #expect((layer.animation(forKey: "slide")?.beginTime ?? 0) != 0)
+        #expect(Tokens.Motion.shownSlide(CALayer()) == nil)
+    }
+
+    /// A finger swiping again the moment a swipe was called off picks the list up where it is, mid spring back, so
+    /// carrying on the same way past the distance still switches space.
+    @Test func aSwipeRightAfterOneCalledOffCarriesOnFromTheList() throws {
+        let added = Library.shared.addSpace(name: "Touch swipe again test")
+        defer { Library.shared.removeSpace(added.id) }
+        let spaces = Library.shared.spaces
+        let here = try #require(spaces.firstIndex { $0.id == added.id }).advanced(by: -1)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 260, height: 700), styleMask: [.borderless],
+                              backing: .buffered, defer: true)
+        window.contentView?.wantsLayer = true
+        let sidebar = SidebarView(frame: NSRect(x: 0, y: 0, width: 260, height: 700))
+        window.contentView?.addSubview(sidebar)
+        sidebar.currentSpaceID = spaces[here].id
+        var switched: [Int] = []
+        sidebar.onSwipeSpace = { switched.append($0); return false }
+        let now = ProcessInfo.processInfo.systemUptime
+        // Both swipes before the screen is drawn again, as a quick finger does between frames.
+        CATransaction.begin()
+        defer { CATransaction.commit() }
+        sidebar.touchSwipeBegan()
+        sidebar.touchSwipeMoved(by: -78, at: now)
+        sidebar.touchSwipeEnded(velocity: 0, cancelled: true)
+        #expect(switched.isEmpty)
+        // From the 78 points it's still out, 52 more is half the sidebar: it switches.
+        sidebar.touchSwipeBegan()
+        sidebar.touchSwipeMoved(by: -52, at: now + 0.2)
+        sidebar.touchSwipeEnded(velocity: 0, cancelled: false)
+        #expect(switched == [1])
+    }
+
     // MARK: Deciding
 
     /// Nothing is decided in the first ten points, where a landing finger jitters; then the angle is the hand's.
