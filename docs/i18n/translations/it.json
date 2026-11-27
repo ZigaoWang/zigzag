@@ -15182,6 +15182,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl j k h l tastiera navigazione successivo precedente pannello spazio arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Passkey per %@"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Usa una passkey salvata"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS chiede una volta se Zigzag può elencarle"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Suggerisci le passkey salvate su questo Mac sotto i campi di accesso. macOS te lo chiede prima."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Consenti…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Suggerite sotto i campi di accesso, solo sul sito per cui ciascuna è stata creata. Puoi cambiarlo in Impostazioni di Sistema › Privacy e sicurezza."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Non suggerite, come impostato in Impostazioni di Sistema › Privacy e sicurezza. Un sito che chiede una passkey può ancora usarla."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Passkey"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy accesso suggerisci riempimento automatico compilazione privacy"
+      }
     }
   },
   "InfoPlist": {

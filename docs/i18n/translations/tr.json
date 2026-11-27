@@ -15182,6 +15182,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl j k h l klavye gezinme sonraki önceki sekme space arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@ için geçiş anahtarı"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Kayıtlı Geçiş Anahtarı Kullan"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS, Zigzag’in bunları listeleyip listeleyemeyeceğini bir kez sorar"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu Mac’te kayıtlı geçiş anahtarlarını giriş alanlarının altında öner. macOS önce size sorar."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "İzin Ver…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Giriş alanlarının altında, yalnızca her birinin oluşturulduğu sitede önerilir. Bunu Sistem Ayarları › Gizlilik ve Güvenlik’te değiştirin."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sistem Ayarları › Gizlilik ve Güvenlik’teki ayara göre önerilmez. Geçiş anahtarı isteyen bir site onu yine de kullanabilir."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Geçiş Anahtarları"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy geçiş anahtarı giriş öner otomatik doldur gizlilik"
+      }
     }
   },
   "InfoPlist": {

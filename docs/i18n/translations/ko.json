@@ -14852,6 +14852,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl j k h l keyboard navigation next previous tab space arc 컨트롤 키보드 탐색 다음 이전 탭 스페이스"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@용 패스키"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "저장된 패스키 사용"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS가 Zigzag의 패스키 목록 표시를 허용할지 한 번 묻습니다"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "이 Mac에 저장된 패스키를 로그인 필드 아래에 제안합니다. macOS가 먼저 묻습니다."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "허용…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "로그인 필드 아래에, 각 패스키를 만든 사이트에서만 제안됩니다. 시스템 설정 › 개인정보 보호 및 보안에서 변경하세요."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "시스템 설정 › 개인정보 보호 및 보안의 설정에 따라 제안되지 않습니다. 패스키를 요청하는 사이트에서는 계속 사용할 수 있습니다."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "패스키"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy 패스키 로그인 제안 자동 완성 개인정보"
+      }
     }
   },
   "InfoPlist": {

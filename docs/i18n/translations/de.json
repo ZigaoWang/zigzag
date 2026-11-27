@@ -15231,6 +15231,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl steuerung j k h l tastatur navigation nächster vorheriger tab space arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Passkey für %@"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Gesicherten Passkey verwenden"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS fragt einmal, ob Zigzag sie auflisten darf"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Die auf diesem Mac gesicherten Passkeys unter Anmeldefeldern vorschlagen. macOS fragt dich zuerst."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Erlauben …"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Unter Anmeldefeldern vorgeschlagen, nur auf der Website, für die der Passkey erstellt wurde. Ändern kannst du das unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nicht vorgeschlagen, wie unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“ festgelegt. Eine Website, die nach einem Passkey fragt, kann ihn weiterhin nutzen."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Passkeys"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy passkeys anmelden vorschlagen automatisch ausfüllen datenschutz"
+      }
     }
   },
   "language": "de"

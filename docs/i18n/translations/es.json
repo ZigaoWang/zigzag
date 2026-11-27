@@ -15512,6 +15512,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl j k h l teclado navegación siguiente anterior pestaña espacio arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Llave de acceso de %@"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Usar una llave de acceso guardada"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS pregunta una vez si Zigzag puede mostrarlas"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sugiere las llaves de acceso guardadas en este Mac bajo los campos de inicio de sesión. macOS te lo pregunta antes."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Permitir…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Se sugieren bajo los campos de inicio de sesión, solo en el sitio para el que se creó cada una. Cámbialo en Ajustes del Sistema › Privacidad y seguridad."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "No se sugieren, según lo definido en Ajustes del Sistema › Privacidad y seguridad. Un sitio que pida una llave de acceso aún puede usarla."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Llaves de acceso"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy llave de acceso iniciar sesión sugerir autorrelleno privacidad"
+      }
     }
   },
   "InfoPlist": {

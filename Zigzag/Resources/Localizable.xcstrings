@@ -1306,6 +1306,89 @@
         }
       }
     },
+    "Allow…" : {
+      "comment" : "Button beside “Passkeys” in Settings › Passwords: shows macOS's prompt asking whether Zigzag may list the passkeys saved on this Mac.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erlauben …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consenti…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "許可…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "허용…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta toe…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zezwól…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzin Ver…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允許…"
+          }
+        }
+      }
+    },
     "Checks every %lld minutes, or hourly in Low Power Mode." : {
       "comment" : "Under the fields of the New Live Folder sheet: how often a live folder fetches its feed or list. The number is minutes (30).",
       "localizations" : {
@@ -2049,6 +2132,255 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "轉交"
+          }
+        }
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can." : {
+      "comment" : "Explanation under “Passkeys” in Settings › Passwords, with Zigzag not allowed to list the passkeys saved on this Mac. System Settings › Privacy & Security are names macOS uses; match them.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht vorgeschlagen, wie unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“ festgelegt. Eine Website, die nach einem Passkey fragt, kann ihn weiterhin nutzen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se sugieren, según lo definido en Ajustes del Sistema › Privacidad y seguridad. Un sitio que pida una llave de acceso aún puede usarla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non suggérées, selon le réglage de Réglages Système › Confidentialité et sécurité. Un site qui demande une clé d’identification peut toujours l’utiliser."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non suggerite, come impostato in Impostazioni di Sistema › Privacy e sicurezza. Un sito che chiede una passkey può ancora usarla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「システム設定 › プライバシーとセキュリティ」の設定により提案されません。サイトがパスキーを求めた場合は引き続き使用できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 설정 › 개인정보 보호 및 보안의 설정에 따라 제안되지 않습니다. 패스키를 요청하는 사이트에서는 계속 사용할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niet voorgesteld, zoals ingesteld in Systeeminstellingen › Privacy en beveiliging. Een website die om een passkey vraagt, kan die nog steeds gebruiken."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie są proponowane, zgodnie z ustawieniem w „Ustawienia systemowe” › „Prywatność i ochrona”. Witryna, która poprosi o klucz dostępu, nadal może go użyć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não sugeridas, conforme definido em Ajustes do Sistema › Privacidade e segurança. Um site que pede uma chave de acesso ainda pode usá-la."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не предлагаются: так задано в разделе «Системные настройки» › «Конфиденциальность и безопасность». Сайт, который запрашивает ключ доступа, по-прежнему может его использовать."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sistem Ayarları › Gizlilik ve Güvenlik’teki ayara göre önerilmez. Geçiş anahtarı isteyen bir site onu yine de kullanabilir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不建议：已在“系统设置 › 隐私与安全性”中关闭。网站请求通行密钥时仍可使用。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不建議：已在「系統設定 › 隱私權與安全性」中關閉。網站要求通行密鑰時仍可使用。"
+          }
+        }
+      }
+    },
+    "Passkey for %@" : {
+      "comment" : "Under a saved passkey in the menu that fills a password into a page. The placeholder is a site, like github.com.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passkey für %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Llave de acceso de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé d’identification pour %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passkey per %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のパスキー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@용 패스키"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passkey voor %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klucz dostępu dla %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chave de acesso para %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ключ доступа для %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ için geçiş anahtarı"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的通行密钥"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的通行密鑰"
+          }
+        }
+      }
+    },
+    "Passkeys" : {
+      "comment" : "A setting in Settings › Passwords: whether Zigzag suggests the passkeys saved on this Mac under sign-in fields.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passkeys"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Llaves de acceso"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clés d’identification"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passkey"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パスキー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "패스키"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passkeys"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klucze dostępu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaves de acesso"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ключи доступа"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geçiş Anahtarları"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通行密钥"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通行密鑰"
           }
         }
       }
@@ -3464,6 +3796,172 @@
         }
       }
     },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first." : {
+      "comment" : "Explanation under “Passkeys” in Settings › Passwords, before macOS has been asked whether Zigzag may list the passkeys saved on this Mac.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die auf diesem Mac gesicherten Passkeys unter Anmeldefeldern vorschlagen. macOS fragt dich zuerst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sugiere las llaves de acceso guardadas en este Mac bajo los campos de inicio de sesión. macOS te lo pregunta antes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggérer les clés d’identification enregistrées sur ce Mac sous les champs de connexion. macOS vous le demande d’abord."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggerisci le passkey salvate su questo Mac sotto i campi di accesso. macOS te lo chiede prima."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacに保存したパスキーをログインフィールドの下に提案します。最初にmacOSが確認します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Mac에 저장된 패스키를 로그인 필드 아래에 제안합니다. macOS가 먼저 묻습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stel de passkeys die op deze Mac zijn bewaard voor onder aanmeldvelden. macOS vraagt het je eerst."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proponuj klucze dostępu zachowane na tym Macu pod polami logowania. macOS najpierw zapyta."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sugerir as chaves de acesso salvas neste Mac abaixo de campos de login. O macOS pergunta antes."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Предлагать ключи доступа, сохранённые на этом Mac, под полями входа. Сначала macOS спросит вас."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Mac’te kayıtlı geçiş anahtarlarını giriş alanlarının altında öner. macOS önce size sorar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在登录框下方建议此 Mac 上存储的通行密钥。macOS 会先询问你。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在登入框下方建議此 Mac 上儲存的通行密鑰。macOS 會先詢問你。"
+          }
+        }
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security." : {
+      "comment" : "Explanation under “Passkeys” in Settings › Passwords, with Zigzag allowed to list the passkeys saved on this Mac. System Settings › Privacy & Security are names macOS uses; match them.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unter Anmeldefeldern vorgeschlagen, nur auf der Website, für die der Passkey erstellt wurde. Ändern kannst du das unter „Systemeinstellungen“ › „Datenschutz & Sicherheit“."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se sugieren bajo los campos de inicio de sesión, solo en el sitio para el que se creó cada una. Cámbialo en Ajustes del Sistema › Privacidad y seguridad."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggérées sous les champs de connexion, uniquement sur le site pour lequel chacune a été créée. Modifiez cela dans Réglages Système › Confidentialité et sécurité."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggerite sotto i campi di accesso, solo sul sito per cui ciascuna è stata creata. Puoi cambiarlo in Impostazioni di Sistema › Privacy e sicurezza."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログインフィールドの下に、そのパスキーを作成したサイトでのみ提案されます。「システム設定 › プライバシーとセキュリティ」で変更できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그인 필드 아래에, 각 패스키를 만든 사이트에서만 제안됩니다. 시스템 설정 › 개인정보 보호 및 보안에서 변경하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voorgesteld onder aanmeldvelden, alleen op de website waarvoor elke passkey is gemaakt. Wijzig dit in Systeeminstellingen › Privacy en beveiliging."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proponowane pod polami logowania, tylko w witrynie, dla której każdy został utworzony. Zmień to w „Ustawienia systemowe” › „Prywatność i ochrona”."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sugeridas abaixo de campos de login, somente no site para o qual cada uma foi criada. Altere isso em Ajustes do Sistema › Privacidade e segurança."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Предлагаются под полями входа, только на сайте, для которого создан ключ. Изменить это можно в разделе «Системные настройки» › «Конфиденциальность и безопасность»."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giriş alanlarının altında, yalnızca her birinin oluşturulduğu sitede önerilir. Bunu Sistem Ayarları › Gizlilik ve Güvenlik’te değiştirin."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示在登录框下方，只在通行密钥所属的网站上。可在“系统设置 › 隐私与安全性”中更改。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示在登入框下方，只在通行密鑰所屬的網站上。可在「系統設定 › 隱私權與安全性」中更改。"
+          }
+        }
+      }
+    },
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too." : {
       "comment" : "Explanation under “Removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it. The rest keeps syncing.",
       "localizations" : {
@@ -4709,6 +5207,89 @@
         }
       }
     },
+    "Use a Saved Passkey" : {
+      "comment" : "A row in the fill-password menu on a site that takes passkeys, before macOS has been asked whether Zigzag may list the passkeys saved on this Mac. Picking it asks.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesicherten Passkey verwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar una llave de acceso guardada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser une clé d’identification enregistrée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa una passkey salvata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存したパスキーを使用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 패스키 사용"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gebruik bewaarde passkey"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Użyj zachowanego klucza dostępu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar uma chave de acesso salva"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использовать сохранённый ключ доступа"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kayıtlı Geçiş Anahtarı Kullan"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用存储的通行密钥"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用儲存的通行密鑰"
+          }
+        }
+      }
+    },
     "With the sidebar hidden, it comes out over the page at two thirds of the window’s height." : {
       "comment" : "Explanation under “Shorter floating sidebar” in Settings › Appearance.",
       "localizations" : {
@@ -5051,6 +5632,172 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "檔案"
+          }
+        }
+      }
+    },
+    "macOS asks once whether Zigzag may list them" : {
+      "comment" : "Under Use a Saved Passkey in the fill-password menu: picking it shows macOS's prompt about passkey access.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS fragt einmal, ob Zigzag sie auflisten darf"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS pregunta una vez si Zigzag puede mostrarlas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS demande une fois si Zigzag peut les afficher"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS chiede una volta se Zigzag può elencarle"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzagに一覧表示を許可するかをmacOSが一度だけ確認します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS가 Zigzag의 패스키 목록 표시를 허용할지 한 번 묻습니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS vraagt één keer of Zigzag ze mag tonen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS zapyta raz, czy Zigzag może je wyświetlać"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O macOS pergunta uma vez se o Zigzag pode listá-las"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS один раз спросит, можно ли Zigzag показывать их"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS, Zigzag’in bunları listeleyip listeleyemeyeceğini bir kez sorar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 会询问一次是否允许 Zigzag 列出它们"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 會詢問一次是否允許 Zigzag 列出它們"
+          }
+        }
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy" : {
+      "comment" : "Words that find the Passkeys setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy passkeys anmelden vorschlagen automatisch ausfüllen datenschutz"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy llave de acceso iniciar sesión sugerir autorrelleno privacidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy clé identification connexion suggérer remplissage automatique confidentialité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy accesso suggerisci riempimento automatico compilazione privacy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy パスキー ログイン 提案 自動入力 プライバシー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy 패스키 로그인 제안 자동 완성 개인정보"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy aanmelden voorstellen automatisch invullen privacy"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy klucz dostępu logowanie proponuj autouzupełnianie prywatność"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy chave de acesso login sugerir preenchimento automático privacidade"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy ключ доступа вход предлагать автозаполнение конфиденциальность"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy geçiş anahtarı giriş öner otomatik doldur gizlilik"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy 通行密钥 登录 建议 自动填充 隐私"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "passkey webauthn touch id sign in suggest autofill privacy 通行密鑰 登入 建議 自動填寫 隱私"
           }
         }
       }
@@ -118755,7 +119502,7 @@
       }
     },
     "Open System Settings" : {
-      "comment" : "Button beside “Not signed in to iCloud” in Settings › General: opens Apple Account in System Settings.\nButton by a browser in the welcome window. System Settings is macOS’s app.\nButton under a problem in the Import window. System Settings is macOS's app.",
+      "comment" : "Button beside “Not signed in to iCloud” in Settings › General: opens Apple Account in System Settings.\nButton by a browser in the welcome window. System Settings is macOS’s app.\nButton under a problem in the Import window. System Settings is macOS's app.\nButton beside “Passkeys” in Settings › Passwords: opens Privacy & Security in System Settings, where passkey access is changed.",
       "localizations" : {
         "de" : {
           "stringUnit" : {

@@ -15842,6 +15842,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl j k h l klawiatura nawigacja następna poprzednia karta przestrzeń arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Klucz dostępu dla %@"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Użyj zachowanego klucza dostępu"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS zapyta raz, czy Zigzag może je wyświetlać"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Proponuj klucze dostępu zachowane na tym Macu pod polami logowania. macOS najpierw zapyta."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Zezwól…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Proponowane pod polami logowania, tylko w witrynie, dla której każdy został utworzony. Zmień to w „Ustawienia systemowe” › „Prywatność i ochrona”."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nie są proponowane, zgodnie z ustawieniem w „Ustawienia systemowe” › „Prywatność i ochrona”. Witryna, która poprosi o klucz dostępu, nadal może go użyć."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Klucze dostępu"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy klucz dostępu logowanie proponuj autouzupełnianie prywatność"
+      }
     }
   },
   "InfoPlist": {

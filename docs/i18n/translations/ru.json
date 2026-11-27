@@ -15891,6 +15891,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl j k h l клавиатура навигация следующая предыдущая вкладка пространство arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ключ доступа для %@"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Использовать сохранённый ключ доступа"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS один раз спросит, можно ли Zigzag показывать их"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Предлагать ключи доступа, сохранённые на этом Mac, под полями входа. Сначала macOS спросит вас."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Разрешить…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Предлагаются под полями входа, только на сайте, для которого создан ключ. Изменить это можно в разделе «Системные настройки» › «Конфиденциальность и безопасность»."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Не предлагаются: так задано в разделе «Системные настройки» › «Конфиденциальность и безопасность». Сайт, который запрашивает ключ доступа, по-прежнему может его использовать."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ключи доступа"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy ключ доступа вход предлагать автозаполнение конфиденциальность"
+      }
     }
   },
   "language": "ru"

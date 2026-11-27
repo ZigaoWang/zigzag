@@ -15182,6 +15182,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl j k h l toetsenbord navigatie volgende vorige tabblad space arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Passkey voor %@"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Gebruik bewaarde passkey"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS vraagt één keer of Zigzag ze mag tonen"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Stel de passkeys die op deze Mac zijn bewaard voor onder aanmeldvelden. macOS vraagt het je eerst."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sta toe…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Voorgesteld onder aanmeldvelden, alleen op de website waarvoor elke passkey is gemaakt. Wijzig dit in Systeeminstellingen › Privacy en beveiliging."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Niet voorgesteld, zoals ingesteld in Systeeminstellingen › Privacy en beveiliging. Een website die om een passkey vraagt, kan die nog steeds gebruiken."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Passkeys"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy aanmelden voorstellen automatisch invullen privacy"
+      }
     }
   },
   "InfoPlist": {

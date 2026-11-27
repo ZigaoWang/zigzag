@@ -15561,6 +15561,60 @@
         "state": "translated",
         "value": "vim hjkl control ctrl j k h l teclado navegação próxima anterior aba espaço arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Chave de acesso para %@"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Usar uma chave de acesso salva"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "O macOS pergunta uma vez se o Zigzag pode listá-las"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sugerir as chaves de acesso salvas neste Mac abaixo de campos de login. O macOS pergunta antes."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Permitir…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sugeridas abaixo de campos de login, somente no site para o qual cada uma foi criada. Altere isso em Ajustes do Sistema › Privacidade e segurança."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Não sugeridas, conforme definido em Ajustes do Sistema › Privacidade e segurança. Um site que pede uma chave de acesso ainda pode usá-la."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Chaves de acesso"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy chave de acesso login sugerir preenchimento automático privacidade"
+      }
     }
   },
   "language": "pt-BR"

@@ -20,6 +20,7 @@ Zigzag 使用 `zh-Hant` 提供繁體中文介面。請以英文原文和字串�
 | Settings / General / Language | 設定／一般／語言 |
 | Privacy & Security | 隱私權與安全性 |
 | Keychain / AutoFill | 鑰匙圈／自動填寫 |
+| Passkeys | 通行密鑰 |
 | Account / Sign-ins / Certificate | 帳號／登入狀態／憑證 |
 | Local Network / Port | 區域網路／連接埠 |
 | File / Folder / File Extension | 檔案／資料夾／副檔名 |

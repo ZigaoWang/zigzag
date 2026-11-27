@@ -15231,6 +15231,60 @@
         "state": "translated",
         "value": "vim hjkl contrôle control ctrl j k h l clavier navigation suivant précédent onglet espace arc"
       }
+    },
+    "Passkey for %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Clé d’identification pour %@"
+      }
+    },
+    "Use a Saved Passkey": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Utiliser une clé d’identification enregistrée"
+      }
+    },
+    "macOS asks once whether Zigzag may list them": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "macOS demande une fois si Zigzag peut les afficher"
+      }
+    },
+    "Suggest the passkeys saved on this Mac under sign-in fields. macOS asks you first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Suggérer les clés d’identification enregistrées sur ce Mac sous les champs de connexion. macOS vous le demande d’abord."
+      }
+    },
+    "Allow…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Autoriser…"
+      }
+    },
+    "Suggested under sign-in fields, only on the site each was made for. Change this in System Settings › Privacy & Security.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Suggérées sous les champs de connexion, uniquement sur le site pour lequel chacune a été créée. Modifiez cela dans Réglages Système › Confidentialité et sécurité."
+      }
+    },
+    "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Non suggérées, selon le réglage de Réglages Système › Confidentialité et sécurité. Un site qui demande une clé d’identification peut toujours l’utiliser."
+      }
+    },
+    "Passkeys": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Clés d’identification"
+      }
+    },
+    "passkey webauthn touch id sign in suggest autofill privacy": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "passkey webauthn touch id sign in suggest autofill privacy clé identification connexion suggérer remplissage automatique confidentialité"
+      }
     }
   },
   "language": "fr"
