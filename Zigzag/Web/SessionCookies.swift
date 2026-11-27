@@ -117,11 +117,11 @@ enum SessionCookies {
 
     // MARK: Putting them back
 
-    /// Sets the saved cookies into `jar`, then removes the file (the next save writes it again). How many were set.
+    /// Sets the saved cookies into `jar`. The file stays until a save writes over it, so a run that never saves keeps
+    /// them for the next launch (#502). How many were set.
     @discardableResult
     static func restore(from url: URL, into jar: any SessionCookieJar) async -> Int {
         let saved = read(url)
-        remove(url)
         let cookies = saved.compactMap(\.cookie)
         if !cookies.isEmpty { await jar.setSessionCookies(cookies) }
         return cookies.count
@@ -240,7 +240,7 @@ enum SessionCookies {
         let cookies = await store.httpCookieStore.allCookies()
         // A later save is under way, or the profile was removed meanwhile.
         guard generation[id] == turn, Profiles.shared.listed(id) != nil else { return }
-        // Read from a process that ended or just started: the next save writes them.
+        // Read from a process that ended meanwhile: the next save writes them.
         guard NetworkProcessCookies.noted(store, cookies: cookies, process: process) else { return }
         let kept = KeptCookies.clearsOnQuit(in: id) ? KeptCookies.sites(in: id) : nil
         let chosen = toSave(cookies, keeping: kept)
@@ -329,11 +329,14 @@ enum NetworkProcessCookies {
         noted(store, cookies: await store.httpCookieStore.allCookies(), process: process)
     }
 
-    /// Keeps `cookies` read from `store`, unless the process they were read from (`before`) ended or just started.
+    /// Keeps `cookies` read from `store`, unless the process they were read from (`before`) ended meanwhile. With none
+    /// known before (none was running, or WebKit doesn't say), they came from the one running now (#502).
     @discardableResult
     static func noted(_ store: WKWebsiteDataStore, cookies: [HTTPCookie], process before: Int) -> Bool {
-        guard store.isPersistent, before > 0, process(of: store) == before, !SessionCookies.isRestoring(store) else { return false }
-        known[ObjectIdentifier(store)] = Known(process: before, cookies: cookies.filter(\.isSessionOnly))
+        guard store.isPersistent, !SessionCookies.isRestoring(store) else { return false }
+        let now = process(of: store)
+        guard before == 0 || now == before else { return false }
+        if now > 0 { known[ObjectIdentifier(store)] = Known(process: now, cookies: cookies.filter(\.isSessionOnly)) }
         return true
     }
 
