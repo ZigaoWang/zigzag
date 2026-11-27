@@ -109,6 +109,8 @@ final class TabManager {
         var groupID: UUID? = nil
         /// When it closed, so ⇧⌘T takes the latest closed anywhere, tab or window.
         var closedAt = Date()
+        /// The pinned page or favorite it was: brought back, it opens there again rather than as a tab (#549).
+        var bookmarkID: UUID? = nil
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
@@ -1203,9 +1205,9 @@ final class TabManager {
     // MARK: Bookmarks
 
     /// Opens the bookmark's live tab, creating it on first use. A page of a pinned split or group opens with the
-    /// rest of it, side by side again as it was laid out.
-    func openBookmark(_ bookmark: Bookmark) {
-        let tab = liveTab(for: bookmark)
+    /// rest of it, side by side again as it was laid out. `closed`: it closed there, and comes back as it was (#549).
+    func openBookmark(_ bookmark: Bookmark, reopening closed: ClosedTab? = nil) {
+        let tab = liveTab(for: bookmark, reopening: closed)
         if let pinned = Library.shared.pinnedSplit(containing: bookmark.id), split(for: tab)?.count != pinned.ids.count {
             let marks = pinned.ids.compactMap { Library.shared.bookmark($0) }
             if marks.count == pinned.ids.count {
@@ -1223,16 +1225,22 @@ final class TabManager {
         select(tab)
     }
 
-    /// A bookmark's live tab, made (not yet shown) if it isn't open.
-    private func liveTab(for bookmark: Bookmark) -> Tab {
+    /// A bookmark's live tab, made (not yet shown) if it isn't open: at its own address, or where `closed` left it.
+    private func liveTab(for bookmark: Bookmark, reopening closed: ClosedTab? = nil) -> Tab {
         if let tab = bookmarkTabs[bookmark.id] { return tab }
         let spaceID = Library.shared.spaceID(ofBookmark: bookmark.id) ?? currentSpaceID
-        let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: spaceID)
+        let tab = closed.map { Tab(url: $0.url, title: $0.title, spaceID: spaceID, interactionState: $0.interactionState, lastActivated: $0.lastActivated) }
+            ?? Tab(url: bookmark.url, title: bookmark.title, spaceID: spaceID)
+        closed?.apply(to: tab)
         tab.isFavorite = Library.shared.isFavorite(bookmark.id)
         tab.host = host
         watch(tab)
         tab.bookmarkID = bookmark.id
-        tab.landingUntil = Date().addingTimeInterval(8)
+        if closed == nil {
+            tab.landingUntil = Date().addingTimeInterval(8)
+            // Opened fresh, it's back: ⇧⌘T no longer has it to bring back.
+            closedTabs.removeAll { $0.bookmarkID == bookmark.id }
+        }
         bookmarkTabs[bookmark.id] = tab
         // Told to the extensions before its page loads: a content script that asks its extension about its tab as the
         // page starts (1Password's) otherwise hears "Tab not found".
@@ -1576,7 +1584,8 @@ final class TabManager {
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         if let bookmarkID = tab.bookmarkID {
             // Closing a pinned page closes it, wherever it had got to: one ⌘W, never two. The pin stays, and
-            // opens fresh at its own address next time.
+            // opens fresh at its own address next time; ⇧⌘T brings it back where it was.
+            remember(closedRecord(of: tab, at: 0, split: nil))
             bookmarkTabs[bookmarkID] = nil
             closedPins.insert(bookmarkID)
             recentTabIDs.removeAll { $0 == tab.id }
@@ -1587,8 +1596,7 @@ final class TabManager {
             return
         }
         guard var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) else { return }
-        closedTabs.append(closedRecord(of: tab, at: index, split: pair))
-        if closedTabs.count > closedLimit { closedTabs.removeFirst(closedTabs.count - closedLimit) }
+        remember(closedRecord(of: tab, at: index, split: pair))
         // The tabs under it move up a level rather than close with it.
         liftChildren(of: tab)
         list.remove(at: index)
@@ -1625,6 +1633,7 @@ final class TabManager {
     /// Removes a tab without choosing a new selection (the caller does).
     private func closeKeepingSelection(_ tab: Tab, split pair: SplitPair? = nil, heir: Tab? = nil) {
         if let bookmarkID = tab.bookmarkID {
+            remember(closedRecord(of: tab, at: 0, split: nil))
             bookmarkTabs[bookmarkID] = nil
             closedPins.insert(bookmarkID)
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
@@ -1638,6 +1647,12 @@ final class TabManager {
         store.unwatch(tab.id)
         tab.close()
         structureChanged()
+    }
+
+    /// Keeps a closed tab for ⇧⌘T and ⌘Z, within the limit.
+    private func remember(_ closed: ClosedTab) {
+        closedTabs.append(closed)
+        if closedTabs.count > closedLimit { closedTabs.removeFirst(closedTabs.count - closedLimit) }
     }
 
     private func closedRecord(of tab: Tab, at index: Int, split pair: SplitPair?) -> ClosedTab {
@@ -1775,6 +1790,12 @@ final class TabManager {
         let found: Int? = id.map { id in closedTabs.lastIndex { $0.id == id } } ?? (closedTabs.isEmpty ? nil : closedTabs.count - 1)
         guard let index = found else { return nil }
         let closed = closedTabs.remove(at: index)
+        // A pinned page or favorite that's still there comes back in its place, at the page it was on.
+        if let mark = closed.bookmarkID.flatMap(Library.shared.bookmark) {
+            guard select else { return liveTab(for: mark, reopening: closed) }
+            openBookmark(mark, reopening: closed)
+            return bookmarkTabs[mark.id]
+        }
         let space = Library.shared.space(closed.spaceID) != nil ? closed.spaceID : currentSpaceID
         let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState,
                       lastActivated: closed.lastActivated)
@@ -2929,7 +2950,7 @@ extension TabManager.ClosedTab {
         self.init(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
                   interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, customIcon: tab.customIcon, split: pair,
                   lastActivated: tab.lastActivated, parentID: tab.parentID, childIDs: childIDs, isCollapsed: tab.isCollapsed,
-                  groupID: tab.groupID)
+                  groupID: tab.groupID, bookmarkID: tab.bookmarkID)
     }
 
     /// What it had beyond its page, back on the tab that reopens it.

@@ -517,4 +517,34 @@ struct TabGroupRulesTests {
         #expect(other.tabs(in: space).count == 4)
         #expect(other.selectedTab === back)
     }
+
+    /// ⌘W unloads a pinned page and keeps its row; ⇧⌘T loads it again there, at the page and history it had (#549).
+    @Test func aClosedPinnedPageComesBackInItsPlace() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let history = Data([1, 2, 3])
+        let later = URL(string: "https://example.com/pinned/later")!
+        let tabs = [Tab(url: URL(string: "https://example.com/a")!, title: "A", spaceID: space),
+                    Tab(url: later, title: "Pinned", spaceID: space, interactionState: history)]
+        manager.adopt(tabs, in: space)
+        manager.bookmarkTab(tabs[1], in: space)
+        let mark = try #require(tabs[1].bookmarkID)
+        let pinned = try #require(manager.bookmarkTab(for: mark))
+        manager.close(pinned)
+        #expect(manager.bookmarkTab(for: mark) == nil)
+        let closed = try #require(manager.lastClosedTab)
+        #expect(closed.bookmarkID == mark && closed.interactionState == history)
+        #expect(WindowManager.shared.canReopenLastClosed(from: manager))
+        WindowManager.shared.reopenLastClosed(from: manager)
+        let back = try #require(manager.bookmarkTab(for: mark))
+        #expect(back.url == later)
+        #expect(manager.selectedTab === back)
+        #expect(manager.tabs(in: space).map(\.displayTitle) == ["A"])
+        // Closed again, then opened from its row: it's back, so ⇧⌘T has nothing of it left.
+        manager.close(back)
+        manager.openBookmark(try #require(Library.shared.bookmark(mark)))
+        #expect(manager.lastClosedTab == nil)
+    }
 }
