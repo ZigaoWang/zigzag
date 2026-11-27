@@ -432,6 +432,15 @@
   Test: IMECommitTests.aClickOrANewPageForgetsTheComposition
   Test: IMECommitTests.aFieldLeavesOtherTextOverMarkedLettersAlone
 
+## The loading line
+- A page loads → the line along the card's top edge is where the page is, and only there: it doesn't move between WebKit's steps, so a page that stops arriving holds still, and a site that never answers never looks nearly done. Reduce Motion changes nothing here, because there was never extra motion to leave out.
+  Test: LoadingLineTests.theLineStaysWhereThePageStopped
+  Test: LoadingLineTests.aPageThatNeverAnswersStaysAtTheStart
+- A new request in the same tab starts the estimate over, so a smaller value arrives → the line goes back with it, never sticking at the higher one.
+  Test: LoadingLineTests.theLineFollowsThePageBackwardsToo
+- The load finishes → the line is whole, from wherever it was, and fades.
+  Test: LoadingLineTests.theLineFinishesWhereItWas
+
 ## Slow loads in Report a Problem
 - A page whose server doesn't answer for 10 seconds, or that shows nothing after 30 → Help › Report a Problem lists it with its site, the step it's stuck in ("waiting for the server", "receiving the page") and how long each step took, never the page's address.
   Test: LoadTimingsTests.aServerThatNeverAnswersIsNotedAsWaitingForIt
