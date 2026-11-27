@@ -1,12 +1,117 @@
 import AppKit
 
+/// Whether the screen is locked or another user has the Mac, and whether Zigzag's next wake is the one unlocking
+/// brings: macOS gives the front back to the app that had it, which is never a link's wake.
+@MainActor final class ScreenLock {
+    static let shared = ScreenLock()
+    static let lockedNotification = Notification.Name("com.apple.screenIsLocked")
+    static let unlockedNotification = Notification.Name("com.apple.screenIsUnlocked")
+    /// Posted on the default center when `isLocked` changes.
+    static let changedNotification = Notification.Name("ZigzagScreenLockChanged")
+    /// How long after unlocking its wake may still reach Zigzag.
+    static let unlockGrace: TimeInterval = 2
+
+    private var screenLocked = false
+    private var sessionAway = false
+    var isLocked: Bool { screenLocked || sessionAway }
+    /// From a lock until its unlock's wake has come, to Zigzag or another app, or `unlockGrace` after.
+    private(set) var wakeIsUnlock = false
+    private var graceWork: DispatchWorkItem?
+    private var observers: [(NotificationCenter, Any)] = []
+
+    /// Centers are injectable so tests never broadcast a screen lock.
+    func start(workspace: NotificationCenter = NSWorkspace.shared.notificationCenter,
+               distributed: NotificationCenter = DistributedNotificationCenter.default()) {
+        guard observers.isEmpty else { return }
+        let events: [(NotificationCenter, Notification.Name)] = [
+            (distributed, Self.lockedNotification), (distributed, Self.unlockedNotification),
+            (workspace, NSWorkspace.sessionDidResignActiveNotification), (workspace, NSWorkspace.sessionDidBecomeActiveNotification),
+            (workspace, NSWorkspace.didActivateApplicationNotification),
+        ]
+        observers = events.map { center, name in
+            (center, center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                let isZigzag = app?.processIdentifier == ProcessInfo.processInfo.processIdentifier
+                let isLoginWindow = app?.bundleIdentifier == "com.apple.loginwindow", name = note.name
+                MainActor.assumeIsolated { self?.heard(name, isZigzag: isZigzag, isLoginWindow: isLoginWindow) }
+            })
+        }
+    }
+
+    private func heard(_ name: Notification.Name, isZigzag: Bool, isLoginWindow: Bool) {
+        switch name {
+        case Self.lockedNotification: screenDidLock()
+        case Self.unlockedNotification: screenDidUnlock()
+        case NSWorkspace.sessionDidResignActiveNotification: sessionDidResign()
+        case NSWorkspace.sessionDidBecomeActiveNotification: sessionDidBecomeActive()
+        default: appActivated(isZigzag: isZigzag, isLoginWindow: isLoginWindow)
+        }
+    }
+
+    func stop() {
+        observers.forEach { $0.0.removeObserver($0.1) }
+        observers = []
+    }
+
+    func screenDidLock() { set(screen: true) }
+    func screenDidUnlock() { set(screen: false) }
+    func sessionDidResign() { set(session: true) }
+    func sessionDidBecomeActive() { set(session: false) }
+
+    /// Another app came to the front after unlocking: that was the unlock's wake, and Zigzag's next one is its own.
+    func appActivated(isZigzag: Bool, isLoginWindow: Bool) {
+        guard !isZigzag, !isLoginWindow, !isLocked else { return }
+        endUnlockWake()
+    }
+
+    /// Zigzag is waking: true once, when unlocking woke it.
+    func takeUnlockWake() -> Bool {
+        let unlocking = wakeIsUnlock
+        if !isLocked { endUnlockWake() }
+        return unlocking
+    }
+
+    private func set(screen: Bool? = nil, session: Bool? = nil) {
+        let was = isLocked
+        if let screen { screenLocked = screen }
+        if let session { sessionAway = session }
+        if isLocked {
+            graceWork?.cancel()
+            graceWork = nil
+            wakeIsUnlock = true
+        } else if was {
+            let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.endUnlockWake() } }
+            graceWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.unlockGrace, execute: work)
+        }
+        if was != isLocked { NotificationCenter.default.post(name: Self.changedNotification, object: self) }
+    }
+
+    private func endUnlockWake() {
+        graceWork?.cancel()
+        graceWork = nil
+        wakeIsUnlock = false
+    }
+
+    #if DEBUG
+    /// For tests: back to unlocked, with no wake pending.
+    func reset() {
+        let was = isLocked
+        screenLocked = false
+        sessionAway = false
+        endUnlockWake()
+        if was { NotificationCenter.default.post(name: Self.changedNotification, object: self) }
+    }
+    #endif
+}
+
 /// A link from another app wakes Zigzag, and macOS brings every Zigzag window forward with it, a moment before Zigzag
 /// hears of the link. For a link going to Zigzag Mini, as Little Arc, the browser windows should stay where they were.
 /// So unless Zigzag was plainly woken some other way, its browser windows wait unseen for that moment; a link for
 /// Zigzag Mini then puts them back exactly where they were, and anything else shows them where macOS put them. The
 /// other ways are told apart by what you did last and where the pointer is, never by how long ago (a busy Zigzag can
 /// take a while to hear it woke): ⌘Tab, Spotlight and shortcuts end with a key, and the Dock, a notification or a
-/// Zigzag window sits under the pointer. Those are never touched.
+/// Zigzag window sits under the pointer. Unlocking the screen is never a link's wake either. Those are never touched.
 enum MiniLinkWake {
     private static var waiting: [NSWindow] = []
     /// Each waiting window's place as Zigzag woke: the window just above it, of any app, top to bottom.
@@ -30,9 +135,14 @@ enum MiniLinkWake {
             if Date() < until { return }
         }
         guard MiniWindowController.opensExternalLinks, waiting.isEmpty else { return }
-        let windows = WindowManager.shared.controllers.compactMap(\.window).filter { $0.isVisible && !$0.isMiniaturized }
-        guard !windows.isEmpty else { return }
-        let reason = Self.reasonNotToWait()
+        wake(WindowManager.shared.controllers.compactMap(\.window), reason: reasonNotToWait())
+    }
+
+    /// Holds `windows` unseen for a link, unless `reason` says the wake plainly isn't one.
+    static func wake(_ windows: [NSWindow], reason: @autoclosure () -> String?) {
+        let windows = windows.filter { $0.isVisible && !$0.isMiniaturized }
+        guard waiting.isEmpty, !windows.isEmpty else { return }
+        let reason = reason()
         lastReason = (reason, Date())
         guard reason == nil else { return }
         // Where they were as Zigzag went to the background: by now macOS may already have raised them, and their
@@ -87,6 +197,12 @@ enum MiniLinkWake {
         release(restoring: true)
     }
 
+    /// Whether windows are held unseen for a link now.
+    static var isHolding: Bool { !waiting.isEmpty }
+
+    /// Lets held windows show where they are.
+    static func release() { release(restoring: false) }
+
     private static func release(restoring: Bool) {
         timeout?.cancel()
         timeout = nil
@@ -105,7 +221,9 @@ enum MiniLinkWake {
     }
 
     /// Why this wake plainly isn't a link from another app, if it plainly isn't.
-    private static func reasonNotToWait() -> String? {
+    static func reasonNotToWait() -> String? {
+        // Unlocking gives the front back to Zigzag: its windows show at once, as they were.
+        if ScreenLock.shared.takeUnlockWake() { return "the screen unlocking" }
         let state = CGEventSourceStateID.combinedSessionState
         let owner = ownerOfWindowUnderPointer()
         return reasonNotToWait(sinceClick: CGEventSource.secondsSinceLastEventType(state, eventType: .leftMouseUp),

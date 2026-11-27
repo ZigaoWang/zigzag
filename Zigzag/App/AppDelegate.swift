@@ -238,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if Headless.isBackgroundOnly { Headless.whenOpened = forYou } else { forYou() }
         Tokens.Contrast.start()
+        ScreenLock.shared.start()
         DebugBridge.start()
         // Only if you turned it on in Settings: otherwise nothing listens.
         MCPService.startIfOn()

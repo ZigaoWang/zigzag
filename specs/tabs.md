@@ -166,6 +166,21 @@
 - A sleeping tab woken, or one restored after a relaunch → its page is the site's page now, not a copy kept from before.
   Test: UnloadedTabTests.aRestoredPageIsTheSitesPageNowNotWebKitsOldCopy
 
+## Locking the screen
+- Lock the screen, then unlock it → Zigzag's windows show at once as they were, in the same order among other apps'
+  windows, never held unseen as for a link's wake to Zigzag Mini.
+  Test: MiniLinkWakeTests.unlockingNeverHoldsTheWindows
+- After unlocking, once its wake has come to Zigzag or another app → a link from another app holds the windows
+  for Zigzag Mini again.
+  Test: MiniLinkWakeTests.theUnlockWakeIsTakenOnce
+  Test: MiniLinkWakeTests.theLockIsHeardFromItsNotifications
+- A see-through space's glass → it stays through the lock, so the window shows with it on unlocking.
+  Test: MiniLinkWakeTests.theGlassStaysThroughALock
+- The page in front while the screen is locked → it stays awake and isn't reloaded on unlocking.
+  Test: MiniLinkWakeTests.theFrontTabStaysShownWhileLocked
+- Show a mini player when you leave Zigzag on, and lock the screen with a video playing → it stays in its page.
+  No test yet.
+
 ## Handoff
 - The key window's tab on an http or https page → offered to your other devices; never a private window, Zigzag's own pages, a file, an error page or this Mac's own address.
   Test: HandoffTests.onlyAWebPageAnotherDeviceCanOpenIsOffered

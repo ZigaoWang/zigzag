@@ -168,27 +168,35 @@ class SpaceFrameView: ColorView {
     /// Follows the window's visibility for as long as the view is in one, so the glass comes back the moment the
     /// window shows (at launch, from behind another window, back from the Dock).
     private var occlusionObserver: NSObjectProtocol?
+    /// Follows the screen locking, which hides every window without anyone moving it.
+    private var lockObserver: NSObjectProtocol?
+    /// Locked since the window was last seen: the glass stays as it was, so unlocking shows the window at once
+    /// rather than without its glass until macOS says it's in sight (black behind it in full screen).
+    private var keptThroughLock = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
+        [occlusionObserver, lockObserver].compactMap { $0 }.forEach(NotificationCenter.default.removeObserver)
         occlusionObserver = nil
+        lockObserver = nil
         guard let window else { return }
-        occlusionObserver = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshGlassOcclusion() }
-        }
+        let refresh: @Sendable (Notification) -> Void = { [weak self] _ in MainActor.assumeIsolated { self?.refreshGlassOcclusion() } }
+        occlusionObserver = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main, using: refresh)
+        lockObserver = NotificationCenter.default.addObserver(forName: ScreenLock.changedNotification, object: nil, queue: .main, using: refresh)
         refreshGlassOcclusion()
     }
 
     isolated deinit {
-        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
+        [occlusionObserver, lockObserver].compactMap { $0 }.forEach(NotificationCenter.default.removeObserver)
     }
 
     /// A window you can't see (behind others, minimized, on another desktop) needs no live blur: the glass goes
-    /// until it shows again, so the window server isn't re-blurring a window nobody is looking at.
+    /// until it shows again, so the window server isn't re-blurring a window nobody is looking at. A locked screen
+    /// isn't that: the glass stays for the unlock.
     func refreshGlassOcclusion() {
         let visible = window?.occlusionState.contains(.visible) ?? true
-        let on = glassWanted && visible && !glassIsCovered
+        if ScreenLock.shared.isLocked { keptThroughLock = true } else if visible { keptThroughLock = false }
+        let on = glassWanted && (visible || keptThroughLock) && !glassIsCovered
         if let clearGlass, !clearGlass.isHidden || on { clearGlass.alphaValue = on ? 1 : 0 }
         glassView.alphaValue = on ? 1 : 0
     }
