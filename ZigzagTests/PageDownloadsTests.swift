@@ -188,6 +188,58 @@ struct PageDownloadsTests {
         #expect(try await setup.saved("export 2.docx") == "attachment export.docx")
     }
 
+    /// Site answers in a suite of the test's own, with Ask before a site downloads files set to `asking`.
+    private func withSiteAnswers(asking: Bool, _ body: () async throws -> Void) async throws {
+        let suite = "PageDownloadsTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        SitePermissions.asksBeforeDownloads = asking
+        try await body()
+    }
+
+    /// With Ask before a site downloads files on and nobody's answer kept, a hidden frame's export asks, naming the
+    /// page's site, instead of saving unasked. With no window to ask in, it isn't saved.
+    @Test func aHiddenFrameAsksWhenAskingIsOn() async throws {
+        try await withSiteAnswers(asking: true) {
+            let setup = try await Setup()
+            defer { setup.end() }
+            let page = try #require(SiteOrigin.of(setup.site)), frame = try #require(SiteOrigin.of(setup.otherSite))
+            try await setup.click("frameAfterExport", in: setup.tab())
+            #expect(try await setup.saved("export.docx", seconds: 4) == nil)
+            #expect(SitePermissions.hasAsked(.downloads, origin: page))
+            #expect(!SitePermissions.hasAsked(.downloads, origin: frame))
+            // The page's site allowed: the export saves.
+            SitePermissions.remember("allow", subject: PermissionSubject.downloads, origin: page)
+            try await setup.click("frameAfterExport", in: setup.tab())
+            #expect(try await setup.saved("export.docx") == "attachment export.docx")
+        }
+    }
+
+    /// A Block kept for the frame's site or for the page's refuses a frame's file, with asking off too.
+    @Test func aBlockForTheFramesSiteOrThePagesStopsAFramesFile() async throws {
+        for asking in [false, true] {
+            try await withSiteAnswers(asking: asking) {
+                let setup = try await Setup()
+                defer { setup.end() }
+                let page = try #require(SiteOrigin.of(setup.site)), frame = try #require(SiteOrigin.of(setup.otherSite))
+                SitePermissions.remember("allow", subject: PermissionSubject.downloads, origin: page)
+                SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: frame)
+                try await setup.click("frameAfterExport", in: setup.tab())
+                #expect(try await setup.saved("export.docx", seconds: 4) == nil, "frame's site blocked, asking \(asking)")
+                SitePermissions.remember(nil, subject: PermissionSubject.downloads, origin: frame)
+                SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: page)
+                try await setup.click("frameAfterExport", in: setup.tab())
+                #expect(try await setup.saved("export.docx", seconds: 4) == nil, "page's site blocked, asking \(asking)")
+                #expect(setup.savedNames.isEmpty)
+            }
+        }
+    }
+
     @Test func aFetchedBlobClickedAfterAnAwaitSaves() async throws {
         let setup = try await Setup()
         defer { setup.end() }

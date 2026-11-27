@@ -2226,6 +2226,12 @@
         "value": "Bloquer du contenu sur les pages"
       }
     },
+    "Blocked a download a frame in this page started on its own": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Téléchargement lancé de lui-même par un cadre de cette page bloqué"
+      }
+    },
     "Blocked a download from this site": {
       "stringUnit": {
         "state": "translated",

@@ -28,6 +28,7 @@ L’interfaccia italiana di Zigzag è `it`. Controlla il significato di ogni str
 | App | app (un’app) |
 | Extensions / Chrome Web Store / Firefox Add-ons | estensioni / Chrome Web Store / Componenti aggiuntivi di Firefox |
 | History / Archive / Downloads | cronologia / archivio / Download |
+| Frame (a page inside a web page) | frame |
 | Tidy (tabs, into the Archive) | Archivia |
 | Settings / General / Language / Appearance | Impostazioni / Generali / Lingua / Aspetto |
 | System Settings / Privacy & Security / Automation | Impostazioni di Sistema / Privacy e sicurezza / Automazione |

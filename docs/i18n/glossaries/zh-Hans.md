@@ -60,6 +60,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Site controls (the site panel) | 网站设置 | 网站控制 | Safari's per-site settings are 网站设置; "控制" sounds technical. |
 | Address (field) | 地址栏 | 智能搜索栏 | Safari calls it 智能搜索栏, but Zigzag's field is plainer; 地址栏 is what people say. |
 | Downloads | 下载 | 下载项 | Safari's list is 下载项; as a title and button, 下载 is enough. |
+| Frame (a page inside a web page) | 框架 | 帧 | Safari's 框架, as in 在新窗口中打开框架; 帧 is a video frame. |
 | History | 历史记录 | | Safari. |
 | Settings | 设置 | | macOS since Ventura. |
 | Extensions | 扩展 | 扩展程序 | Safari says 扩展; Chrome says 扩展程序. Zigzag runs Chrome extensions, but on a Mac 扩展 reads native. |

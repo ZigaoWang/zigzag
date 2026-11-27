@@ -411,9 +411,11 @@ enum SitePermissions {
 
     /// Whether this site may download, asking on its first one. Put off or no window means refused. With asking off
     /// in Settings, unanswered sites download freely; a kept Block still refuses. `asking` is false for page-started
-    /// downloads, which never get a question.
-    static func downloadsAllowed(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil,
+    /// downloads, which never get a question. `frameSites`: for a frame's file, the frame's own sites, whose Block
+    /// refuses it too; the question names the page's site, as in Safari and Chrome.
+    static func downloadsAllowed(origin: String, frameSites: [String] = [], window: NSWindow?, isPrivate: Bool, tab: Tab? = nil,
                                  asking: Bool = true) async -> Bool {
+        if frameSites.contains(where: { $0 != origin && downloads(origin: $0, tab: tab) == false }) { return false }
         if let known = downloads(origin: origin, tab: tab) { return known }
         guard asking else { return true }
         // Asking off: same as before sites were asked. A kept Block above still wins.

@@ -24,6 +24,7 @@ A interface em português do Brasil do Zigzag é `pt-BR`. Confirme o sentido de 
 | App | app (um app) |
 | Extensions / Chrome Web Store / Firefox Add-ons | extensões / Chrome Web Store / Extras do Firefox |
 | History / Archive / Downloads | histórico / arquivo / downloads |
+| Frame (a page inside a web page) | quadro |
 | Tidy (tabs, into the Archive) | Arquivar |
 | Settings / General / Language / Appearance | Ajustes / Geral / Idioma / Aparência |
 | System Settings / Privacy & Security / Automation | Ajustes do Sistema / Privacidade e segurança / Automação |

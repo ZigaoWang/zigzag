@@ -64,6 +64,18 @@ struct DownloadPolicyTests {
         #expect(frameFile(DownloadPolicy.scriptDownloadGap + 8, nil) == .download)
     }
 
+    /// A frame's file answers to the site the frame went there from and to the file's own, not only the page's.
+    @Test func aFramesFileAnswersToTheFramesOwnSites() {
+        let policy = DownloadPolicy()
+        let file = URL(string: "https://files.example/export.docx")!
+        #expect(policy.frameSites(for: file) == ["https://files.example"])
+        policy.noteFrame(navigatingTo: file, from: "https://ads.example")
+        policy.noteFrame(navigatingTo: URL(string: "https://other.example/a")!, from: "https://other.example")
+        #expect(policy.frameSites(for: file) == ["https://ads.example", "https://files.example"])
+        #expect(DownloadPolicy.refusedNote(isMainFrame: false) != DownloadPolicy.refusedNote(isMainFrame: true))
+        #expect(DownloadPolicy.refusedFrameText != DownloadPolicy.refusedText)
+    }
+
     /// A click or key in the page counts for a download its script starts later, which WebKit no longer sees as
     /// clicked once the page has waited on its server.
     @Test func aClickInThePageCountsForItsNextDownload() {

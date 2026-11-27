@@ -21,6 +21,7 @@ Zigzag arayüzünü `tr` olarak Türkçe sunar. Anlam, İngilizce kaynakta ve he
 | Split View / Reader / Picture in Picture | Bölünmüş Görünüm / Okuyucu / Pencere İçinde Pencere |
 | Extensions / Chrome Web Store / Firefox Add-ons | Genişletmeler / Chrome Web Store / Firefox Add-ons |
 | History / Archive / Downloads | Geçmiş / Arşiv / İndirilenler |
+| Frame (a page inside a web page) | çerçeve |
 | Settings / General / Language / Appearance | Ayarlar / Genel / Dil / Görünüm |
 | System Settings / Privacy & Security | Sistem Ayarları / Gizlilik ve Güvenlik |
 | Keychain / AutoFill | Anahtar Zinciri / Otomatik Doldur |

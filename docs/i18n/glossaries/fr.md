@@ -24,6 +24,7 @@ L’interface française de Zigzag est `fr`. Vérifiez le sens de chaque chaîne
 | App | app (une app) |
 | Extensions / Chrome Web Store / Firefox Add-ons | extensions / Chrome Web Store / Modules complémentaires Firefox |
 | History / Archive / Downloads | historique / archive / téléchargements |
+| Frame (a page inside a web page) | cadre |
 | Tidy (tabs, into the Archive) | Archiver |
 | Settings / General / Language / Appearance | Réglages / Général / Langue / Apparence |
 | System Settings / Privacy & Security / Automation | Réglages Système / Confidentialité et sécurité / Automatisation |

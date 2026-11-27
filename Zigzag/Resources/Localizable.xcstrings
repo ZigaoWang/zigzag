@@ -41833,6 +41833,89 @@
         }
       }
     },
+    "Blocked a download a frame in this page started on its own" : {
+      "comment" : "Toast when a frame inside a web page (often a hidden one) starts a second download within half a minute without a click.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Download, den ein Frame dieser Seite selbst gestartet hat, wurde blockiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se bloqueó una descarga que un marco de esta página inició por su cuenta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téléchargement lancé de lui-même par un cadre de cette page bloqué"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloccato un download avviato da un frame di questa pagina senza un clic"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このページ内のフレームが勝手に開始したダウンロードをブロックしました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 페이지의 프레임이 스스로 시작한 다운로드를 차단함"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download geblokkeerd die een frame in deze pagina zelf startte"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zablokowano pobieranie rozpoczęte samodzielnie przez ramkę na tej stronie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download iniciado por um quadro desta página por conta própria bloqueado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Заблокирована загрузка, начатая фреймом на этой странице самостоятельно"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu sayfadaki bir çerçevenin kendi başına başlattığı bir indirme engellendi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拦截此网页中的框架自行开始的下载"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已阻擋此網頁中的框架自行開始的下載"
+          }
+        }
+      }
+    },
     "Blocked a download from this site" : {
       "comment" : "Toast when a site is not allowed to save files and sends one anyway.",
       "localizations" : {

@@ -24,6 +24,7 @@ La interfaz en español de Zigzag es `es`: un solo español neutro que se lee bi
 | App | app |
 | Extensions / Chrome Web Store / Firefox Add-ons | extensiones / Chrome Web Store / Complementos de Firefox |
 | History / Archive / Downloads | historial / archivo / descargas |
+| Frame (a page inside a web page) | marco |
 | Tidy (tabs, into the Archive) / Archived | Archivar / archivada |
 | Settings / General / Language / Appearance | Ajustes / General / Idioma / Apariencia |
 | System Settings / Privacy & Security / Automation | Ajustes del Sistema / Privacidad y seguridad / Automatización |

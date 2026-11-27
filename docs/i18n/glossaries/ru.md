@@ -25,6 +25,7 @@
 | AI apps | ИИ-приложения |
 | Extensions / Chrome Web Store / Firefox Add-ons | Расширения / Chrome Web Store / Firefox Add-ons |
 | History / Archive / Downloads | История / Архив / Загрузки |
+| Frame (a page inside a web page) | фрейм |
 | Settings / General / Language / Appearance | Настройки / Основные / Язык / Внешний вид |
 | System Settings / Privacy & Security / Automation | Системные настройки / Конфиденциальность и безопасность / Автоматизация |
 | Website, site / Page / Web page | Сайт / Страница / Веб-страница |

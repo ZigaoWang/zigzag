@@ -16,6 +16,7 @@ Zigzag 使用 `zh-Hant` 提供繁體中文介面。請以英文原文和字串�
 | Command Bar / Site Controls | 指令列／網站設定 |
 | Extensions / Chrome Web Store | 延伸功能／Chrome 線上應用程式商店 |
 | History / Archive / Downloads | 瀏覽記錄／封存／下載項目 |
+| Frame (a page inside a web page) | 框架 |
 | Settings / General / Language | 設定／一般／語言 |
 | Privacy & Security | 隱私權與安全性 |
 | Keychain / AutoFill | 鑰匙圈／自動填寫 |

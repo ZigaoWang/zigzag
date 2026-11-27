@@ -1919,6 +1919,9 @@ extension Tab: WKNavigationDelegate {
                 pendingHTTPFallback = nil
             }
         }
+        if let frame = navigationAction.targetFrame, !frame.isMainFrame {
+            downloads.noteFrame(navigatingTo: navigationAction.request.url, from: SiteOrigin.of(frame.securityOrigin))
+        }
         // Clicked downloads save. Script-started ones save too, but not a burst (`DownloadPolicy`); a click or key in
         // the page since the last one lets the next through.
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: userInitiated || ownLoad,
@@ -1934,7 +1937,8 @@ extension Tab: WKNavigationDelegate {
             // No rule: ask once per site whether it may download. Unprompted downloads never ask, but a stored answer
             // applies.
             if policy == .download, let target = navigationAction.request.url,
-               await !mayDownload(target, in: webView, retry: navigationAction.request, asking: userInitiated || ownLoad) {
+               await !mayDownload(target, in: webView, retry: navigationAction.request, asking: userInitiated || ownLoad,
+                                  frameSites: navigationAction.targetFrame?.isMainFrame == false ? downloads.frameSites(for: target) : []) {
                 return (.cancel, preferences)
             }
             if policy == .cancel {
@@ -2262,7 +2266,10 @@ extension Tab: WKNavigationDelegate {
             WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, in: self)
         }
         // A file blocked by `DownloadPolicy`, a frame's too: a refused export never goes without a word.
-        if policy == .cancel { refusedDownload(in: webView) }
+        if policy == .cancel {
+            refusedDownload(in: webView, text: navigationResponse.isForMainFrame ? DownloadPolicy.refusedText : DownloadPolicy.refusedFrameText,
+                            note: DownloadPolicy.refusedNote(isMainFrame: navigationResponse.isForMainFrame))
+        }
         #if DEBUG
         if policy == .download {
             debugLog("download chosen: mime=\(mime) canShow=\(navigationResponse.canShowMIMEType) mainFrame=\(navigationResponse.isForMainFrame) attachment=\(!disposition.isEmpty)")
@@ -2299,14 +2306,17 @@ extension Tab: WKNavigationDelegate {
                 }
             }
             // No rule took it: the site's download permission decides. The request isn't available here and a guess
-            // would turn a POST into a GET, so no retry is offered. Unclicked responses never ask.
-            if await !mayDownload(target, in: webView, asking: wasClicked) { return .cancel }
+            // would turn a POST into a GET, so no retry is offered. An unclicked page response never asks; a frame's
+            // file asks as the page's would, since WebKit never says whether its frame was clicked.
+            let isFrame = !navigationResponse.isForMainFrame
+            if await !mayDownload(target, in: webView, asking: wasClicked || isFrame,
+                                  frameSites: isFrame ? downloads.frameSites(for: target) : []) { return .cancel }
         }
         return policy
     }
 
     /// Shows a toast for a blocked download.
-    private func refusedDownload(in webView: WKWebView, text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click",
+    private func refusedDownload(in webView: WKWebView, text: String = DownloadPolicy.refusedText, note: String = DownloadPolicy.refusedNote(isMainFrame: true),
                                  action: (title: String, run: () -> Void)? = nil) {
         Diagnostics.note("Download refused", site: url?.host(), note, isPrivate: isPrivate)
         guard let host = webView.window?.windowController as? PromptHost else { return }
@@ -2316,8 +2326,9 @@ extension Tab: WKNavigationDelegate {
     }
 
     /// Whether the site may download; false means cancel (a toast explains). Asked once per site: "This time" for the
-    /// page, "Always" saved. `retry`: the request to offer again, if repeatable.
-    private func mayDownload(_ url: URL, in webView: WKWebView, retry: URLRequest? = nil, asking: Bool = true) async -> Bool {
+    /// page, "Always" saved. `retry`: the request to offer again, if repeatable. `frameSites`: a frame's own sites.
+    private func mayDownload(_ url: URL, in webView: WKWebView, retry: URLRequest? = nil, asking: Bool = true,
+                             frameSites: [String] = []) async -> Bool {
         guard let origin = SiteOrigin.of(webView.url ?? url) else {
             // Local files have no site to ask about. A page without a nameable origin (about:blank, data:) can't
             // download when asking is on; with asking off it downloads as before.
@@ -2327,8 +2338,8 @@ extension Tab: WKNavigationDelegate {
             DownloadManager.shared.dropFileHandoff(for: url, from: webView)
             return false
         }
-        let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self,
-                                                             asking: asking)
+        let allowed = await SitePermissions.downloadsAllowed(origin: origin, frameSites: frameSites, window: host?.hostWindow,
+                                                             isPrivate: isPrivate, tab: self, asking: asking)
         if !allowed {
             refusedDownload(in: webView, text: DownloadPolicy.blockedText, note: "This site is not allowed to save files",
                             action: askAgain(origin: origin, request: retry, in: webView))

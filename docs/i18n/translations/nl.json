@@ -2903,6 +2903,12 @@
         "value": "Inhoud op pagina’s blokkeren"
       }
     },
+    "Blocked a download a frame in this page started on its own": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Download geblokkeerd die een frame in deze pagina zelf startte"
+      }
+    },
     "Blocked a download from this site": {
       "stringUnit": {
         "state": "translated",

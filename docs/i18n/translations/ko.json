@@ -2789,6 +2789,12 @@
         "value": "페이지의 콘텐츠 차단"
       }
     },
+    "Blocked a download a frame in this page started on its own": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "이 페이지의 프레임이 스스로 시작한 다운로드를 차단함"
+      }
+    },
     "Blocked a download from this site": {
       "stringUnit": {
         "state": "translated",

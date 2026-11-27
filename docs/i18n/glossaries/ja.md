@@ -23,6 +23,7 @@ Zigzag の日本語インターフェイスは `ja` です。意味は英語の�
 | App | App |
 | Extensions / Chrome Web Store / Firefox Add-ons | 機能拡張／Chromeウェブストア／Firefoxアドオン |
 | History / Archive / Downloads | 履歴／アーカイブ／ダウンロード |
+| Frame (a page inside a web page) | フレーム |
 | Settings / General / Language / Appearance | 設定／一般／言語／外観 |
 | System Settings / Privacy & Security / Automation | システム設定／プライバシーとセキュリティ／オートメーション |
 | Website / Site / Page | Webサイト／サイト／ページ |

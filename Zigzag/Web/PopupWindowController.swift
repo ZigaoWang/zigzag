@@ -621,6 +621,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         }
         // Unclicked download streams are refused, as in a tab.
         let clicked = PopupNotice.isUserInitiated(navigationAction)
+        if let frame = navigationAction.targetFrame, !frame.isMainFrame {
+            downloads.noteFrame(navigatingTo: navigationAction.request.url, from: SiteOrigin.of(frame.securityOrigin))
+        }
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: clicked,
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
                                          lastInput: DownloadPolicy.lastInput(in: webView)) {
@@ -631,7 +634,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             // Otherwise ask once per site whether it may download. Page-started downloads never ask, but a kept
             // answer still applies.
             if policy == .download, let url = navigationAction.request.url,
-               await !mayDownload(url, request: navigationAction.request, asking: clicked) { return .cancel }
+               await !mayDownload(url, request: navigationAction.request, asking: clicked,
+                                  frameSites: navigationAction.targetFrame?.isMainFrame == false ? downloads.frameSites(for: url) : []) { return .cancel }
             if policy == .cancel {
                 // Page-started: Allow Once re-requests from the same page; a request that can't be re-sent leaves the
                 // notice as it is.
@@ -728,11 +732,16 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                      wasClicked: wasClicked) {
                 return .cancel
             }
-            // Then the site's download permission decides. Unclicked responses never ask.
-            if await !mayDownload(url, asking: wasClicked) { return .cancel }
+            // Then the site's download permission decides. An unclicked page response never asks; a frame's file
+            // asks as the page's would.
+            let isFrame = !navigationResponse.isForMainFrame
+            if await !mayDownload(url, asking: wasClicked || isFrame, frameSites: isFrame ? downloads.frameSites(for: url) : []) { return .cancel }
         }
         // A frame's file too: a refused export never goes without a word.
-        if policy == .cancel { refusedDownload() }
+        if policy == .cancel {
+            refusedDownload(text: navigationResponse.isForMainFrame ? DownloadPolicy.refusedText : DownloadPolicy.refusedFrameText,
+                            note: DownloadPolicy.refusedNote(isMainFrame: navigationResponse.isForMainFrame))
+        }
         // WebRTC follows a redirect's destination.
         if navigationResponse.isForMainFrame {
             WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, here: webRTCChoices)
@@ -741,7 +750,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     /// Shown under the header, never silently.
-    private func refusedDownload(text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click",
+    private func refusedDownload(text: String = DownloadPolicy.refusedText, note: String = DownloadPolicy.refusedNote(isMainFrame: true),
                                  action: (title: String, run: () -> Void)? = nil) {
         Diagnostics.note("Download refused", site: webView.url?.host(), note, isPrivate: isPrivate)
         guard let content = window?.contentView, window?.isVisible == true else { return }
@@ -768,7 +777,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     /// As in a tab: asked once, "This time" for the page, "Always" for the site. False means cancel the download.
-    private func mayDownload(_ url: URL, request: URLRequest? = nil, asking: Bool = true) async -> Bool {
+    private func mayDownload(_ url: URL, request: URLRequest? = nil, asking: Bool = true, frameSites: [String] = []) async -> Bool {
         guard let origin = SiteOrigin.of(webView.url ?? url) else {
             // Local files have no site. A site-made page (about:blank, data:) has no nameable origin, so with asking
             // on it can't download.
@@ -785,8 +794,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if let window, SitePermissions.asksBeforeDownloads, SitePermissions.downloads(origin: origin, tab: opener) == nil {
             window.makeKeyAndOrderFront(nil)
         }
-        let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: window, isPrivate: isPrivate, tab: opener,
-                                                             asking: asking)
+        let allowed = await SitePermissions.downloadsAllowed(origin: origin, frameSites: frameSites, window: window, isPrivate: isPrivate,
+                                                             tab: opener, asking: asking)
         if !allowed {
             refusedDownload(text: DownloadPolicy.blockedText, note: "This site is not allowed to save files",
                             action: askAgain(origin: origin, request: request))

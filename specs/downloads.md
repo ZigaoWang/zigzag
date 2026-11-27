@@ -19,8 +19,8 @@
   Test: DownloadPolicyTests.aFrameSavesLikeThePageItIsIn
   Test: PageDownloadsTests.aHiddenFrameHandingOverAnExportSaves
   Test: PageDownloadsTests.aHiddenFrameNobodyClickedForSavesOnceThenAfterAClick
-- A download held back → a note says the page's download was blocked, a frame's included.
-  No test yet.
+- A download held back → a note says the page's download was blocked; a frame's says a frame in the page started it.
+  Test: DownloadPolicyTests.aFramesFileAnswersToTheFramesOwnSites
 - A page's own file (a blob: or data: link with a download name, revoked right after its click, or never added to the page) → saved under that name.
   Test: PageDownloadsTests.aBlobRevokedRightAfterItsClickSaves
   Test: PageDownloadsTests.aDataAddressSavesUnderItsName
@@ -40,6 +40,10 @@
   Test: SitePermissionsPolicyTests.askingOnceKeepsTheAnswerForTheSite
 - A Block kept for a site → its downloads stop, with asking off too.
   Test: SitePermissionsPolicyTests.aStoredBlockWinsWithTheSettingOff
+- A frame's file → asks as the page's own would, naming the page's site; a Block kept for the frame's site or the page's stops it, with asking off too.
+  Test: PageDownloadsTests.aHiddenFrameAsksWhenAskingIsOn
+  Test: PageDownloadsTests.aBlockForTheFramesSiteOrThePagesStopsAFramesFile
+  Test: DownloadPolicyTests.aFramesFileAnswersToTheFramesOwnSites
 
 ## The downloads panel
 - The sidebar's download button → the five newest downloads, and Open Downloads Folder at the bottom.

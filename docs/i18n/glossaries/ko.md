@@ -25,6 +25,7 @@ Zigzag의 한국어 인터페이스는 `ko`입니다. 의미는 영어 원문과
 | App | 앱 |
 | Extensions / Chrome Web Store / Firefox Add-ons | 확장 프로그램／Chrome 웹 스토어／Firefox 부가 기능 |
 | History / Archive / Downloads | 방문 기록／보관함 (보관, 보관됨)／다운로드 |
+| Frame (a page inside a web page) | 프레임 |
 | Browsing data | 브라우징 데이터 |
 | Settings / General / Language / Appearance | 설정／일반／언어／모양 |
 | System Settings / Privacy & Security / Automation | 시스템 설정／개인정보 보호 및 보안／자동화 |

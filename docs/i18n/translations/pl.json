@@ -3143,6 +3143,12 @@
         "value": "Blokowanie treści na stronach"
       }
     },
+    "Blocked a download a frame in this page started on its own": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Zablokowano pobieranie rozpoczęte samodzielnie przez ramkę na tej stronie"
+      }
+    },
     "Blocked a download from this site": {
       "stringUnit": {
         "state": "translated",

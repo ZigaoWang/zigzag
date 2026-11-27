@@ -2226,6 +2226,12 @@
         "value": "Inhalte auf Seiten blockieren"
       }
     },
+    "Blocked a download a frame in this page started on its own": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ein Download, den ein Frame dieser Seite selbst gestartet hat, wurde blockiert"
+      }
+    },
     "Blocked a download from this site": {
       "stringUnit": {
         "state": "translated",

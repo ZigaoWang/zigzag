@@ -2903,6 +2903,12 @@
         "value": "Sayfalardaki içeriği engelleme"
       }
     },
+    "Blocked a download a frame in this page started on its own": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu sayfadaki bir çerçevenin kendi başına başlattığı bir indirme engellendi"
+      }
+    },
     "Blocked a download from this site": {
       "stringUnit": {
         "state": "translated",

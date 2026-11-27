@@ -21,6 +21,7 @@ Interfejs Zigzag w języku polskim to `pl`. Znaczenie wynika z angielskiego oryg
 | Split View / Reader / Picture in Picture | Split View / Czytnik / Obraz w obrazie |
 | Extensions / Chrome Web Store / Firefox Add-ons | rozszerzenia / Chrome Web Store / Firefox Add-ons |
 | History / Archive / Downloads | historia / archiwum / Pobrane (pojedyncze: pobranie) |
+| Frame (a page inside a web page) | ramka |
 | Applications folder / Trash / Reading List | folder Aplikacje / Kosz („Przenieś do Kosza”) / Lista Czytelnia |
 | Video / Shade (space editor) | wideo (nieodmienne, czasownik w liczbie pojedynczej) / Przyciemnienie |
 | Find Next / Find Previous / Bring All to Front | Znajdź następne / Znajdź poprzednie / Przenieś wszystko na wierzch |

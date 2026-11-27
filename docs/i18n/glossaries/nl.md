@@ -24,6 +24,7 @@ Zigzag biedt zijn interface als `nl` in het Nederlands aan. De betekenis staat i
 | App | App (de, mv. apps) |
 | Extensions / Chrome Web Store / Firefox Add-ons | Extensies / Chrome Web Store / Firefox-add-ons |
 | History / Archive / Downloads | Geschiedenis / Archief / Downloads |
+| Frame (a page inside a web page) | frame |
 | Settings / General / Language / Appearance | Instellingen / Algemeen / Taal / Uiterlijk |
 | Services (menu) / Minimize / Ungroup | Voorzieningen / Minimaliseer / Hef groep op |
 | Nest Tab / Unnest Tab / Nested tabs | Zet onder tabblad erboven / Haal onder bovenliggend tabblad vandaan / Onderliggende tabbladen |

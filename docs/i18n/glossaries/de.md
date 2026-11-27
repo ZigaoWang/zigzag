@@ -24,6 +24,7 @@ Zigzag bietet seine Oberfläche als `de` auf Deutsch an. Die Bedeutung steht im 
 | App | App (die) |
 | Extensions / Chrome Web Store / Firefox Add-ons | Erweiterungen / Chrome Web Store / Firefox-Add-ons |
 | History / Archive / Downloads | Verlauf / Archiv / Downloads |
+| Frame (a page inside a web page) | Frame |
 | Settings / General / Language / Appearance | Einstellungen / Allgemein / Sprache / Erscheinungsbild |
 | System Settings / Privacy & Security / Automation | Systemeinstellungen / Datenschutz & Sicherheit / Automation |
 | Website, site / Page / Web page | Website / Seite / Webseite |
