@@ -14,12 +14,18 @@ struct PageBrowserGlobalTests {
             typeof frame.browser, typeof made.browser].join(' ');
     """
 
+    /// `'browser' in window` for the page's first script, now, and the same in its frame.
+    private static let named = """
+    return [window.early, 'browser' in window, frames[0].early, 'browser' in frames[0]].join(' ');
+    """
+
     @Test func anOrdinaryPageHasNoBrowserWithNoExtensions() async throws {
         let server = try PageTestServer()
         let site = try await server.start()
         defer { server.listener.cancel() }
         let page = try await open(site, controller: WKWebExtensionController(configuration: .nonPersistent()), patterns: [:])
         #expect(try await page.callAsyncJavaScript(Self.probe, contentWorld: .page) as? String == "undefined undefined  undefined undefined")
+        #expect(try await page.callAsyncJavaScript(Self.named, contentWorld: .page) as? String == "false false false false")
     }
 
     @Test func aTabsPageHasNoBrowser() async throws {
@@ -33,6 +39,8 @@ struct PageBrowserGlobalTests {
         for _ in 0..<100 where page.isLoading || page.title != "page" { try await Task.sleep(for: .milliseconds(50)) }
         // A tab's page starts more worlds after it starts, and WebKit sets `browser` again for each.
         #expect(try await page.callAsyncJavaScript(Self.probe, contentWorld: .page) as? String == "undefined undefined  undefined undefined")
+        // No name at all, as in Chrome and Safari: not for the page's first script, nor later, in a frame too.
+        #expect(try await page.callAsyncJavaScript(Self.named, contentWorld: .page) as? String == "false false false false")
         // A page's own global of that name still works.
         #expect(try await page.callAsyncJavaScript("window.browser = { mine: 1 }; return window.browser.mine", contentWorld: .page) as? Int == 1)
     }
@@ -118,7 +126,9 @@ nonisolated private final class PageTestServer: @unchecked Sendable {
             connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, _, _ in
                 let request = String(decoding: data ?? Data(), as: UTF8.self)
                 let path = request.components(separatedBy: " ").dropFirst().first ?? "/"
-                let body = Data((path == "/frame" ? "<!doctype html><title>frame</title>" : "<!doctype html><title>page</title><body><iframe src=\"/frame\"></iframe>").utf8)
+                // The first script of each notes whether it could see a `browser` before anything else ran.
+                let early = "<script>window.early = 'browser' in window</script>"
+                let body = Data((path == "/frame" ? "<!doctype html>\(early)<title>frame</title>" : "<!doctype html>\(early)<title>page</title><body><iframe src=\"/frame\"></iframe>").utf8)
                 let head = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
                 connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
             }

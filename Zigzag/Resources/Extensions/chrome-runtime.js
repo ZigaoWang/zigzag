@@ -26,9 +26,31 @@
     const isWebKits = (value) => !!value && typeof value === 'object' && Object.keys(value).join() === 'runtime' &&
       !!value.runtime && typeof value.runtime.sendMessage === 'function';
     let own;
-    try {
-      Object.defineProperty(window, 'browser', { get: () => own, set: (value) => { if (!isWebKits(value)) own = value; }, configurable: true, enumerable: false });
-    } catch (e) {}
+    const slot = { get: () => own, set: (value) => { if (!isWebKits(value)) own = value; }, configurable: true, enumerable: false };
+    try { Object.defineProperty(window, 'browser', slot); } catch (e) { return; }
+    // Chrome and Safari have no `browser` here at all, so `'browser' in window` is false. WebKit sets it again only
+    // while the page's script worlds start, before the page's own scripts: once the page is parsed into, the slot
+    // goes, keeping anything the page set itself. A WebKit object set after that is taken out again.
+    const dropWebKits = () => {
+      const now = Object.getOwnPropertyDescriptor(window, 'browser');
+      if (now && 'value' in now && isWebKits(now.value)) delete window.browser;
+    };
+    let freed = false;
+    const free = () => {
+      if (freed) return;
+      freed = true;
+      observer.disconnect();
+      const now = Object.getOwnPropertyDescriptor(window, 'browser');
+      if (now && now.get === slot.get) {
+        delete window.browser;
+        if (own !== undefined) window.browser = own;
+      }
+      dropWebKits();
+    };
+    const observer = new MutationObserver(free);
+    observer.observe(document, { childList: true, subtree: true });
+    setTimeout(free, 0);
+    document.addEventListener('DOMContentLoaded', dropWebKits, { once: true });
     return;
   }
   const runtime = window.browser && window.browser.runtime;

@@ -49,6 +49,9 @@
   Test: SiteAccessContentScriptTests.anOffSiteNeedsNoRestart
 - A web page, with or without extensions → no `browser` and no `chrome.runtime`, as in Chrome; content scripts and extension pages keep theirs.
   Test: PageBrowserGlobalTests.anOrdinaryPageHasNoBrowserWithNoExtensions
+- `'browser' in window` on a web page → false, as in Chrome and Safari, for its first script and after, in its frames too; a `browser` the page sets itself stays.
+  Test: PageBrowserGlobalTests.anOrdinaryPageHasNoBrowserWithNoExtensions
+  Test: PageBrowserGlobalTests.aTabsPageHasNoBrowser
 - A site an extension lists in `externally_connectable` → `chrome.runtime` with only `sendMessage`, `connect` and `lastError`, and WebKit's own `browser.runtime`; other sites get neither.
   Test: PageBrowserGlobalTests.onlyAListedSiteGetsChromesMessagingAndContentScriptsKeepTheirs
 - An extension asking for a site its site access doesn't cover (`permissions.request`) right after you used it → the more-access sheet asks; Allow grants it, Don't Allow or no recent use answers false.
