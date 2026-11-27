@@ -3,6 +3,7 @@
 ## Tabs and windows
 - ⌘T → the command bar opens for a new tab; ⌘T again closes it.
   Test: MenuShortcutsTests.commandTOpensTheNewTabBarAndAgainClosesIt
+  Test: EverydayFlowsTests.commandTThenCommandWGoesBackToTheTabYouWereOn
 - ⌘N → a new window; with no window open, the last closed one comes back instead.
   No test yet.
 - ⇧⌘N → a new private window.
@@ -11,6 +12,7 @@
   Test: MenuShortcutsTests.commandWClosesWhatIsUpFirstThenTheTab
 - ⇧⌘T → the most recently closed tab or window comes back, across all windows.
   Test: ReopenLastClosedTests.theLatestClosedComesBackFirst
+  Test: EverydayFlowsTests.shiftCommandTBringsBackAClosedWindow
 - ⌥⌘↓ / ⌥⌘↑ (or ⇧⌘] / ⇧⌘[) → next or previous row as the sidebar shows it, wrapping, staying in the space.
   Test: TabNavigationTests.goesDownTheSidebarAndWraps
 - ⌥⌘→ / ⌥⌘← → next or previous space, stopping at the ends.
@@ -29,14 +31,17 @@
 ## Page
 - ⌘L → the command bar opens over the address with the current URL selected; Return on it unchanged reloads.
   Test: MenuShortcutsTests.commandLSelectsTheAddressAndReturnUnchangedReloads
+  Test: EverydayFlowsTests.typingAnAddressAndReturnLoadsItInTheTab
 - ⌘R → reload. ⇧⌘R → reload ignoring the cache.
   Test: DeveloperToolTests.shiftCommandRReloadsIgnoringTheCache
 - ⌥⌘R → Reader on or off; on a loading page it waits, and ⌥⌘R again on that tab cancels the wait.
   Test: ReaderWaitTests.onlyTheSameTabCallsTheWaitOff
+  Test: EverydayFlowsTests.readerComesOnOverThePageAndGoesOff
 - ⌘[ / ⌘] (or ⌘← / ⌘→ when nothing is being edited) → back and forward.
   Test: MenuShortcutsTests.commandBracketsGoBackAndForward
 - ⌘F → the find bar; ⌘F again with its field focused hides it.
   Test: MenuShortcutsTests.commandFShowsTheFindBarAndAgainHidesIt
+  Test: EverydayFlowsTests.findInPageCountsWhatIsTyped
 - ⌘G / ⇧⌘G → next or previous match, opening the find bar if it's closed.
   Test: FindCountTests.findNextWithTheBarClosedStepsOnce
 - ⌘D → Pin Tab: pins the page to the end of the space's pinned pages without asking.

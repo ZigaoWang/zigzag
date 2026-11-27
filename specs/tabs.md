@@ -3,30 +3,39 @@
 ## Closing
 - ⌘W on a tab opened from another tab, before you switched tabs yourself → the next tab that opener opened, else the opener.
   Test: TabCloseSelectionTests.aLinkOpenedInFrontClosesBackToItsPage
+  Test: EverydayFlowsTests.aLinkOpenedInFrontClosesBackToItsPage
 - ⌘W on a tab you opened yourself (⌘T, New Tab), before you switched tabs → the tab you were on.
   Test: TabCloseSelectionTests.aNewTabClosesBackToTheTabYouWereOn
+  Test: EverydayFlowsTests.commandTThenCommandWGoesBackToTheTabYouWereOn
 - ⌘W on any other tab you switched to → the tab below, else the one above; never the one you used last.
   Test: TabCloseSelectionTests.closingGoesToTheTabBelowNotTheOneYouWereOnBefore
+  Test: EverydayFlowsTests.aLinkOpenedBehindThenClosedGoesToTheNext
 - ⌘W on a pinned tab or favorite → it unloads and stays; next time it opens fresh at its saved address.
   Test: TabCloseSelectionTests.closingAPinnedPageOrFavoriteUnloadsItAndKeepsIt
   Test: TabCloseSelectionTests.aClosedPinnedPageOrFavoriteStaysInTheSidebar
   Test: TabCloseSelectionTests.aClosedPinnedPageInAFolderOrSplitStaysInTheSidebar
   Test: PinnedGroupTests.aClosedPinStaysInAFoldedSectionUntilYouLeaveTheSpace
   Test: ShutFolderClosedPinTests.aClosedPageStaysUnderItsShutFolderUntilYouLeaveTheSpace
+  Test: EverydayFlowsTests.aClosedPinnedTabStaysWhereItShows
+  Test: EverydayFlowsTests.aClosedFavoriteStaysInFavorites
 - ⌘W on the last tab of a space → the space's most recent page, else the space shows empty.
   Test: TabCloseSelectionTests.closingTheLastTabGoesToTheSpacesRecentPageElseEmpty
+  Test: EverydayFlowsTests.closingTheLastTabOfASpace
 - Close a tab → its page is let go at once, so WebKit can end its process; ⇧⌘T loads it again with its history.
   Test: PageReleaseTests.aClosedTabLetsGoOfItsPageAndItself
 
 ## Reopening
 - ⇧⌘T → whatever closed last comes back, app-wide: a tab, a tab of a closed window, or a whole window.
   Test: ReopenLastClosedTests.theLatestClosedComesBackFirst
+  Test: EverydayFlowsTests.shiftCommandTBringsBackAClosedWindow
 - ⇧⌘T for a tab → back in its own window, at its old place, split and group.
   Test: ReopenLastClosedTests.aClosedTabComesBackIntoItsWindow
+  Test: EverydayFlowsTests.shiftCommandTBringsBackAClosedTabInItsPlace
 - ⇧⌘T for a tab of a closed window → it opens in the front window on its own.
   Test: ReopenLastClosedTests.aTabOfAClosedWindowComesBackOnItsOwn
 - ⇧⌘T after ⌘W on a pinned page or favorite → it loads again in its own row, at the page and history it had; opened from its row in between, it's back already and ⇧⌘T passes it over.
   Test: ReopenLastClosedTests.aClosedPinnedPageComesBackInItsPlace
+  Test: EverydayFlowsTests.shiftCommandTBringsBackAClosedPinnedTabInItsRow
 - ⇧⌘T in an everyday window → never a private tab; private windows reopen only their own.
   Test: ReopenLastClosedTests.aPrivateTabNeverComesBackInAnEverydayWindow
 
@@ -73,10 +82,12 @@
   Test: CommandClickedLinksTests.aDelinkedAnchorWithAScriptAddressStaysOff
 - ⇧-click or Open Link in Zigzag Mini → a Zigzag Mini centered over the window's page, in the page's space and profile.
   Test: MiniFromPageTests.itOpensOverTheWindowsPage
+  Test: EverydayFlowsTests.aLinkInMiniComesBackToTheWindowAsATab
 - The same from a private window → the Mini is private: its own store, never saved to History or brought back after an update.
   Test: MiniFromPageTests.aPrivateWindowsMiniIsPrivate
 - ⌘O in a Mini opened from a page → the same live page becomes a tab right after the one it came from.
   Test: MiniFromPageTests.openInZigzagPutsItRightAfterTheTabItCameFrom
+  Test: EverydayFlowsTests.aLinkInMiniComesBackToTheWindowAsATab
 - Settings › Zigzag Mini › Open ⇧-clicked links in the page off, as it starts → ⇧-click opens the standalone Zigzag Mini as above.
   Test: InPageMiniPolicyTests.theSettingIsOffUntilTurnedOn
   Test: InPageMiniHostTests.withTheSettingOffAShiftClickIsTheStandaloneMini
@@ -231,6 +242,8 @@
   Test: TouchMovesTests.theListScrollsNearItsEdgesFasterNearer
 - A finger and the mouse drag a row the same way: reorder, into a folder, a split, another space.
   Test: TouchMovesTests.theMouseAndAFingerDriveTheSameDrag
+  Test: EverydayFlowsTests.draggingARowReordersWhatTheSidebarShows
+  Test: EverydayFlowsTests.aFolderIsMadeOpenedShutAndTakesADraggedTab
 - Touch and hold one of several picked rows → they all lift; move, and they're carried together, as dragging them with the mouse does.
   Test: TouchMovesTests.holdingAPickedRowLiftsAndCarriesThemAll
 - Drag the sidebar's edge with a finger → it resizes as with the mouse; a finger takes the edge anywhere 22 points either side of it, its full height.
@@ -330,6 +343,7 @@
   Test: BookmarkFolderTests.aFlickHoveringAtTheCutoffTapsOnce
   Test: SwipeGestureTests.aSlowSwipeTapsOnceAtTheFullDistance
   Test: SwipeGestureTests.touchSwipesNeverTap
+  Test: EverydayFlowsTests.swipingBackShowsTheArrowTapsOnceAndGoesBack
 - A sideways gesture that starts where the page can scroll that way, or on a page that cancels its wheel events (a canvas, a map) → the page's for the whole gesture, even once it reaches its edge; only a new gesture there goes back. Mostly up and down, or turning sideways after starting up and down, is a scroll.
   Test: SwipeGestureTests.aSidewaysScrollerKeepsTheGestureUntilANewOneAtItsEdge
   Test: SwipeGestureTests.aPageThatCancelsWheelsNeverSwipes

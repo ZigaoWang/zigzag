@@ -5,10 +5,13 @@
   Test: SpaceDefaultColorsTests.defaultIsTheColorTheSpaceWasMadeWith
 - ⌃1–⌃9 → that space; a number with no space does nothing.
   Test: NumberHintsTests.spaceNumbersGoToTheirOwnSpaceAndNinthIsTheNinth
+  Test: EverydayFlowsTests.switchingSpacesByKeysShowsThatSpacesTabsAndSelection
 - ⌥⌘→ / ⌥⌘← → next or previous space, stopping at the ends.
   Test: MenuShortcutsTests.optionCommandArrowsGoThroughTheSpacesAndStopAtTheEnds
+  Test: EverydayFlowsTests.switchingSpacesByKeysShowsThatSpacesTabsAndSelection
 - Swipe sideways on the sidebar → the next space slides in with your fingers, its color blending in; calling it off goes back.
   Test: SpaceSwitchLookTests.aSwipeBlendsWithTheFingersAndCallingItOffGoesBack
+  Test: EverydayFlowsTests.swipingTheSidebarShowsTheNextSpace
 - Switch spaces → the window takes the new space's color before its page shows.
   Test: SpaceSwitchLookTests.aSwitchSaysTheSpaceBeforeThePage
 
@@ -77,6 +80,7 @@
   Test: TopBarTests.theSidebarsToggleIsInTheBarOnlyWhileTheSidebarIsHidden
 - Pointer at the sidebar's edge of the window while it's hidden → it slides out once, and back when you leave it.
   Test: SidebarEdgeRevealTests.runningOnPastTheEdgeAndComingBackBringsItOutOnce
+  Test: EverydayFlowsTests.theFloatingSidebarComesOutStaysForItsMenuAndGoesAfter
 - A menu opened from the sidebar while it's slid out (a row's, the +, a space's, a favorite's, the address's), its icon picker, or a row being renamed → it stays out with the pointer anywhere; once that's gone, it stays if the pointer is on it and slides back if not. The shorter floating sidebar and the screen-edge sidebar do the same.
   Test: SidebarMenuHoldTests.aRowMenuKeepsItOutWithThePointerAway
   Test: SidebarMenuHoldTests.closedWithThePointerAwayItGoesBack
@@ -84,5 +88,6 @@
   Test: SidebarMenuHoldTests.escAndAnItemChosenLetItGo
   Test: SidebarMenuHoldTests.anAppKitMenuFromItHoldsItUntilItEnds
   Test: SidebarMenuHoldTests.theShorterSidebarIsHeldTheSameWay
+  Test: EverydayFlowsTests.theFloatingSidebarComesOutStaysForItsMenuAndGoesAfter
 - Hover and press on sidebar rows and buttons → visible on every space color, white and black included, light and dark.
   Test: ContrastTokensTests.hoverShowsOnEverySpace

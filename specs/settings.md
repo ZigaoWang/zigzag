@@ -3,6 +3,7 @@
 ## Panes
 - Settings opened on one pane → only that pane's rows are made; another pane's are made the first time it's shown or searched.
   Test: SettingsLazyBuildTests.openingOnGeneralMakesNoRowsForTheOtherPanes
+  Test: EverydayFlowsTests.settingsOpensOnEachPane
 
 ## Boxes that fold
 - A folded box → its rows are made the first time it opens, or when a search has words they could match; a box with nothing inside has no chevron.

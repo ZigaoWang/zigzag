@@ -38,7 +38,7 @@
 
 ## Folders
 - New Folder in a space's menu, Add to New Folder on a pinned page, or New Folder Inside on a folder → a folder named New Folder, ready to rename.
-  No test yet.
+  Test: EverydayFlowsTests.aFolderIsMadeOpenedShutAndTakesADraggedTab
 - Open All in Tabs on a folder → every page in it and its subfolders opens as new tabs in list order, the first shown; past 10 it asks first; ⌘Z closes them.
   Test: FolderBulkTests.openAllOpensThePagesAsNewTabsInOrderAndUndoes
 - Expand All / Collapse All on a folder → it and every folder inside it; each is offered only when it would change something.
@@ -53,6 +53,7 @@
   Test: ShutFolderClosedPinTests.aClosedPageStaysUnderItsShutFolderUntilYouLeaveTheSpace
   Test: ShutFolderClosedPinTests.aClosedPageGoesWhenItsFolderIsOpenedAndShutAgain
   Test: ShutFolderClosedPinTests.anotherFolderOpenedOrShutKeepsTheClosedPage
+  Test: EverydayFlowsTests.aClosedPinnedTabStaysWhereItShows
 
 ## Importing from Arc
 - Arc's folders inside folders → the same tree in Pinned, in Arc's order with their names, shut; empty ones stay behind.
@@ -88,7 +89,7 @@
 
 ## Pinned tabs
 - ⌘W on a pinned tab → it unloads and stays pinned.
-  No test yet.
+  Test: EverydayFlowsTests.aClosedPinnedTabStaysWhereItShows
 - A pinned tab that wandered off its address → its menu leads with Back to Pinned Page, Set Current Page as Pinned and Separate from Pinned Tab.
   Test: SidebarRowMenuTests.aPinnedPageThatWanderedOffLeadsWithGoingBackOrKeepingIt
 - The × on a pinned tab that wandered off → it says Back to Pinned Page and goes back; a middle-click still unloads.
@@ -103,6 +104,7 @@
   Test: PinnedGroupTests.aClosedPinStaysInAFoldedSectionUntilYouLeaveTheSpace
   Test: PinnedGroupTests.aClosedPinInAFoldedSectionGoesWhenItsFoldedAgain
   Test: PinnedGroupTests.aClosedPinInAFolderStaysUnderItInAFoldedSection
+  Test: EverydayFlowsTests.aClosedPinnedTabStaysWhereItShows
 
 ## Private windows
 - Pin from a private window, any way in → nothing is pinned; Pin Link isn't in a link's menu there.

@@ -15,6 +15,7 @@
   Test: SplitCloseTests.aLinkDroppedOnThePageOpensATabNotASplit
 - Open in Split View in a tab's sidebar menu or the command bar → it opens on the right of the current page.
   Test: SplitCloseTests.openInSplitViewFromTheMenuOpensOnTheRight
+  Test: EverydayFlowsTests.splitViewOpensClosesOnePageAndSeparates
 - Drag a tab or pinned row over the page → the half or quarter it would take is shaded, with a card naming the page and where it opens, kept clear of the pointer; it fades away off the page.
   Test: SplitDragTests.theHintFadesAndNamesThePageComingIn
 - Touch and hold a tab, then drag it onto the page, across its menu or not → it opens there as with the mouse.
@@ -25,6 +26,7 @@
   Test: SplitDropTests.aSplitShowsInOneRow
 - Click × on the row → closes only the page of the part it sits in.
   Test: SplitCloseTests.theRowsCloseButtonClosesOnePart
+  Test: EverydayFlowsTests.splitViewOpensClosesOnePageAndSeparates
 - A split of two, three or four pages draws the same row in the tab list and among the pinned pages.
   Test: PinnedGroupTests.bothSectionsDrawTheSameRow
 - Middle-click the row → closes the page of the part under the pointer.
@@ -33,6 +35,7 @@
   Test: SplitCloseTests.theMenuOffersBoth
 - Separate Tabs (⌃⌘\), in the row's menu or the View menu → every page becomes its own tab and the selection stays.
   Test: SidebarRowMenuTests.aSplitLeadsWithSeparatingItAndEachPageGetsItsOwnMenu
+  Test: EverydayFlowsTests.splitViewOpensClosesOnePageAndSeparates
 - Remove from Split View on one page of three or four → only that page leaves; the rest close up.
   Test: SidebarRowMenuTests.onePageOfThreeCanLeaveTheRestSideBySide
 - ⌘Z after closing one page of a split → the split comes back on the same side at the same size.
@@ -99,5 +102,6 @@
 ## Closing and suspending one page
 - Close one page of a split of two (⌘W, or × on its strip or row part) → the one left takes the split row's place as a plain tab.
   Test: SplitCloseTests.closingTheLeftPageLeavesTheOtherInItsPlace
+  Test: EverydayFlowsTests.splitViewOpensClosesOnePageAndSeparates
 - Suspend Page on one page of a split → that page leaves the split and sleeps; the other stays shown.
   Test: SidebarRowMenuTests.onePageOfASplitSleepsAndTheOtherStaysShown
