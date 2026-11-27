@@ -8,6 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - Press and hold to open a menu, slide onto an item and let go to choose it, as in other Mac apps: right-press or hold a two-finger click on a tab, favorite, folder, space or the sidebar, or press a menu button like the sidebar's +, a … button or a dropdown, which now opens as the press goes down. Right-clicking the sidebar's Back or Forward in the title bar opens its list again.
 - ⌘T then ⌘W from a pinned page or a favorite goes back to it, as it does from a regular tab, instead of to a tab in the list.
+- ⇧⌘T on a pinned page you've unpinned since closing it brings it back where a new tab opens, instead of at the top of your tabs.
 - The sidebar from the screen edge no longer comes out with the AI Apps window's tabs after you showed that window; it's always one of your own windows'.
 - A page you're looking at beside the screen edge's sidebar, or in Zigzag Mini, no longer goes to sleep and leaves an empty page; one that sleeps anyway shows its name card.
 - Exporting from a web app that hands the file over through a hidden frame, like Feishu Docs' Download as Word, PDF or Markdown, saves the file again instead of doing nothing. A second export after another click goes through too, and a download Zigzag holds back always says so. With Ask before a site downloads files on, it asks first, as the page's own downloads do. ([#535](https://github.com/ZigaoWang/zigzag/issues/535))

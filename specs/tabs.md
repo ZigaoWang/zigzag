@@ -39,6 +39,8 @@
 - ⇧⌘T after ⌘W on a pinned page or favorite → it loads again in its own row, at the page and history it had; opened from its row in between, it's back already and ⇧⌘T passes it over.
   Test: ReopenLastClosedTests.aClosedPinnedPageComesBackInItsPlace
   Test: EverydayFlowsTests.shiftCommandTBringsBackAClosedPinnedTabInItsRow
+- ⇧⌘T for a pinned page or favorite removed since it closed → back as a tab where a new tab opens, as Settings › Tabs says.
+  Test: TabCloseSelectionTests.aClosedPinUnpinnedSinceReopensWhereANewTabWould
 - ⇧⌘T in an everyday window → never a private tab; private windows reopen only their own.
   Test: ReopenLastClosedTests.aPrivateTabNeverComesBackInAnEverydayWindow
 

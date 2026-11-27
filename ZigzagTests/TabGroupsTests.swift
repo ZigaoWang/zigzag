@@ -477,6 +477,28 @@ struct TabGroupRulesTests {
         }
     }
 
+    /// ⇧⌘T on a pinned page that was unpinned since it closed: back as a tab where a new tab opens, not at the top.
+    @Test func aClosedPinUnpinnedSinceReopensWhereANewTabWould() throws {
+        try inWindow(["A", "B", "C"]) { controller, tabs in
+            let manager = controller.tabManager
+            let pinned = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/reopen/pinned")!, title: "Pinned", to: space))
+            manager.openBookmark(pinned)
+            controller.closeTab(nil)
+            Library.shared.removeBookmark(pinned.id)
+            manager.select(tabs[1])
+            let back = try #require(manager.reopenClosedTab())
+            #expect(back.bookmarkID == nil && back.url == pinned.url)
+            #expect(manager.selectedTab === back)
+            // Where a new tab from B goes, as Settings › Tabs places it, read rather than set.
+            let at = try #require(manager.tabs(in: space).firstIndex { $0 === back })
+            if TabManager.newTabPlace != .top { #expect(at != 0) }
+            manager.close(back)
+            manager.select(tabs[1])
+            let probe = manager.newTab(url: nil, spaceID: space, select: true)
+            #expect(manager.tabs(in: space).firstIndex { $0 === probe } == at)
+        }
+    }
+
     /// ⌘W on the space's last tab goes to the page you were on before it in the space; with none, the space is empty.
     @Test func closingTheLastTabGoesToTheSpacesRecentPageElseEmpty() throws {
         try inWindow(["Last"]) { controller, tabs in

@@ -1803,7 +1803,9 @@ final class TabManager {
         closed.apply(to: tab)
         tab.host = host
         watch(tab)
-        let at = min(closed.index, tabs(in: space).count)
+        // A pinned page unpinned since it closed had no place in the list: it goes where a new tab would.
+        let at = closed.bookmarkID != nil ? newTabPlacement(in: space, opener: nil, select: select, site: closed.url).index
+            : min(closed.index, tabs(in: space).count)
         // The tabs that were under it and moved up a level when it closed go back under it, if they still follow it.
         // Its parent and those tabs may have closed and come back too (closing many at once, then ⌘Z): they're found
         // by the ids they have now.
