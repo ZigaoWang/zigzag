@@ -34,6 +34,9 @@
 - Quit and open again with On launch set to Continue where you left off → sites' session cookies come back with the tabs, before any page asks for anything (YouTube's theater mode, sign-ins that use them).
   Test: SessionCookiesTests.onlySessionCookiesComeBackAsTheyWere
   Test: SessionCookiesTests.theyreBackBeforeThePageAsksForAnything
+- The same again and again, or when WebKit doesn't say which network process holds the cookies → they come back each time: the kept ones stay until a newer save writes over them.
+  Test: SessionCookiesTests.theFileStaysUntilASaveReplacesIt
+  Test: SessionCookiesTests.aReadWithNoKnownNetworkProcessIsSaved
 - The same with Open a new window → they're gone, as before.
   Test: SessionCookiesTests.openANewWindowDropsThemUnread
 - A private window → none are kept.
