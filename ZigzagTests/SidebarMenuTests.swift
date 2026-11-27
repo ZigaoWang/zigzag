@@ -1341,6 +1341,30 @@ struct BackHoldEventTests {
         }
     }
 
+    /// A right-press on Back in the title bar's strip opens its list at once; slide onto a page and let go.
+    @Test func aRightPressOnTheSidebarsBackSlidesToAPage() async throws {
+        try await pages(["one", "two", "three"]) { urls in
+            try await inWindow(urls) { controller, tab in
+                let window = try #require(controller.window)
+                func right(_ type: NSEvent.EventType, at point: NSPoint) {
+                    window.sendEvent(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!)
+                }
+                right(.rightMouseDown, at: middle(of: controller.sidebar.backButton))
+                let menu = try #require(MenuPanel.current)
+                defer { menu.close(animated: false) }
+                #expect(menu.itemTitles == ["two", "one"])
+                right(.rightMouseDragged, at: menu.debugItemPoint(0))
+                right(.rightMouseDragged, at: menu.debugItemPoint(1))
+                #expect(menu.highlightedIndex == 1)
+                try await Task.sleep(for: .milliseconds(250))
+                right(.rightMouseUp, at: menu.debugItemPoint(1))
+                #expect(await until { tab.webView?.url == urls[0] && tab.webView?.isLoading == false })
+                #expect(MenuPanel.current == nil)
+            }
+        }
+    }
+
     @Test func aPlainClickOnTheSidebarsBackGoesOneStep() async throws {
         try await pages(["one", "two", "three"]) { urls in
             try await inWindow(urls) { controller, tab in
@@ -1352,6 +1376,322 @@ struct BackHoldEventTests {
                 #expect(await until { tab.webView?.url == urls[1] && tab.webView?.isLoading == false })
                 #expect(MenuPanel.current == nil)
             }
+        }
+    }
+}
+
+/// A press held into a drawn menu, slid onto an item and let go, as in every Mac menu: a right-press (a two-finger
+/// click held on the trackpad), a Control-press, or a press on a menu button.
+@MainActor
+struct MenuPressTests {
+    private final class Log {
+        var chosen: [String] = []
+        var clicks = 0
+    }
+
+    private func window() -> NSWindow {
+        let window = NSWindow(contentRect: NSRect(x: -6000, y: 200, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        return window
+    }
+
+    /// A window with a row whose right-click opens One, Two, a line, Off (dimmed) and More, with Inner in it.
+    private func host(_ log: Log) -> (NSWindow, InteractiveView) {
+        let window = window()
+        let row = InteractiveView(frame: NSRect(x: 100, y: 300, width: 200, height: 30))
+        row.drawsMenu = true
+        row.onClick = { _ in log.clicks += 1 }
+        row.onRightClick = { _ in
+            let menu = NSMenu()
+            menu.autoenablesItems = false
+            menu.addItem(SidebarMenus.Item("One") { log.chosen.append("One") })
+            menu.addItem(SidebarMenus.Item("Two") { log.chosen.append("Two") })
+            menu.addItem(.separator())
+            menu.addItem(SidebarMenus.Item("Off", enabled: false) { log.chosen.append("Off") })
+            let more = SidebarMenus.Item("More") {}
+            let inner = NSMenu()
+            inner.addItem(SidebarMenus.Item("Inner") { log.chosen.append("Inner") })
+            more.submenu = inner
+            menu.addItem(more)
+            return menu
+        }
+        window.contentView?.addSubview(row)
+        return (window, row)
+    }
+
+    private func mouse(_ type: NSEvent.EventType, at point: NSPoint, in window: NSWindow, flags: NSEvent.ModifierFlags = []) -> NSEvent {
+        NSEvent.mouseEvent(with: type, location: point, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                           windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+    }
+
+    private func middle(of view: NSView) -> NSPoint { view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil) }
+
+    /// Long enough held that letting go is a choice, not a click.
+    private func hold() async throws { try await Task.sleep(for: .milliseconds(250)) }
+
+    @Test func aRightPressSlidOntoAnItemAndLetGoChoosesIt() async throws {
+        let log = Log()
+        let (window, row) = host(log)
+        let start = middle(of: row)
+        row.rightMouseDown(with: mouse(.rightMouseDown, at: start, in: window))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        #expect(menu.anchor === row)
+        row.rightMouseDragged(with: mouse(.rightMouseDragged, at: NSPoint(x: start.x + 3, y: start.y - 8), in: window))
+        row.rightMouseDragged(with: mouse(.rightMouseDragged, at: menu.debugItemPoint(1), in: window))
+        // The item under the pointer lights while the press is down.
+        #expect(menu.highlightedIndex == 1)
+        try await hold()
+        row.rightMouseUp(with: mouse(.rightMouseUp, at: menu.debugItemPoint(1), in: window))
+        #expect(log.chosen == ["Two"])
+        #expect(log.clicks == 0)
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func aRightClickInPlaceLeavesTheMenuOpenToClick() async throws {
+        let log = Log()
+        let (window, row) = host(log)
+        let start = middle(of: row)
+        row.rightMouseDown(with: mouse(.rightMouseDown, at: start, in: window))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        try await hold()
+        row.rightMouseUp(with: mouse(.rightMouseUp, at: start, in: window))
+        #expect(MenuPanel.current === menu)
+        #expect(log.chosen.isEmpty && log.clicks == 0)
+    }
+
+    @Test func aQuickWobblyClickLeavesTheMenuOpen() throws {
+        let log = Log()
+        let (window, row) = host(log)
+        let start = middle(of: row)
+        row.rightMouseDown(with: mouse(.rightMouseDown, at: start, in: window))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        // Up at once, a few points down onto the first item: a click, not a choice.
+        row.rightMouseDragged(with: mouse(.rightMouseDragged, at: menu.debugItemPoint(0), in: window))
+        row.rightMouseUp(with: mouse(.rightMouseUp, at: menu.debugItemPoint(0), in: window))
+        #expect(MenuPanel.current === menu)
+        #expect(log.chosen.isEmpty)
+    }
+
+    @Test func lettingGoOnALineOrADimmedItemLeavesItOpenAndOutsideClosesIt() async throws {
+        for target in ["line", "dimmed", "outside"] {
+            let log = Log()
+            let (window, row) = host(log)
+            row.rightMouseDown(with: mouse(.rightMouseDown, at: middle(of: row), in: window))
+            let menu = try #require(MenuPanel.current)
+            defer { menu.close(animated: false) }
+            let frame = menu.convert(menu.bounds, to: nil)
+            let two = menu.debugItemPoint(1), off = menu.debugItemPoint(2)
+            let point = switch target {
+            case "line": NSPoint(x: two.x, y: (two.y + off.y) / 2)
+            case "dimmed": off
+            default: NSPoint(x: frame.maxX + 60, y: frame.midY)
+            }
+            row.rightMouseDragged(with: mouse(.rightMouseDragged, at: menu.debugItemPoint(0), in: window))
+            row.rightMouseDragged(with: mouse(.rightMouseDragged, at: point, in: window))
+            try await hold()
+            row.rightMouseUp(with: mouse(.rightMouseUp, at: point, in: window))
+            #expect(log.chosen.isEmpty, "\(target)")
+            if target == "outside" {
+                #expect(MenuPanel.current == nil, "\(target)")
+            } else {
+                #expect(MenuPanel.current === menu, "\(target)")
+            }
+        }
+    }
+
+    @Test func slidingOntoASubmenuOpensItAndLettingGoInItChooses() async throws {
+        let log = Log()
+        let (window, row) = host(log)
+        row.rightMouseDown(with: mouse(.rightMouseDown, at: middle(of: row), in: window))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        row.rightMouseDragged(with: mouse(.rightMouseDragged, at: menu.debugItemPoint(0), in: window))
+        row.rightMouseDragged(with: mouse(.rightMouseDragged, at: menu.debugItemPoint(3), in: window))
+        #expect(menu.highlightedIndex == 3)
+        try await Task.sleep(for: .milliseconds(400))
+        let sub = try #require(menu.openSubmenu)
+        #expect(sub.itemTitles == ["Inner"])
+        row.rightMouseDragged(with: mouse(.rightMouseDragged, at: sub.debugItemPoint(0), in: window))
+        #expect(sub.highlightedIndex == 0)
+        #expect(menu.highlightedIndex == 3)
+        row.rightMouseUp(with: mouse(.rightMouseUp, at: sub.debugItemPoint(0), in: window))
+        #expect(log.chosen == ["Inner"])
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func aControlPressSlidOntoAnItemChoosesItWithoutAClick() async throws {
+        let log = Log()
+        let (window, row) = host(log)
+        row.mouseDown(with: mouse(.leftMouseDown, at: middle(of: row), in: window, flags: .control))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        row.mouseDragged(with: mouse(.leftMouseDragged, at: menu.debugItemPoint(0), in: window, flags: .control))
+        #expect(menu.highlightedIndex == 0)
+        try await hold()
+        row.mouseUp(with: mouse(.leftMouseUp, at: menu.debugItemPoint(0), in: window, flags: .control))
+        #expect(log.chosen == ["One"])
+        #expect(log.clicks == 0)
+    }
+
+    /// The window server can keep a press's drags and release: the menu reads the pointer and the button instead.
+    @Test func aPressWhoseDragsNeverArriveStillChooses() async throws {
+        let saved = MenuPanel.pressPointer
+        defer { MenuPanel.pressPointer = saved }
+        let log = Log()
+        let (window, row) = host(log)
+        let start = middle(of: row)
+        var pointer = (location: window.convertPoint(toScreen: start), buttons: 2)
+        MenuPanel.pressPointer = { pointer }
+        row.rightMouseDown(with: mouse(.rightMouseDown, at: start, in: window))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        #expect(menu.debugFollowsPress)
+        pointer.location = window.convertPoint(toScreen: menu.debugItemPoint(1))
+        try await hold()
+        #expect(menu.highlightedIndex == 1)
+        pointer.buttons = 0
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(log.chosen == ["Two"])
+        #expect(MenuPanel.current == nil)
+        // The release that comes late goes nowhere.
+        row.rightMouseUp(with: mouse(.rightMouseUp, at: menu.debugItemPoint(1), in: window))
+        #expect(log.chosen == ["Two"] && log.clicks == 0)
+    }
+
+    /// A finger's hold has its own slide and lift (`TouchHold`); a press of the mouse doesn't take its menu.
+    @Test func aMenuAFingerOpensDoesntFollowAPress() throws {
+        let log = Log()
+        let (_, row) = host(log)
+        let hold = try #require(row.beginTouchHold(at: middle(of: row)))
+        hold.showMenu()
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        #expect(!menu.debugFollowsPress)
+    }
+
+    @Test func aDropdownPressedSlidAndLetGoChoosesOnce() async throws {
+        let window = window()
+        let dropdown = DropdownButton()
+        dropdown.options = ["Red", "Green", "Blue"].map { DropdownButton.Option(title: $0) }
+        dropdown.frame = NSRect(x: 200, y: 300, width: 160, height: Tokens.Page.controlHeight)
+        window.contentView?.addSubview(dropdown)
+        var picked: [Int] = []
+        dropdown.onSelect = { picked.append($0) }
+        dropdown.mouseDown(with: mouse(.leftMouseDown, at: middle(of: dropdown), in: window))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        dropdown.mouseDragged(with: mouse(.leftMouseDragged, at: menu.debugItemPoint(2), in: window))
+        #expect(menu.highlightedIndex == 2)
+        try await hold()
+        dropdown.mouseUp(with: mouse(.leftMouseUp, at: menu.debugItemPoint(2), in: window))
+        #expect(picked == [2])
+        #expect(dropdown.selectedIndex == 2)
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func aMenuButtonPressedSlidAndLetGoChoosesOnce() async throws {
+        let window = window()
+        let button = IconButton(symbol: "ellipsis", toolTip: "More")
+        button.frame = NSRect(x: 200, y: 300, width: 28, height: 28)
+        window.contentView?.addSubview(button)
+        var chosen: [String] = []
+        var opened = 0
+        button.clicksOnMouseDown = true
+        button.onClick = { _ in
+            opened += 1
+            MenuPanel.show(["Copy", "Paste"].map { title in .item(MenuPanel.Item(title: title) { chosen.append(title) }) }, from: button)
+        }
+        button.mouseDown(with: mouse(.leftMouseDown, at: middle(of: button), in: window))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        button.mouseDragged(with: mouse(.leftMouseDragged, at: menu.debugItemPoint(1), in: window))
+        #expect(menu.highlightedIndex == 1)
+        try await hold()
+        button.mouseUp(with: mouse(.leftMouseUp, at: menu.debugItemPoint(1), in: window))
+        #expect(chosen == ["Paste"])
+        #expect(opened == 1)
+        #expect(MenuPanel.current == nil)
+        #expect(!button.isPressed)
+    }
+
+    /// A window over a fresh manager with one blank tab; the library is restored after.
+    private func inWindow(_ body: (BrowserWindowController, NSWindow) async throws -> Void) async throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        manager.select(manager.newTab(url: URL(string: "about:blank"), spaceID: space))
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let window = try #require(controller.window)
+        // Off screen, out of the pointer's way, and in front of this process's other windows only.
+        if let top = NSApp.orderedWindows.first(where: { $0 !== window }) {
+            window.order(.above, relativeTo: top.windowNumber)
+        } else {
+            window.orderBack(nil)
+        }
+        window.setFrameOrigin(NSPoint(x: -6000, y: 200))
+        window.layoutIfNeeded()
+        try await body(controller, window)
+    }
+
+    private func enabledItem(after index: Int, in menu: MenuPanel) -> Int? {
+        menu.itemTitles.indices.first { $0 > index && menu.debugIsEnabled(menu.itemTitles[$0]) == true }
+    }
+
+    /// The sidebar's +, a pane's …, the address bar's buttons and the rest open their menu as the press goes down.
+    @Test func menuButtonsOpenOnThePress() async throws {
+        try await inWindow { controller, _ in
+            let sidebar = controller.sidebar
+            for button in [sidebar.newSpaceButton, sidebar.address.captureButton, sidebar.address.translateButton] {
+                #expect(button.clicksOnMouseDown)
+            }
+            for card in controller.root.paneCards { #expect(card.header.more.clicksOnMouseDown) }
+        }
+    }
+
+    @Test func aRightPressOnTheSidebarsEmptySpaceSlidesThroughItsMenu() async throws {
+        try await inWindow { controller, window in
+            let sidebar = controller.sidebar
+            let point = sidebar.convert(NSPoint(x: sidebar.bounds.midX, y: sidebar.bounds.maxY - 80), to: nil)
+            sidebar.rightMouseDown(with: mouse(.rightMouseDown, at: point, in: window))
+            let menu = try #require(MenuPanel.current)
+            defer { menu.close(animated: false) }
+            #expect(menu.anchor === sidebar)
+            let index = try #require(enabledItem(after: 0, in: menu))
+            sidebar.rightMouseDragged(with: mouse(.rightMouseDragged, at: menu.debugItemPoint(index), in: window))
+            #expect(menu.highlightedIndex == index)
+            let frame = menu.convert(menu.bounds, to: nil)
+            try await hold()
+            sidebar.rightMouseUp(with: mouse(.rightMouseUp, at: NSPoint(x: frame.maxX + 200, y: frame.midY), in: window))
+            #expect(MenuPanel.current == nil)
+        }
+    }
+
+    /// A tab row in a real window, through the window's own event path: the drags and the release reach the menu.
+    @Test func aTabRowsMenuFollowsAPressThroughTheWindow() async throws {
+        try await inWindow { controller, window in
+            controller.sidebar.list.reload(animated: false)
+            window.contentView?.layoutSubtreeIfNeeded()
+            let tab = try #require(controller.tabManager.selectedTab)
+            let row = try #require(controller.sidebar.list.tabRow(tab.id))
+            let start = row.convert(NSPoint(x: 20, y: row.bounds.midY), to: nil)
+            window.sendEvent(mouse(.rightMouseDown, at: start, in: window))
+            let menu = try #require(MenuPanel.current)
+            defer { menu.close(animated: false) }
+            #expect(menu.anchor === row)
+            window.sendEvent(mouse(.rightMouseDragged, at: menu.debugItemPoint(0), in: window))
+            let index = try #require(enabledItem(after: 0, in: menu))
+            window.sendEvent(mouse(.rightMouseDragged, at: menu.debugItemPoint(index), in: window))
+            #expect(menu.highlightedIndex == index)
+            let frame = menu.convert(menu.bounds, to: nil)
+            try await hold()
+            window.sendEvent(mouse(.rightMouseUp, at: NSPoint(x: frame.maxX + 100, y: frame.midY), in: window))
+            #expect(MenuPanel.current == nil)
         }
     }
 }
