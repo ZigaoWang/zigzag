@@ -15134,6 +15134,24 @@
           }
         }
       }
+    },
+    "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sommige instellingen zijn te groot voor iCloud en blijven op deze Mac. Al het andere wordt gesynchroniseerd."
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Wat niet in iCloud past, blijft alleen op deze Mac: %@ en sommige instellingen. Al het andere wordt gesynchroniseerd."
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Wat niet in iCloud past, blijft alleen op deze Mac: %@. Al het andere wordt gesynchroniseerd."
+      }
     }
   },
   "InfoPlist": {

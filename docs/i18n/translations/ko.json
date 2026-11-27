@@ -14804,6 +14804,24 @@
           }
         }
       }
+    },
+    "Some settings are too big for iCloud, so they stay on this Mac. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "일부 설정은 iCloud에 비해 너무 커서 이 Mac에 남습니다. 나머지는 모두 동기화됩니다."
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@, and some settings. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud에 비해 너무 커서 이 Mac에만 남는 항목: %@ 및 일부 설정. 나머지는 모두 동기화됩니다."
+      }
+    },
+    "Too big for iCloud, so kept on this Mac only: %@. Everything else syncs.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud에 비해 너무 커서 이 Mac에만 남는 항목: %@. 나머지는 모두 동기화됩니다."
+      }
     }
   },
   "InfoPlist": {
