@@ -1339,6 +1339,40 @@ extension SyncLibrary {
         #expect(b.library.settings["ReaderSize"] == .int(20))
     }
 
+    @Test func aPreferenceThatStaysHereIsNeverRemovedElsewhere() throws {
+        func sites(_ n: Int, _ tag: String) -> SettingValue { .array((0..<n).map { .string("\(tag)-\($0)-with-a-long-name.example.com") }) }
+        // Four under the total cap together, synced to B.
+        let four: [String: SettingValue] = ["DarkPagesOnSites": sites(3_800, "dark"), "ZoomLevels": .dictionary(["z.example": .double(1.25)]),
+                                            "SiteIcons": .dictionary(Dictionary(uniqueKeysWithValues: (0..<3_300).map { ("site-\($0)-with-a-long-name.example.com", SettingValue.string("star")) })),
+                                            "CookieBannersHandledSites": sites(3_800, "banner"), "TranslateNeverSites": sites(3_800, "never")]
+        for value in four.values { #expect(!SyncPreferences.isTooBig(value)) }
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal")], settings: four))
+        a.sync()
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal")]), clock: a.clock)
+        b.sync(); a.sync()
+        for (key, value) in four { #expect(b.library.settings[key] == value, "\(key)") }
+        #expect(a.session.tooBig.settings.isEmpty)
+        // A adds one more and goes over: what's new here stays here, and what iCloud has stays in iCloud and on B.
+        a.edit { $0.settings["JavaScriptOffSites"] = sites(2_200, "scripts") }
+        a.sync(); b.sync(); a.sync(); b.sync()
+        #expect(a.session.tooBig.settings == ["JavaScriptOffSites"])
+        for (key, value) in four { #expect(b.library.settings[key] == value, "\(key)") }
+        #expect(b.library.settings["JavaScriptOffSites"] == nil)
+        guard case .settings(let record)? = cloud.remote(SyncName.settings).map({ SyncBody.decode(type: $0.type, payload: $0.payload) }) else { Issue.record("no settings"); return }
+        #expect(record.values.values.allSatisfy { $0.value != nil }, "\(record.values.filter { $0.value.value == nil }.keys.sorted())")
+        // Settled: nothing goes up again and again.
+        let sentA = a.sent, sentB = b.sent
+        a.sync(); b.sync(); a.sync(); b.sync()
+        #expect(a.sent == sentA && b.sent == sentB)
+        // A B with its own value of the one that stays on A keeps it, and A keeps its own.
+        b.edit { $0.settings["JavaScriptOffSites"] = .array([.string("b.example")]) }
+        b.sync(); a.sync(); b.sync(); a.sync()
+        #expect(b.library.settings["JavaScriptOffSites"] == .array([.string("b.example")]))
+        #expect(a.library.settings["JavaScriptOffSites"] == sites(2_200, "scripts"))
+        for (key, value) in four { #expect(b.library.settings[key] == value && a.library.settings[key] == value, "\(key)") }
+    }
+
     @Test func aRemovalsRecordTooBigKeepsItsNewestNotes() throws {
         let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
         // Thousands removed lately, more than one record holds.
