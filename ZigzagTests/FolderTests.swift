@@ -551,6 +551,8 @@ struct ShutFolderClosedPinTests {
         let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/shut/kept")!, title: "Kept", to: space))
         let folder = try #require(Library.shared.addFolder(named: "Shut", with: [pin.id], in: space))
         Library.shared.setFolderOpen(folder.id, false)
+        // The pointer on the sidebar, where a closed page's row is held.
+        controller.sidebar.list.debugHover(true)
         try body(controller, pin, folder)
     }
 
@@ -600,6 +602,18 @@ struct ShutFolderClosedPinTests {
             try openAndClose(controller, pin, folder, byButton: false)
             controller.setAllFoldersOpen(in: space, true)
             controller.setAllFoldersOpen(in: space, false)
+            #expect(pinRow(controller, pin.id) == nil)
+        }
+    }
+
+    /// The held row goes once the pointer leaves the sidebar (#576).
+    @Test func aClosedPageGoesOnceThePointerLeaves() throws {
+        try inWindow { controller, pin, folder in
+            try openAndClose(controller, pin, folder, byButton: true)
+            let event = try #require(NSEvent.enterExitEvent(with: .mouseExited, location: .zero, modifierFlags: [], timestamp: 0,
+                                                            windowNumber: controller.window?.windowNumber ?? 0, context: nil,
+                                                            eventNumber: 0, trackingNumber: 0, userData: nil))
+            controller.sidebar.list.mouseExited(with: event)
             #expect(pinRow(controller, pin.id) == nil)
         }
     }

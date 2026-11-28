@@ -352,6 +352,7 @@ import Testing
             let manager = controller.tabManager
             manager.bookmarkTab(tabs[0], in: space)
             manager.bookmarkTab(tabs[1], in: space)
+            tabs.forEach { $0.ensureWebView() }
             let open = try #require(tabs[0].bookmarkID), loose = try #require(tabs[1].bookmarkID)
             @MainActor func closed(_ title: String) throws -> UUID {
                 try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/\(title)")!, title: title, to: space)).id
@@ -398,6 +399,7 @@ import Testing
         for byButton in [false, true] {
             try inFoldedWindow(["Tab"]) { controller, _, space in
                 let manager = controller.tabManager
+                controller.sidebar.list.debugHover(true)
                 let other = Library.shared.addSpace(name: "Other").id
                 let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/folded/kept")!, title: "Kept", to: space))
                 #expect(pinRow(controller, pin.id) == nil)
@@ -420,6 +422,7 @@ import Testing
         try inFoldedWindow(["Tab"]) { controller, _, space in
             let manager = controller.tabManager
             let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/folded/refold")!, title: "Refold", to: space))
+            controller.sidebar.list.debugHover(true)
             manager.openBookmark(pin)
             controller.closeTab(nil)
             #expect(pinRow(controller, pin.id) != nil)
@@ -438,6 +441,7 @@ import Testing
             let manager = controller.tabManager
             let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/folded/filed")!, title: "Filed", to: space))
             let folder = try #require(Library.shared.addFolder(named: "Folder", with: [pin.id], in: space))
+            controller.sidebar.list.debugHover(true)
             manager.openBookmark(pin)
             controller.closeTab(nil)
             let rows = pinnedItems(controller)
@@ -451,6 +455,68 @@ import Testing
                                                          eventNumber: 0, clickCount: 1, pressure: 1)))
             #expect(manager.selectedTab === manager.bookmarkTab(for: pin.id))
             #expect(pinnedItems(controller).filter { $0 == .bookmark(pin.id) }.count == 1)
+        }
+    }
+
+    /// The pointer leaves the list, as the mouse does.
+    private func pointerLeaves(_ controller: BrowserWindowController) throws {
+        let event = try #require(NSEvent.enterExitEvent(with: .mouseExited, location: .zero, modifierFlags: [], timestamp: 0,
+                                                        windowNumber: controller.window?.windowNumber ?? 0, context: nil,
+                                                        eventNumber: 0, trackingNumber: 0, userData: nil))
+        controller.sidebar.list.mouseExited(with: event)
+    }
+
+    /// Folded, a pin closed under the pointer keeps its row only until the pointer leaves the list (#576).
+    @Test func aClosedPinGoesFromAFoldedSectionOnceThePointerLeaves() throws {
+        for byButton in [false, true] {
+            try inFoldedWindow(["Tab"]) { controller, _, space in
+                let manager = controller.tabManager
+                let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/folded/leave")!, title: "Leave", to: space))
+                controller.sidebar.list.debugHover(true)
+                manager.openBookmark(pin)
+                if byButton { try #require(pinRow(controller, pin.id)).onClose?() } else { controller.closeTab(nil) }
+                let row = try #require(pinRow(controller, pin.id), "byButton=\(byButton)")
+                #expect(row.isUnloaded)
+                try pointerLeaves(controller)
+                #expect(pinRow(controller, pin.id) == nil, "byButton=\(byButton)")
+                // Back over the list, it doesn't come back.
+                controller.sidebar.list.debugHover(true)
+                #expect(pinRow(controller, pin.id) == nil, "byButton=\(byButton)")
+            }
+        }
+    }
+
+    /// Folded, ⌘W on a pin with the pointer away from the list: its row goes at once (#576).
+    @Test func aPinClosedWithThePointerAwayGoesAtOnce() throws {
+        try inFoldedWindow(["Tab"]) { controller, _, space in
+            let pin = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/folded/away")!, title: "Away", to: space))
+            controller.tabManager.openBookmark(pin)
+            #expect(pinRow(controller, pin.id) != nil)
+            controller.closeTab(nil)
+            #expect(pinRow(controller, pin.id) == nil)
+        }
+    }
+
+    /// Folded, a pinned page shows only while it's open: one not loaded since a relaunch doesn't, nor one asleep (#576).
+    @Test func aFoldedSectionShowsNoPinThatIsntLoaded() throws {
+        try inFoldedWindow(["0", "1"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.select(tabs[0])
+            manager.bookmarkTab(tabs[1], in: space)
+            let pin = try #require(tabs[1].bookmarkID)
+            // As it comes back after a relaunch.
+            tabs[1].isRestored = true
+            #expect(!tabs[1].isLoaded)
+            #expect(!pinnedItems(controller).contains(.bookmark(pin)))
+            tabs[1].ensureWebView()
+            #expect(pinnedItems(controller).contains(.bookmark(pin)))
+            #expect(SidebarListView.isRunning(tabs[1]))
+            // Put to sleep, it no longer counts as open.
+            let sleeper = Tab(url: nil, title: "Asleep", spaceID: space)
+            sleeper.ensureWebView()
+            sleeper.suspend(because: "test")
+            #expect(sleeper.isAsleep && !SidebarListView.isRunning(sleeper))
+            sleeper.close()
         }
     }
 

@@ -45,12 +45,13 @@
   Test: ArcFolderTests.expandAndCollapseAllReachEveryLevel
 - Collapse All Folders / Expand All Folders in a space's menu → all of that space's folders at once.
   Test: FolderBulkTests.aSpacesFoldersFoldAtOnceWithTheMenuOfferingOnlyWhatChanges
-- A shut folder → it still shows the page you're on and its pages opened since it was shut, never the ones open when you shut it.
+- A shut folder → it still shows the page you're on and its pages opened since it was shut that are still open, never the ones open when you shut it.
   Test: ShutFolderRowsTests.thePageYouAreOnStillShows
   Test: ShutFolderRowsTests.aPageOpenedSinceItWasShutShows
   Test: ShutFolderRowsTests.shuttingHidesThePagesOpenThen
-- ⌘W or the × on a page shown under a shut folder → its row stays there, unloaded. It goes once you switch to another space, open or shut that folder again (Expand All and Collapse All too) or relaunch.
+- ⌘W or the × on a page shown under a shut folder, the pointer on the sidebar → its row stays there, unloaded, until the pointer leaves the sidebar; it goes sooner if you switch to another space or open or shut that folder again (Expand All and Collapse All too). With the pointer away, it goes at once.
   Test: ShutFolderClosedPinTests.aClosedPageStaysUnderItsShutFolderUntilYouLeaveTheSpace
+  Test: ShutFolderClosedPinTests.aClosedPageGoesOnceThePointerLeaves
   Test: ShutFolderClosedPinTests.aClosedPageGoesWhenItsFolderIsOpenedAndShutAgain
   Test: ShutFolderClosedPinTests.anotherFolderOpenedOrShutKeepsTheClosedPage
   Test: EverydayFlowsTests.aClosedPinnedTabStaysWhereItShows
@@ -101,9 +102,12 @@
   No test yet.
 - Unpin a page of a pinned group → the whole group comes back as a group of tabs.
   Test: PinnedGroupTests.pinningAGroupOfTabsKeepsItWholeAsOneFolder
-- The pinned section folded with the chevron by the space's name → only the pinned pages that are open and the page you're on show, each under the folders on its way.
+- The pinned section folded with the chevron by the space's name → only the pinned pages that are open and the page you're on show, each under the folders on its way; one asleep or not loaded since Zigzag reopened doesn't.
   Test: PinnedGroupTests.foldedPinsShowOpenPagesUnderTheirFolders
-- ⌘W or the × on a pinned page in a folded section → its row stays, unloaded, under its folders; a click opens it in place. It goes once you switch to another space, fold the section again or relaunch.
+  Test: PinnedGroupTests.aFoldedSectionShowsNoPinThatIsntLoaded
+- ⌘W or the × on a pinned page in a folded section, the pointer on the sidebar → its row stays, unloaded, under its folders, until the pointer leaves the sidebar, so nothing moves under it; a click opens it in place. It goes sooner if you switch to another space or fold the section again. With the pointer away, it goes at once.
+  Test: PinnedGroupTests.aClosedPinGoesFromAFoldedSectionOnceThePointerLeaves
+  Test: PinnedGroupTests.aPinClosedWithThePointerAwayGoesAtOnce
   Test: PinnedGroupTests.aClosedPinStaysInAFoldedSectionUntilYouLeaveTheSpace
   Test: PinnedGroupTests.aClosedPinInAFoldedSectionGoesWhenItsFoldedAgain
   Test: PinnedGroupTests.aClosedPinInAFolderStaysUnderItInAFoldedSection

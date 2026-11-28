@@ -320,6 +320,8 @@ import WebKit
                 Library.shared.setFolderOpen(folder!.id, place != .shutFolder)
             }
             SidebarListView.debugCollapsed = place == .foldedSection || place == .foldedInFolder ? [space.uuidString] : []
+            // The pointer on the sidebar: a folded or shut row closed under it stays until it leaves.
+            controller.sidebar.list.debugHover(true)
             controller.sidebar.list.reload(animated: false)
             controller.listOpenBookmark(mark)
             let page = try #require(controller.tabManager.bookmarkTab(for: mark.id))

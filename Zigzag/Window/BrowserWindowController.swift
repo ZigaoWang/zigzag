@@ -3844,28 +3844,28 @@ extension BrowserWindowController: SidebarDelegate {
         let folders = Library.shared.spaces.first { $0.folders?.contains { $0.id == id } == true }?.folders ?? []
         let pages = open ? [] : folders.pages(in: id)
         let tucking = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
-        forgetClosedPins(folders.pages(in: id))
+        forgetHeldPins(folders.pages(in: id))
         Library.shared.setFolderOpen(id, open, tucking: tucking)
     }
     /// Expand All / Collapse All for a folder and its subfolders (#343).
     func setFolderTreeOpen(_ id: UUID, _ open: Bool) {
         let pages = open ? [] : Library.shared.allBookmarkIDs(inFolder: id)
         let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
-        forgetClosedPins(Library.shared.allBookmarkIDs(inFolder: id))
+        forgetHeldPins(Library.shared.allBookmarkIDs(inFolder: id))
         Library.shared.setFolderTreeOpen(id, open, shown: Set(shown))
     }
     /// Collapse All Folders / Expand All Folders for a space's pinned folders (#343).
     func setAllFoldersOpen(in spaceID: UUID, _ open: Bool) {
         let pages = open ? [] : Library.shared.bookmarks(in: spaceID).map(\.id)
         let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
-        forgetClosedPins(Library.shared.bookmarks(in: spaceID).map(\.id))
+        forgetHeldPins(Library.shared.bookmarks(in: spaceID).map(\.id))
         Library.shared.setAllFoldersOpen(in: spaceID, open, shown: Set(shown))
     }
-    /// A folder opened or shut: the closed pages it kept listed go, in every window.
-    private func forgetClosedPins(_ ids: some Sequence<UUID>) {
+    /// A folder opened or shut: the rows it held for pages closed under the pointer go, in every window.
+    private func forgetHeldPins(_ ids: some Sequence<UUID>) {
         let ids = Array(ids)
-        tabManager.forgetClosedPins(ids)
-        for controller in WindowManager.shared.controllers where controller !== self { controller.tabManager.forgetClosedPins(ids) }
+        bothSidebars { $0.list.forgetHeldPins(ids) }
+        for controller in WindowManager.shared.controllers where controller !== self { controller.bothSidebars { $0.list.forgetHeldPins(ids) } }
     }
     /// Whether any of the space's pinned folders is open (or shut, for `open` false).
     static func hasFolders(in spaceID: UUID, isOpen open: Bool) -> Bool {
@@ -4704,14 +4704,14 @@ enum HandoffPage: Equatable {
 // MARK: - Pinned tabs as tiles (#539)
 
 extension BrowserWindowController {
-    /// The space's pinned tiles as shown: folded, only open ones and the page you're on, as rows would be.
+    /// The space's pinned tiles as shown: folded, only open ones (not asleep or waiting since a relaunch) and the page you're on, as rows would be.
     var shownPinnedTiles: [(Bookmark, partners: [Bookmark])] {
         guard SidebarView.pinnedTabsAsTiles else { return [] }
         let space = tabManager.currentSpaceID
         let tiles = Library.shared.pinnedTiles(in: space)
         guard SidebarListView.isCollapsed(space) else { return tiles }
         let current = tabManager.selectedTab?.bookmarkID
-        return tiles.filter { tile in ([tile.0] + tile.partners).contains { $0.id == current || tabManager.bookmarkTab(for: $0.id) != nil } }
+        return tiles.filter { tile in ([tile.0] + tile.partners).contains { $0.id == current || tabManager.bookmarkTab(for: $0.id).map(SidebarListView.isRunning) == true } }
     }
 
     func reloadPinnedTiles() {
