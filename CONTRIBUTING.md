@@ -33,6 +33,18 @@ TEST_RUNNER_ZIGZAG_TEST_VAULT=memory xcodebuild test -project Zigzag.xcodeproj -
 
 `scripts/test.sh` runs the same tests split across six test processes, in about a minute; `--only Suite` runs one suite.
 
+GitHub Actions runs the tests on every pull request and every push to `main` and the release branches
+(`.github/workflows/test.yml`): it builds Zigzag with Xcode 27 on GitHub's macOS runner, signed ad hoc, and runs
+`scripts/test.sh`, leaving out the few suites listed there that need a real development profile. If it fails,
+the run's test logs are attached to it. A second job runs `scripts/check-strings.py` and
+`scripts/check-strings.py --notes Unreleased`; on a pull request it only warns, since the maintainers fill in
+translations. To check the same on your Mac:
+
+```sh
+scripts/test.sh
+python3 scripts/check-strings.py --notes Unreleased
+```
+
 The tests run inside a Debug build of Zigzag. `ZIGZAG_TEST_VAULT=memory`, which xcodebuild passes on through its
 `TEST_RUNNER_` prefix, gives that build a password vault held in memory for the run, so it never reads, writes or
 asks for passwords in your keychain. It works the same when you launch a Debug build by hand.
@@ -114,7 +126,7 @@ same points and issue links. [docs/i18n/README.md](docs/i18n/README.md) says whe
 - **Small, focused pull requests**: one feature or fix each, so it can be reviewed and tried in the app. A pull
   request that changes a lot at once, or moves code around while changing it, is hard to review and slow to land;
   split it up, and talk big changes through in an issue before you start.
-- Don't add CI workflows or other files under `.github/workflows`.
+- Don't add or change files under `.github/workflows`; the maintainers look after CI.
 - Write `Fixes #N` in the pull request so the issue closes with it.
 - Every change people will notice gets a line under `## [Unreleased]`, in `### New` or `### Fixed`, in
   [CHANGELOG.md](CHANGELOG.md), in English. End the line with the issue link, and separate several with ", ":
