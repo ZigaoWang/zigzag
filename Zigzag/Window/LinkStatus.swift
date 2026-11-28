@@ -1,20 +1,33 @@
 import AppKit
 
 /// Where a link goes, shown in the page's bottom-left corner while you hover it.
+///
+/// The pill sits where a page's own links may be: at the bottom-left, a big button a site could put there. It never
+/// takes a press — a click goes through it to the page, and so does the pointer hovering a link under it (#592) — and
+/// while the pointer is over it, it steps aside so the link under it reads.
 final class LinkStatusController {
     private weak var overlay: NSView?
-    private let pill = FloatingPanelView()
+    private let pill = LinkStatusPill()
     private let label = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let hideDebouncer = Debouncer(delay: 0.15)
     private var visible = false
+    /// Where the pointer is over the pill, as its tracking area last said. Kept here so the fade can be worked out
+    /// without a window, and so it holds while the link under the pointer changes.
+    private(set) var pointerOver = false
     /// From the capsule's ends to the text: about half its height, so the round ends never crowd a letter.
     private static let padding = Tokens.Metric.linkStatusHeight / 2 - 2
+
+    /// How far the pill steps back while the pointer is over it: enough that the link under it reads through, still
+    /// there so the address can be read by moving off it. It's the one fade the pass-through pairs with: it never
+    /// dims without letting the click through, since the pill can't take one at all.
+    static let steppedAside: CGFloat = 0.25
 
     init(overlay: NSView) {
         self.overlay = overlay
         pill.radius = Tokens.Metric.linkStatusHeight / 2
         pill.addSubview(label)
         label.lineBreakMode = .byTruncatingMiddle
+        pill.onPointerChange = { [weak self] over in self?.pointerMoved(over: over) }
         pill.onLayout = { [weak self] in
             guard let self else { return }
             let h = self.label.lineHeight
@@ -54,12 +67,34 @@ final class LinkStatusController {
             // Pointing from link to link many times a minute: it's simply there, and caught while fading, it's back.
             pill.present(arrival: .instant)
         }
+        // The pointer can stay put over the pill while the link under it changes: it must stay stepped aside, not
+        // flash back whole on every move of the link.
+        applyStepAside()
     }
 
     func hide() {
         guard visible else { return }
         visible = false
+        pointerOver = false
         pill.dismiss()
+    }
+
+    /// The pointer is over the pill (`over`), or has left it. The pill fades back so the link under it reads, and
+    /// comes back whole when the pointer is off it. The pill's tracking area calls it as the pointer moves; the tests
+    /// call it directly.
+    func pointerMoved(over: Bool) {
+        guard visible else { return }
+        pointerOver = over
+        applyStepAside()
+    }
+
+    /// Puts the pill where the pointer says it should be: stepped aside under the pointer, whole otherwise.
+    private func applyStepAside() {
+        let alpha = pointerOver ? Self.steppedAside : 1
+        guard pill.alphaValue != alpha else { return }
+        Tokens.Motion.animate(Tokens.Motion.change) { [weak self] in
+            self?.pill.animator().alphaValue = alpha
+        }
     }
 
     /// The whole address, so you know where a link goes before you click it, without the noise: no "https://", no
@@ -78,5 +113,38 @@ final class LinkStatusController {
         if text.hasSuffix("/") { text.removeLast() }
         guard let end = text.firstIndex(where: { "/?#".contains($0) }) else { return text }
         return String(text[..<end]) + AddressText.readable(String(text[end...]))
+    }
+}
+
+/// The link address pill's own view. It never takes a press: a click on it goes through to the page under it, where a
+/// link may be (#592). That's why it's this instead of a bare `FloatingPanelView`, which real panels need to keep
+/// their presses.
+///
+/// A tracking area still hears the pointer come and go even though `hitTest` answers nothing: AppKit works out
+/// tracking areas from where the pointer is, not from what would take a press. So the pill can step aside while it's
+/// under the pointer, and come back as the pointer leaves.
+final class LinkStatusPill: FloatingPanelView {
+    /// The pointer came over the pill (`true`) or left it (`false`).
+    var onPointerChange: ((Bool) -> Void)?
+    private var pointerArea: NSTrackingArea?
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let pointerArea { removeTrackingArea(pointerArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        pointerArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onPointerChange?(true)
+        super.mouseEntered(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onPointerChange?(false)
+        super.mouseExited(with: event)
     }
 }

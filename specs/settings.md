@@ -37,6 +37,13 @@
 ## Appearance
 - Show link address on hover, on by default → pointing at a link shows where it goes in the page's bottom-left corner: in browser windows, Zigzag Mini, web apps and the tab overview.
   Test: AppearanceSwitchesTests.theLinkAddressShowsUntilTurnedOff
+- The link address never takes a click meant for the link under it → the pill is not part of hit testing, so the press reaches the page and the link opens, and hovering that link still reports it, in every window that shows the pill.
+  Test: LinkStatusHitTests.aPressOnThePillReachesThePageUnderIt
+  Test: LinkStatusHitTests.whereThePillStepsAsideThePressStillReachesThePage
+- The pointer over the link address → the pill steps aside, faded back to a quarter, so the link under it reads and shows through; off it, or with the link under it changed, it comes back whole. The fade and the pass-through are one behaviour: it never fades while still taking the click.
+  Test: LinkStatusHitTests.thePillStepsAsideWhileThePointerIsOverIt
+  Test: LinkStatusHitTests.aStepAsideHoldsWhileThePointerStaysOnIt
+  Test: LinkStatusHitTests.aPillPutAwayComesBackWhole
 - Show link address on hover off → nothing shows in that corner while pointing at a link; the choice is kept.
   Test: AppearanceSwitchesTests.offNoLinkAddressShowsAndTheChoiceIsKept
 - Shorter floating sidebar, off by default → the sidebar that comes out over the page while hidden runs the window's height, a frame's inset from its edges.
