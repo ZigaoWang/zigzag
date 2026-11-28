@@ -57,7 +57,7 @@ enum SyncPreferences {
         "PictureInPictureFollowsTabs", "PictureInPictureWhenLeaving", "FullScreenFills", "SwipeBetweenPages", "OffersToPinWanderedPage",
         "InPageMini", "ShortcutOverrides",
         // Search
-        "SearchSuggestions", "CustomSearchTemplate", "pdfTwoPages",
+        "SearchSuggestions", "CustomSearchTemplate", "SiteSearches", "pdfTwoPages",
         // Privacy
         "BlockAdsAndTrackers", "AdsAllowedSites", "ProtectsIPFromWebRTC", "JavaScriptAllowed", "JavaScriptOffSites",
         "CookieBanners", "CookieBannersHandledSites", "CookieBannersLeftSites",

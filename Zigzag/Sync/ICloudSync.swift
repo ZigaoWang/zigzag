@@ -1070,6 +1070,7 @@ enum SyncedPreferenceEffects {
         Effect(keys: ["ShortcutOverrides"]) { _, _ in Shortcuts.reapply() },
         Effect(keys: ["TranslateAlways", "TranslateNever", "TranslateNeverSites"]) { _, _ in PageTranslator.choicesChanged.send() },
         Effect(keys: ["SiteIcons"]) { _, _ in SiteIcons.refreshTabs() },
+        Effect(keys: [SiteSearches.key]) { _, _ in SiteSearches.changed.send() },
         Effect(keys: ["DeveloperTools", "DeveloperToolsInBar", "DevelopmentSites", "DeveloperPageSizes"]) { _, _ in DeveloperTools.changed.send() },
         // Compatibility mode, zaps and styles: extensions and the content blocker are told, and open pages of each site
         // that changed get its zaps and style again.

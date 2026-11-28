@@ -180,7 +180,7 @@ struct ZigzagBackup: Codable {
         // Tabs and windows
         "ControlTabOrder", "VimKeys", "NestsOpenedLinks", "WindowsShareTabs", "ArchiveTabsAfter", "SleepsBusyTabs", "NewTabPlace", "NewTabPlaceOtherwise",
         "PictureInPictureFollowsTabs", "PictureInPictureWhenLeaving", "FullScreenFills", "SwipeBetweenPages", "OffersToPinWanderedPage",
-        "CommandBarPosition", "InPageMini", "ShortcutOverrides", "SearchSuggestions", "CustomSearchTemplate", "pdfTwoPages",
+        "CommandBarPosition", "InPageMini", "ShortcutOverrides", "SearchSuggestions", "CustomSearchTemplate", "SiteSearches", "pdfTwoPages",
         // Privacy
         "BlockAdsAndTrackers", "AdsAllowedSites", "ProtectsIPFromWebRTC", "JavaScriptAllowed", "JavaScriptOnSites", "JavaScriptOffSites",
         "CookieBanners", "CookieBannersHandledSites", "CookieBannersLeftSites", "SiteAsksBeforeDownloads",
