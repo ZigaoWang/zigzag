@@ -15,6 +15,25 @@
 - Feature Flags in Settings › Developer → a box for each kind (Stable, Preview and the rest), headed by how many flags it has, folded when it has more than three; its own search opens the boxes to the flags that match.
   No test yet.
 
+## Search
+- Settings › Search › Site Search → the sites you added, each with its keyword, switch, Edit and Delete, then Zigzag's own sites in one box headed by how many, each with its keyword and switch.
+  Test: SiteSearchTests.settingsListsYourSitesThenZigzagsOwn
+- Add Site… with a name, a keyword and an address with %s or {query} → typing the keyword, or the start of the name, in the command bar offers Search and the name; Tab searches that site, as with Zigzag's own.
+  Test: SiteSearchTests.aSiteYouAddIsSearchedWithItsKeyword
+  Test: SiteSearchTests.tabSearchesASiteYouAddedAndBackspaceLeavesIt
+- Searching a site you added → its name sits in front of the field, each result says Search and the name, and Backspace in the empty field leaves it with what you'd typed back.
+  Test: SiteSearchTests.tabSearchesASiteYouAddedAndBackspaceLeavesIt
+- Edit a site you added → its new keyword and address are used at once; switched off, Tab no longer offers it.
+  Test: SiteSearchTests.editingASiteChangesItsKeywordAndAddress
+- Delete a site you added → after asking, its keyword no longer searches it.
+  Test: SiteSearchTests.removingASiteTakesItsKeywordAway
+- A keyword another site you added or a Zigzag site that's on already uses, in any case, one with a space, or one letter → Add stays off and the sheet says why.
+  Test: SiteSearchTests.aKeywordAlreadyUsedIsRefused
+- An address without exactly one %s or {query}, or not http or https with a host → Add stays off and the sheet says the address needs one %s.
+  Test: SiteSearchTests.anAddressThatCantSearchIsRefused
+- One of Zigzag's own sites switched off → its keyword and name are no longer offered for Tab; switched on again, they are.
+  Test: SiteSearchTests.aBuiltInTurnedOffIsNotOffered
+
 ## Appearance
 - Show link address on hover, on by default → pointing at a link shows where it goes in the page's bottom-left corner: in browser windows, Zigzag Mini, web apps and the tab overview.
   Test: AppearanceSwitchesTests.theLinkAddressShowsUntilTurnedOff
