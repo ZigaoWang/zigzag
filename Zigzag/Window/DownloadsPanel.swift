@@ -75,6 +75,13 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         return String(localized: "\(number) of \(b)", comment: "Under a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.")
     }
 
+    /// What a failed download says under its name: that it didn't finish, then why in a few words, like "Not enough
+    /// space on your Mac" or "“Downloads” isn’t there. If it’s on another disk, that disk may not be mounted".
+    static func failedStatus(_ failure: String?) -> String {
+        failure.map { String(localized: "Didn’t finish. \($0).", comment: "Under a download's name in the downloads panel: the download failed, then why, like Not enough space on your Mac.") }
+            ?? String(localized: "Didn’t finish", comment: "Under a download's name in the downloads panel: the download failed.")
+    }
+
     private static func timeLeft(_ seconds: Double) -> String {
         if seconds < 5 { return String(localized: "a few seconds left", comment: "Under a download's name in the downloads panel: time left, after the amount and a comma.") }
         if seconds < 60 {
@@ -155,9 +162,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         case .failed, .cancelled:
             // Say what happened, and offer to try again rather than only to remove it.
             let canRetry = DownloadManager.shared.canRetry(item)
-            status.stringValue = item.state == .failed
-                ? (item.failure.map { String(localized: "Didn’t finish. \($0).", comment: "Under a download's name in the downloads panel: the download failed, then why, like Not enough space on your Mac.") }
-                   ?? String(localized: "Didn’t finish", comment: "Under a download's name in the downloads panel: the download failed."))
+            status.stringValue = item.state == .failed ? Self.failedStatus(item.failure)
                 : String(localized: "Canceled", comment: "Under a download's name in the downloads panel: the download was stopped.")
             actionButton.symbol = canRetry ? "arrow.clockwise" : "xmark"
             actionButton.toolTip = canRetry ? String(localized: "Try Again", comment: "Tooltip of a download's button in the downloads panel: downloads the file again.") : String(localized: "Remove", comment: "Tooltip of a download's button in the downloads panel: takes the download off the list.")

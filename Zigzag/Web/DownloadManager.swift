@@ -38,6 +38,9 @@ final class DownloadItem {
 
     /// Why it stopped, in a few plain words, when it failed ("the connection dropped").
     fileprivate(set) var failure: String?
+    /// Why its folder can't be saved into, kept from when the destination was decided: WebKit's own error names
+    /// neither the folder nor what's wrong with it, so this is said instead when the error says nothing better.
+    fileprivate(set) var placeProblem: String?
 
     /// Finished, but the file isn't where it was saved any more (deleted, or moved in Finder).
     var fileIsMissing: Bool {
@@ -160,10 +163,11 @@ final class DownloadManager: NSObject {
         return active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
     }
 
-    /// Where downloads go: Downloads unless you picked another folder in Settings (and it's still there).
+    /// Where downloads go: Downloads unless you picked another folder in Settings. The pick is kept even when that
+    /// folder is gone, so the download says so rather than quietly landing in Downloads (#588).
     static var folder: URL {
         get {
-            if let path = UserDefaults.standard.string(forKey: "DownloadFolder"), FileManager.default.fileExists(atPath: path) {
+            if let path = UserDefaults.standard.string(forKey: "DownloadFolder") {
                 return URL(fileURLWithPath: path, isDirectory: true)
             }
             return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
@@ -172,6 +176,23 @@ final class DownloadManager: NSObject {
             let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
             UserDefaults.standard.set(newValue.standardizedFileURL == downloads.standardizedFileURL ? nil : newValue.path, forKey: "DownloadFolder")
         }
+    }
+
+    /// Why a download can't be saved into this folder, in plain words naming it, or nil when it can: the folder may
+    /// be gone (an unmounted disk, say), may not be a folder, or may not be writable.
+    static func folderProblem(_ folder: URL = DownloadManager.folder) -> String? {
+        let name = folder.lastPathComponent
+        var isFolder: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder) else {
+            return String(localized: "“\(name)” isn’t there. If it’s on another disk, that disk may not be mounted", comment: "Why a download can't be saved: its folder is missing, named in quotes, like “Downloads” isn’t there. If it’s on another disk, that disk may not be mounted.")
+        }
+        guard isFolder.boolValue else {
+            return String(localized: "“\(name)” isn’t a folder", comment: "Why a download can't be saved: something that isn't a folder is at its folder's place, named in quotes, like “Movies” isn’t a folder.")
+        }
+        guard FileManager.default.isWritableFile(atPath: folder.path) else {
+            return String(localized: "“\(name)” can’t be written to", comment: "Why a download can't be saved: its folder is read-only, named in quotes, like “Movies” can’t be written to.")
+        }
+        return nil
     }
 
     /// Ask with a save sheet each time instead of saving straight to Downloads.
@@ -488,6 +509,8 @@ final class DownloadManager: NSObject {
         if let data = item.resumeData {
             item.resumeData = nil
             item.failure = nil
+            // The same file, so the folder may be back now (or still be gone): ask again rather than keep the old answer.
+            item.placeProblem = item.destination.flatMap { Self.folderProblem($0.deletingLastPathComponent()) }
             item.state = .downloading
             changed.send(item)
             webView.resumeDownload(fromResumeData: data) { [weak self] download in
@@ -533,6 +556,12 @@ final class DownloadManager: NSObject {
             return String(localized: "Not enough space on your Mac", comment: "Why a download failed, under its name in the downloads panel.")
         }
         return nil
+    }
+
+    /// What a failed download's row says under its name: the folder's own problem first, since WebKit's error for a
+    /// folder that isn't there names neither the folder nor why (#588), then what the error itself says.
+    static func failure(_ error: Error, placeProblem: String?) -> String? {
+        placeProblem ?? reason(for: error)
     }
 
     /// A file the page made itself (blob:, data:) can't be fetched again.
@@ -758,6 +787,9 @@ extension DownloadManager: WKDownloadDelegate {
             item.filename = shownName
             item.replaces = replacing
             item.destination = destination
+            // The folder the file is going into, said if WebKit can't make it there: WebKit's own error names neither
+            // the folder nor what's wrong with it (#588).
+            item.placeProblem = Self.folderProblem(destination.deletingLastPathComponent())
             item.opensWhenFinished = opensWhenFinished
             item.fileHandoff = fileHandoff
             changed.send(item)
@@ -956,7 +988,9 @@ extension DownloadManager: WKDownloadDelegate {
         }
         if item.state != .cancelled {
             item.state = .failed
-            item.failure = Self.reason(for: error)
+            // The folder's own problem first: WebKit's error for a folder that isn't there says neither its name nor
+            // why, while this says both (#588).
+            item.failure = Self.failure(error, placeProblem: item.placeProblem)
             Diagnostics.note("Download failed", site: item.sourceURL?.host(), Diagnostics.describe(error as NSError), isPrivate: item.isPrivate)
         }
         changed.send(item)

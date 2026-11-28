@@ -3,6 +3,17 @@
 ## Where files go
 - A download → saved straight to Downloads, or the folder picked in Settings › Downloads while it's still there; Ask Each Time shows the save sheet instead.
   No test yet.
+- The folder picked in Settings that's gone → the download fails and says so, naming the folder, rather than saving in Downloads where you didn't choose.
+  Test: DownloadFolderTests.theChosenFolderIsKeptEvenWhenItIsGone
+- A download that can't be saved → its row says which folder and why: missing, not a folder, or not writable, in plain words.
+  Test: DownloadFolderTests.aDownloadIntoAMissingFolderFailsAndSaysSo
+  Test: DownloadFolderTests.aMissingFolderIsNamedAndSaysWhy
+  Test: DownloadFolderTests.aFileWhereTheFolderShouldBeSaysSo
+  Test: DownloadFolderTests.aReadOnlyFolderSaysItCantBeWrittenTo
+  Test: DownloadFolderTests.aDownloadsLinkToAnUnmountedDiskIsNamed
+- A failed download → the folder's own problem is said before WebKit's vaguer "Couldn't save it in that folder", and Try Again is still offered.
+  Test: DownloadFolderTests.theFolderIsNamedBeforeWebKitsOwnReason
+  Test: DownloadFolderTests.theRowSaysTheFolderAndWhy
 - Two files with one name, even started together → the second gets a name of its own, like "report 2.pdf"; nothing is overwritten.
   Test: DownloadRuleTests.aDestinationIsReadAsAPlaceToSave
 

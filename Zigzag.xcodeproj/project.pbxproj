@@ -228,6 +228,7 @@
 		5407D3683D005B57D0D03AD8 /* tab-capture.js in Resources */ = {isa = PBXBuildFile; fileRef = ECFB222D7082B8C1D2724708 /* tab-capture.js */; };
 		54665D76641D0469C5A31D12 /* CommandActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F18C84CC63265389A43E642F /* CommandActionTests.swift */; };
 		548A302B2614C99406A1F549 /* AdFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165DC73A78E5DF3E0A0AB05D /* AdFilters.swift */; };
+		588E0A1B2C3D4E5F60718293 /* DownloadFolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 588D0A1B2C3D4E5F60718293 /* DownloadFolderTests.swift */; };
 		54A9A3723030A1E1F7B634BB /* DownloadReplaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C81FFBD3A6B1DEE26D521B61 /* DownloadReplaceTests.swift */; };
 		54D9AA715E8636B888566343 /* ZigzagImageDecoder.xpc in CopyFiles */ = {isa = PBXBuildFile; fileRef = 395AE3D24C2A7B82119B0D1D /* ZigzagImageDecoder.xpc */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5526B8836FC5E03F979BBAD1 /* ChromeUniverse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2EF3649E3F23CC6F4A67D /* ChromeUniverse.swift */; };
@@ -1231,6 +1232,7 @@
 		C5FB9C4A851B146B5E9733F8 /* PageSizeHandleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageSizeHandleTests.swift; sourceTree = "<group>"; };
 		C7D5E47199CCF436AD9B499E /* SitePermissionsPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePermissionsPolicyTests.swift; sourceTree = "<group>"; };
 		C81FFBD3A6B1DEE26D521B61 /* DownloadReplaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadReplaceTests.swift; sourceTree = "<group>"; };
+		588D0A1B2C3D4E5F60718293 /* DownloadFolderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadFolderTests.swift; sourceTree = "<group>"; };
 		C88A57E41A091A03DA97E06C /* CHANGELOG.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.md; sourceTree = "<group>"; };
 		C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
 		C8BAFE736F914C5E4DF6E993 /* PageImageIconTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageImageIconTests.swift; sourceTree = "<group>"; };
@@ -2042,6 +2044,7 @@
 				1666E0C362D430512EB37C75 /* DevelopmentSitesTests.swift */,
 				14B44E3C60BDACED82D8B858 /* DiagnosticsTests.swift */,
 				53584D3A138EABED88285971 /* DialogPasswordFixesTests.swift */,
+				588D0A1B2C3D4E5F60718293 /* DownloadFolderTests.swift */,
 				98160990FBB7DDACDE7DEF3E /* DownloadPolicyTests.swift */,
 				C81FFBD3A6B1DEE26D521B61 /* DownloadReplaceTests.swift */,
 				6CC12F553CEF782A3F8900CE /* DownloadRulesTests.swift */,
@@ -3023,6 +3026,7 @@
 				0EEAAFF8838DD30FD0607829 /* DevelopmentSitesTests.swift in Sources */,
 				4E5CF0E3E770AEFADC046339 /* DiagnosticsTests.swift in Sources */,
 				CE5616DC4C93BC6AEDB917D3 /* DialogPasswordFixesTests.swift in Sources */,
+				588E0A1B2C3D4E5F60718293 /* DownloadFolderTests.swift in Sources */,
 				3C7D596D2205FA8C83362D04 /* DownloadPolicyTests.swift in Sources */,
 				54A9A3723030A1E1F7B634BB /* DownloadReplaceTests.swift in Sources */,
 				362CDB35E2739BCEFA79410B /* DownloadRulesTests.swift in Sources */,

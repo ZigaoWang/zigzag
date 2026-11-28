@@ -213453,6 +213453,15 @@
           }
         }
       }
+    },
+    "“%@” isn’t there. If it’s on another disk, that disk may not be mounted" : {
+      "comment" : "Why a download can't be saved: its folder is missing, named in quotes, like “Downloads” isn’t there. If it’s on another disk, that disk may not be mounted."
+    },
+    "“%@” isn’t a folder" : {
+      "comment" : "Why a download can't be saved: something that isn't a folder is at its folder's place, named in quotes, like “Movies” isn’t a folder."
+    },
+    "“%@” can’t be written to" : {
+      "comment" : "Why a download can't be saved: its folder is read-only, named in quotes, like “Movies” can’t be written to."
     }
   },
   "version" : "1.0"
