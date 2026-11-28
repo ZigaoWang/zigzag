@@ -791,6 +791,7 @@ final class MiniPlayer {
     }
 
     static func siteName(_ url: URL?) -> String {
+        if let url, url.isFileURL { return url.lastPathComponent }
         guard let host = url?.host(), !host.isEmpty else { return url?.absoluteString ?? "" }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
@@ -1392,8 +1393,9 @@ final class MiniPlayerView: NSView {
             rest.forEach { $0.animator().alphaValue = all }
             self.placeholder.animator().alphaValue = 1 - all
         }
+        // A change of state in place, as the Mac's Picture in Picture fades its controls; not a press's snap.
         if animated {
-            Tokens.Motion.animate(Tokens.Motion.feedback) { apply() }
+            Tokens.Motion.animate(Tokens.Motion.change) { apply() }
         } else {
             Tokens.Motion.withoutAnimation {
                 self.controls.alphaValue = play
@@ -1667,10 +1669,10 @@ private final class MiniPlayerScrim: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        dim.backgroundColor = NSColor.black.withAlphaComponent(0.38).cgColor
+        dim.backgroundColor = NSColor.black.withAlphaComponent(0.28).cgColor
         layer?.addSublayer(dim)
         for shade in [top, bottom] {
-            shade.colors = [NSColor.black.withAlphaComponent(0.55).cgColor, NSColor.black.withAlphaComponent(0).cgColor]
+            shade.colors = [NSColor.black.withAlphaComponent(0.45).cgColor, NSColor.black.withAlphaComponent(0).cgColor]
             layer?.addSublayer(shade)
         }
     }
