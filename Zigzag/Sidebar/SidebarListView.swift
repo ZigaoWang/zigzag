@@ -278,11 +278,14 @@ final class SidebarListView: NSView {
         // The right page of a pinned split rides in its left page's row, as a split among tabs does.
         let riders = Set(Library.shared.pinnedSplits(in: spaceID).flatMap(\.riders))
         let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
-        // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
-        // open without opening every folder on the way to it. The page you're on is always open.
-        // A pinned page closed since you came to the space keeps its row, unloaded, in a folded section or shut folder.
-        let kept = spaceID == manager.currentSpaceID ? manager.closedPins : []
-        let isOpen: (UUID) -> Bool = { manager.bookmarkTab(for: $0) != nil || kept.contains($0) }
+        // A pinned page that's open shows even inside a shut folder or a folded section, as in Arc: you see what's
+        // open without opening every folder on the way to it, and never a page that isn't: one closed, asleep or not
+        // loaded since Zigzag reopened. The page you're on always shows. A pinned split is open while one of its
+        // pages is.
+        let splitPages = Dictionary(Library.shared.pinnedSplits(in: spaceID).map { ($0.left, Array($0.ids)) }, uniquingKeysWith: { a, _ in a })
+        let running: (UUID) -> Bool = { id in (splitPages[id] ?? [id]).contains { manager.bookmarkTab(for: $0).map(Self.isRunning) == true } }
+        let isOpen: (UUID) -> Bool = { running($0) || self.heldPins.contains($0) }
+        holdPins(shownSpace: spaceID, pages: bookmarks.map(\.id), running: running)
         // Shown as tiles under the favorites instead (#539): the pages in no folder.
         let tiled: Set<UUID> = SidebarView.pinnedTabsAsTiles ? Set(Library.shared.pinnedTiles(in: spaceID).flatMap { [$0.0.id] + $0.partners.map(\.id) }) : []
         let pinned = Self.pinnedRows(bookmarks: bookmarks.map(\.id).filter { !riders.contains($0) && !tiled.contains($0) }, folders: folders,
@@ -905,7 +908,46 @@ final class SidebarListView: NSView {
         return separator?.clearButton.toolTip ?? "-"
     }
     #endif
-    override func mouseExited(with event: NSEvent) { isPointerInside = false }
+    override func mouseExited(with event: NSEvent) { pointerLeft() }
+
+    private func pointerLeft() {
+        isPointerInside = false
+        // The rows of pages closed under the pointer go now it's gone.
+        guard !heldPins.isEmpty else { return }
+        heldPins = []
+        reload(animated: true)
+    }
+
+    // MARK: Held rows
+
+    /// Pinned pages whose rows showed under the pointer when they stopped being open (⌘W, their ×): in a folded
+    /// section or a shut folder they keep their rows, unloaded, until the pointer leaves the list, so nothing moves
+    /// under it mid-action, as Safari keeps a closed tab's place until you leave the tab bar.
+    private var heldPins: Set<UUID> = []
+    /// The space they're in: going to another lets them go.
+    private var heldSpace: UUID?
+
+    /// The pinned pages open when the list was last built.
+    private var openAtBuild: Set<UUID> = []
+
+    /// A page's tab counts as open while it's loaded, or opened and about to load; not asleep nor waiting since a
+    /// relaunch.
+    static func isRunning(_ tab: Tab) -> Bool { tab.isLoaded || !(tab.isAsleep || tab.isRestored) }
+
+    private func holdPins(shownSpace: UUID, pages: [UUID], running: (UUID) -> Bool) {
+        guard let manager else { return }
+        if heldSpace != manager.currentSpaceID { heldPins = []; heldSpace = manager.currentSpaceID; openAtBuild = [] }
+        guard shownSpace == manager.currentSpaceID else { return }
+        let open = Set(pages.filter(running))
+        defer { openAtBuild = open }
+        guard isPointerInside else { heldPins = []; return }
+        // Rows on show whose pages were open last time and aren't now.
+        for case .bookmark(let id) in items where openAtBuild.contains(id) && !open.contains(id) { heldPins.insert(id) }
+    }
+
+    /// Folding the section lets every held row go; opening or shutting a folder, the ones in it.
+    func forgetHeldPins() { heldPins = [] }
+    func forgetHeldPins(_ ids: [UUID]) { heldPins.subtract(ids) }
 
     // MARK: Rows
 
@@ -1649,7 +1691,7 @@ final class SidebarListView: NSView {
     private func toggleCollapsed() {
         guard let manager, !Library.shared.bookmarks(in: manager.currentSpaceID).isEmpty else { return }
         Self.setCollapsed(manager.currentSpaceID, !Self.isCollapsed(manager.currentSpaceID))
-        manager.forgetClosedPins()
+        forgetHeldPins()
         reload(animated: true)
         onFold?()
     }

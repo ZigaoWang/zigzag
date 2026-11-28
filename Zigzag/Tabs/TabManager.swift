@@ -26,11 +26,7 @@ final class TabManager {
         _modify { yield &store.bookmarkTabs; store.listsChanged() }
     }
     private var selectedBySpace: [UUID: UUID] = [:]
-    private(set) var currentSpaceID: UUID { didSet { extensionLists.removeAll(); if currentSpaceID != oldValue { closedPins.removeAll() } } }
-    /// Pinned pages closed since you came to the space on show: a folded section or shut folder keeps their rows.
-    private(set) var closedPins: Set<UUID> = []
-    func forgetClosedPins() { closedPins.removeAll() }
-    func forgetClosedPins(_ ids: some Sequence<UUID>) { closedPins.subtract(ids) }
+    private(set) var currentSpaceID: UUID { didSet { extensionLists.removeAll() } }
     /// MRU order in this window, for Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
     /// Tabs opened from another since you last switched tabs: closing one goes back toward its opener, as in Chrome.
@@ -1587,7 +1583,6 @@ final class TabManager {
             // opens fresh at its own address next time; ⇧⌘T brings it back where it was.
             remember(closedRecord(of: tab, at: 0, split: nil))
             bookmarkTabs[bookmarkID] = nil
-            closedPins.insert(bookmarkID)
             recentTabIDs.removeAll { $0 == tab.id }
             store.unwatch(tab.id)
             tab.close()
@@ -1635,7 +1630,6 @@ final class TabManager {
         if let bookmarkID = tab.bookmarkID {
             remember(closedRecord(of: tab, at: 0, split: nil))
             bookmarkTabs[bookmarkID] = nil
-            closedPins.insert(bookmarkID)
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
             remember(closedRecord(of: tab, at: index, split: pair))
             liftChildren(of: tab)

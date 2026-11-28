@@ -965,7 +965,7 @@ enum DebugBridge {
         case "pinfold":
             if SidebarListView.debugCollapsed == nil { SidebarListView.debugCollapsed = [] }
             SidebarListView.setCollapsed(controller.tabManager.currentSpaceID, arg == "on")
-            controller.tabManager.forgetClosedPins()
+            controller.sidebar.list.forgetHeldPins()
             controller.sidebar.list.reload(animated: false)
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
