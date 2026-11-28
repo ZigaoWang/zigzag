@@ -71,11 +71,14 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.aSpaceSwitchPutsThePageAwayAndNeverShowsTheOldSpace
   Test: EdgeSidebarTests.aSpaceSwitchDuringTheFoldGivesThePageBackAtOnce
   Test: EdgeSidebarTests.aRestBegunBeforeASpaceSwitchShowsNothing
+- The page's place stays out through the switch, with or without the keyboard: the new space's empty page stands in it, its color or picture and the wordmark, and a row's page comes out over it. Esc, a row with no page or the pointer off the panel puts it away as it would a page.
+  Test: EdgeSidebarTests.aSpaceSwitchKeepsThePagesPlaceOnTheNewSpace
+  Test: EdgeSidebarTests.theEmptyPageGoesAsAPageDoes
 - Rest on the same row again while its page is folding away → the new preview has the page, and the tab is never left without one.
   Test: InPageMiniHostTests.reopeningDuringTheFoldOutEndsTheOldBorrowFirst
 - Click into the page → Zigzag comes forward, and the sidebar and the page stay out until the pointer leaves them.
   No test yet.
-- The page clicked into, then Esc or the pointer back on the sidebar → the page folds back and the panel keeps the keyboard; the browser window stays where it was.
+- The page clicked into, then Esc → the page folds back and the panel keeps the keyboard; the browser window stays where it was.
   Test: EdgeSidebarTests.aPageFoldingBackGivesTheKeyboardToThePanel
   Test: EdgeSidebarTests.aPageFoldingBackUnclickedLeavesTheKeyboard
 - Keys pressed in the page clicked into → the page's own first: ⌘W puts it away, its tab still in the list, ⌘R reloads it and ⌘L edits its address. The browser's other keys do what they do in the panel.
