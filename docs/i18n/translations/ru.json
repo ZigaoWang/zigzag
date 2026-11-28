@@ -15945,6 +15945,18 @@
         "state": "translated",
         "value": "passkey webauthn touch id sign in suggest autofill privacy ключ доступа вход предлагать автозаполнение конфиденциальность"
       }
+    },
+    "On a disk that isn’t connected": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "На диске, который не подключен"
+      }
+    },
+    "It leaves this list, and the app stays on its disk. You stay signed in to the site in Zigzag.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Оно исчезнет из этого списка, а само приложение останется на диске. Вы останетесь в системе на сайте в Zigzag."
+      }
     }
   },
   "language": "ru"

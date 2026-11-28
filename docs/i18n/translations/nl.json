@@ -15236,6 +15236,18 @@
         "state": "translated",
         "value": "passkey webauthn touch id sign in suggest autofill privacy aanmelden voorstellen automatisch invullen privacy"
       }
+    },
+    "On a disk that isn’t connected": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Op een schijf die niet is aangesloten"
+      }
+    },
+    "It leaves this list, and the app stays on its disk. You stay signed in to the site in Zigzag.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Hij verdwijnt uit deze lijst en de app blijft op zijn schijf staan. Je blijft aangemeld bij de website in Zigzag."
+      }
     }
   },
   "InfoPlist": {

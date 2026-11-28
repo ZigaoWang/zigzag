@@ -15615,6 +15615,18 @@
         "state": "translated",
         "value": "passkey webauthn touch id sign in suggest autofill privacy chave de acesso login sugerir preenchimento automático privacidade"
       }
+    },
+    "On a disk that isn’t connected": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Em um disco que não está conectado"
+      }
+    },
+    "It leaves this list, and the app stays on its disk. You stay signed in to the site in Zigzag.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ele sai desta lista e o app continua no disco. Você continua conectado ao site no Zigzag."
+      }
     }
   },
   "language": "pt-BR"

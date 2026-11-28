@@ -14906,6 +14906,18 @@
         "state": "translated",
         "value": "passkey webauthn touch id sign in suggest autofill privacy 패스키 로그인 제안 자동 완성 개인정보"
       }
+    },
+    "On a disk that isn’t connected": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "연결되지 않은 디스크에 있음"
+      }
+    },
+    "It leaves this list, and the app stays on its disk. You stay signed in to the site in Zigzag.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "이 목록에서 사라지고, 앱은 해당 디스크에 그대로 남습니다. Zigzag에서는 해당 사이트에 로그인 상태가 유지됩니다."
+      }
     }
   },
   "InfoPlist": {

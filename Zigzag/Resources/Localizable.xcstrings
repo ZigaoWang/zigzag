@@ -2136,6 +2136,89 @@
         }
       }
     },
+    "It leaves this list, and the app stays on its disk. You stay signed in to the site in Zigzag." : {
+      "comment" : "Message of the sheet that removes a site installed as an app whose disk isn't connected, so the app itself can't be deleted.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sie wird aus dieser Liste entfernt, die App bleibt auf ihrem Volume. Du bleibst in Zigzag bei der Website angemeldet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se quita de esta lista y la app se queda en su disco. Tu sesión en el sitio se mantiene en Zigzag."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle disparaît de cette liste et l’app reste sur son disque. Vous restez connecté au site dans Zigzag."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viene tolta da questo elenco e l’app resta sul suo disco. Resti connesso al sito in Zigzag."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリストから外れ、Appはディスク上に残ります。Zigzagでのサイトへのログイン状態はそのまま残ります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 목록에서 사라지고, 앱은 해당 디스크에 그대로 남습니다. Zigzag에서는 해당 사이트에 로그인 상태가 유지됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hij verdwijnt uit deze lijst en de app blijft op zijn schijf staan. Je blijft aangemeld bij de website in Zigzag."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zniknie z tej listy, a aplikacja zostanie na swoim dysku. Logowanie do witryny w Zigzag pozostaje."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ele sai desta lista e o app continua no disco. Você continua conectado ao site no Zigzag."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оно исчезнет из этого списка, а само приложение останется на диске. Вы останетесь в системе на сайте в Zigzag."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu listeden çıkar, uygulama ise diskinde kalır. Zigzag’deki sitede oturumunuz açık kalır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它会从此列表中移除，App 仍保留在其磁盘上。你在 Zigzag 中的网站登录状态不受影响。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它會從此列表中移除，App 仍保留在其磁碟上。你在 Zigzag 中的網站登入狀態不受影響。"
+          }
+        }
+      }
+    },
     "Not suggested, as set in System Settings › Privacy & Security. A site that asks for a passkey still can." : {
       "comment" : "Explanation under “Passkeys” in Settings › Passwords, with Zigzag not allowed to list the passkeys saved on this Mac. System Settings › Privacy & Security are names macOS uses; match them.",
       "localizations" : {
@@ -2215,6 +2298,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "依「系統設定 › 隱私權與安全性」中的設定，不會建議通行密鑰。網站要求通行密鑰時仍可使用。"
+          }
+        }
+      }
+    },
+    "On a disk that isn’t connected" : {
+      "comment" : "Under an installed app in Settings › General, in place of its site, when the app is on an external disk that isn't connected now.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf einem Volume, das nicht verbunden ist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En un disco que no está conectado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur un disque qui n’est pas connecté"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su un disco non collegato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続されていないディスク上にあります"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연결되지 않은 디스크에 있음"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Op een schijf die niet is aangesloten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na dysku, który nie jest podłączony"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em um disco que não está conectado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На диске, который не подключен"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bağlı olmayan bir diskte"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所在磁盘未连接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所在磁碟未連接"
           }
         }
       }
