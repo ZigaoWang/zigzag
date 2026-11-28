@@ -81,12 +81,15 @@ protocol SidebarListDelegate: AnyObject {
     func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem)
     /// Dropped on the page: open it in split view beside the current page. Returns true if it did.
     func listDropOnPage(_ item: SidebarItem) -> Bool
+    /// The profile's name by the space's: Settings › Profiles.
+    func listShowProfiles()
 }
 
 extension SidebarListDelegate {
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { listMove(tab, to: index, in: spaceID, nesting: .fit, grouping: .fit) }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { listUnbookmark(bookmarkID, to: index, under: nil, group: nil) }
     func listMenu(for item: SidebarItem, page: Tab?) -> NSMenu? { listMenu(for: item) }
+    func listShowProfiles() {}
 }
 
 enum SidebarItem: Hashable {
@@ -1011,7 +1014,9 @@ final class SidebarListView: NSView {
         case .header:
             let header = SpaceHeaderView()
             header.onClick = { [weak self, weak header] event in
-                guard let self, header != nil else { return }
+                guard let self, let header else { return }
+                // The profile's name opens Settings › Profiles.
+                if header.isOnProfile(event.locationInWindow) { self.delegate?.listShowProfiles(); return }
                 // The name folds the pinned tabs away, as the chevron does; the space itself is edited from its menu.
                 self.toggleCollapsed()
             }

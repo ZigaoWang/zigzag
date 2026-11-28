@@ -1733,8 +1733,9 @@ final class SpaceHeaderView: InteractiveView {
     }
     private let chevron = NSImageView()
     private let iconView = NSImageView()
-    /// The profile the space is on, quiet at the end of the line, once there's more than one profile to tell apart.
-    /// It gives way to the name: where the two don't both fit, it isn't shown.
+    /// The profile the space is on, quiet at the end of the line, while the spaces are on more than one. It gives way
+    /// to the name: where the two don't both fit, it isn't shown. A click opens Settings › Profiles; under the
+    /// pointer it takes the name's ink.
     private let profileLabel = Label("", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     var profileName: String? {
         didSet {
@@ -1789,11 +1790,8 @@ final class SpaceHeaderView: InteractiveView {
         let pad = Tokens.Space.x1
         // Large, low in its slot; at row size, centered in its row like the rows below it.
         let y = !Self.isLarge ? label.centeredY(in: bounds.height) : isFlipped ? bounds.height - h - pad : pad
-        // Icons and the chevron center on the lowercase letters' middle (the x-height), not the text box, so they sit
-        // level with the name.
         let font = Self.nameFont
         let baseline = isFlipped ? y + (h + font.ascender + font.descender) / 2 : y + (h - font.ascender - font.descender) / 2
-        let xMiddle = isFlipped ? baseline - font.xHeight / 2 : baseline + font.xHeight / 2
         let bearing = Self.inkBearing(of: name, font: font)
         var x = SidebarRowView.inset - Label.inset - bearing
         if icon != nil {
@@ -1808,8 +1806,14 @@ final class SpaceHeaderView: InteractiveView {
             x = iconView.frame.maxX + Tokens.Space.x2 - Label.inset - bearing - (Self.isLarge ? 2 : 0)
         }
         label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
+        // The chevron's ink centers on the capitals' middle, as `Label.centeredY` centers text (#578).
         let side = Tokens.Space.x4
-        chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x2, y: xMiddle - side / 2, width: side, height: side)
+        let span = label.capsSpan
+        let capsMiddle = isFlipped ? y + (span.top + span.bottom) / 2 : y + h - (span.top + span.bottom) / 2
+        let inkMiddle = Self.chevronInkOffset(chevronSymbol, side: side)
+        let scale = window?.backingScaleFactor ?? 2
+        let chevronY = isFlipped ? capsMiddle - side / 2 - inkMiddle : capsMiddle - side / 2 + inkMiddle
+        chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x2, y: (chevronY * scale).rounded() / scale, width: side, height: side)
         // The profile's name, at the line's end where Clear ends on the row below, standing on the name's baseline.
         // It has what the name and its chevron leave, and under a few letters' room it isn't there at all.
         let room = bounds.width - SidebarRowView.inset - (chevron.frame.maxX + Tokens.Space.x2)
@@ -1819,6 +1823,7 @@ final class SpaceHeaderView: InteractiveView {
         let lh = profileLabel.lineHeight
         let labelY = isFlipped ? baseline - (lh + small.ascender + small.descender) / 2 : baseline - (lh - small.ascender - small.descender) / 2
         profileLabel.frame = NSRect(x: bounds.width - SidebarRowView.inset + Label.inset - width, y: round(labelY), width: width, height: lh)
+        updateProfileArea()
         // Cut short, the whole name is under the pointer (#189).
         removeAllToolTips()
         profileTip = nil
@@ -1833,6 +1838,70 @@ final class SpaceHeaderView: InteractiveView {
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: String(first), attributes: [.font: font]))
         return max(0, CTLineGetBoundsWithOptions(line, .useGlyphPathBounds).minX)
     }
+    /// How far the chevron's ink sits below its box's middle (top down), drawn `side` square by an image view as the
+    /// chevron is: a symbol's ink isn't centered in its image. Measured once per image.
+    static func chevronInkOffset(_ symbol: String, side: CGFloat) -> CGFloat {
+        let image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
+        let key = "\(symbol)-\(Tokens.TypeSize.body)-\(side)"
+        if let known = chevronOffsets[key] { return known }
+        let scale: CGFloat = 4
+        var offset: CGFloat = 0
+        if let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(side * scale), pixelsHigh: Int(side * scale), bitsPerSample: 8,
+                                      samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+            rep.size = NSSize(width: side, height: side)
+            // Drawn by an image view like the chevron's, so it lands where the chevron's does.
+            let probe = NSImageView(frame: NSRect(x: 0, y: 0, width: side, height: side))
+            probe.imageScaling = .scaleNone
+            probe.contentTintColor = .black
+            probe.image = image
+            probe.cacheDisplay(in: probe.bounds, to: rep)
+            var top = -1, bottom = -1
+            for y in 0..<rep.pixelsHigh {
+                var inked = false
+                for x in 0..<rep.pixelsWide where (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.3 { inked = true; break }
+                if inked { if top < 0 { top = y }; bottom = y }
+            }
+            if top >= 0 { offset = (CGFloat(top) + CGFloat(bottom + 1)) / 2 / scale - side / 2 }
+        }
+        chevronOffsets[key] = offset
+        return offset
+    }
+    private static var chevronOffsets: [String: CGFloat] = [:]
+    private var chevronSymbol: String { isCollapsed ? "chevron.right" : "chevron.down" }
+    /// The symbol the chevron was last laid out for.
+    private var chevronShown: String?
+
+    /// Whether a window point is on the profile's name, while it shows.
+    func isOnProfile(_ windowPoint: NSPoint) -> Bool {
+        profileName != nil && !profileLabel.isHidden && profileLabel.frame.insetBy(dx: 0, dy: -Tokens.Space.x1).contains(convert(windowPoint, from: nil))
+    }
+    private var profileArea: NSTrackingArea?
+    private var isProfileHovered = false { didSet { if oldValue != isProfileHovered { stateDidChange(animated: false) } } }
+    private func updateProfileArea() {
+        if let profileArea { removeTrackingArea(profileArea) }
+        profileArea = nil
+        guard profileName != nil, !profileLabel.isHidden else { isProfileHovered = false; return }
+        let area = NSTrackingArea(rect: profileLabel.frame.insetBy(dx: 0, dy: -Tokens.Space.x1), options: [.mouseEnteredAndExited, .activeInActiveApp], owner: self)
+        addTrackingArea(area)
+        profileArea = area
+    }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        updateProfileArea()
+    }
+    override func mouseEntered(with event: NSEvent) {
+        if let profileArea, event.trackingArea === profileArea { isProfileHovered = true; return }
+        super.mouseEntered(with: event)
+    }
+    override func mouseExited(with event: NSEvent) {
+        if let profileArea, event.trackingArea === profileArea { isProfileHovered = false; return }
+        super.mouseExited(with: event)
+    }
+
+    #if DEBUG
+    var debugChevronFrame: NSRect { chevron.frame }
+    var debugProfileFrame: NSRect? { profileLabel.isHidden ? nil : profileLabel.frame }
+    #endif
     /// What the cut profile name's tooltip says; a tooltip doesn't keep its owner.
     private var profileTip: NSString?
 
@@ -1852,8 +1921,9 @@ final class SpaceHeaderView: InteractiveView {
             : NSAttributedString(string: label.stringValue, attributes: [.font: Self.nameFont, .foregroundColor: color])
         // A symbol takes the name's own ink; an emoji keeps its colors.
         iconView.contentTintColor = ink.withAlphaComponent(0.86)
-        profileLabel.textColor = Brand.Theme.for(self).quietInk
-        chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.body)
+        profileLabel.textColor = isProfileHovered ? ink : Brand.Theme.for(self).quietInk
+        if chevronShown != chevronSymbol { chevronShown = chevronSymbol; needsLayout = true }
+        chevron.image = Tokens.Symbol.image(chevronSymbol, size: Tokens.TypeSize.body)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
         setAccessibilityLabel(isCollapsed ? String(localized: "\(label.stringValue), pinned tabs hidden", comment: "Accessibility label of the space's name above its pinned tabs, while they're folded away.") : label.stringValue)
