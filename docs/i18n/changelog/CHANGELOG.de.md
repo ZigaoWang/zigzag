@@ -12,6 +12,7 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 ### Behoben
 - Die Ladelinie bewegt sich nur noch, wenn die Seite vorankommt. Bei einer Website, die nicht mehr antwortet, bleibt sie stehen, statt aufs Ende zuzukriechen, und solange nichts ankommt, wird sie sanft heller und dunkler. Danke an [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag beendet sich nicht mehr gelegentlich, wenn du einen Tab schließt oder einer in den Ruhezustand geht und die Bildschirmzeit von macOS beim Freigeben der Seite auf ein Problem stößt.
+- Eine installierte App auf einem Volume, das nicht verbunden ist, bleibt in Einstellungen › Allgemein › Installierte Apps, markiert mit „Auf einem Volume, das nicht verbunden ist“, und funktioniert wieder, sobald das Volume zurück ist. Bisher verschwand sie samt ihrer Symbolleisten-Einstellung aus der Liste, bis du die App geöffnet hast. Danke an [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 

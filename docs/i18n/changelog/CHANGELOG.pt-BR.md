@@ -12,6 +12,7 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 ### Corrigido
 - A linha de carregamento só avança quando a página avança. Num site que parou de responder, ela fica parada em vez de se arrastar até o fim, e enquanto nada chega ela esmaece e volta suavemente. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - O Zigzag não fecha mais de vez em quando ao fechar uma aba ou quando uma é suspensa, se o Tempo de Uso do macOS tiver um problema ao liberar a página.
+- Um app instalado em um disco que não está conectado continua em Ajustes › Geral › Apps instalados, marcado como Em um disco que não está conectado, e volta a funcionar assim que o disco volta. Antes, ele saía da lista, junto com a opção da barra de ferramentas, até você abrir o app. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 

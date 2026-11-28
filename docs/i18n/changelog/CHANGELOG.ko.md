@@ -12,6 +12,7 @@ CHANGELOG.md를 한국어로 옮긴 Zigzag의 릴리스 노트입니다. 앱에�
 ### 수정 사항
 - 로딩 줄은 이제 페이지가 실제로 진행될 때만 움직입니다. 응답을 멈춘 사이트에서는 끝을 향해 슬금슬금 나아가지 않고 그 자리에 멈추며, 아무것도 도착하지 않는 동안에는 줄이 은은하게 흐려졌다 밝아집니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - 탭을 닫거나 탭이 잠자기 상태가 될 때 macOS의 스크린 타임이 페이지를 놓아주는 데 문제가 생기면 Zigzag가 가끔 종료되던 문제가 더 이상 발생하지 않습니다.
+- 연결되지 않은 디스크에 있는 설치된 앱이 설정 › 일반 › 설치된 앱에 ‘연결되지 않은 디스크에 있음’으로 표시된 채 남아 있고, 디스크가 다시 연결되면 바로 다시 사용할 수 있습니다. 이전에는 앱을 열 때까지 도구 막대 선택과 함께 목록에서 사라졌습니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 

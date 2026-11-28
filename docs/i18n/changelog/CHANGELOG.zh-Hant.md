@@ -17,6 +17,7 @@
 ### 修正
 - 載入線只在網頁真的有進展時才會前進。不再回應的網站會讓它停在原處，不會慢慢爬向終點；沒有新內容送達時，載入線會輕輕地明暗起伏。感謝 [Lakeland97](https://github.com/Lakeland97)。 ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - 關閉分頁或分頁進入休眠時，如果 macOS 的「螢幕使用時間」在釋放網頁時出了問題，Zigzag 不會再偶爾結束。
+- 所在磁碟未連接的已安裝 App 會留在「設定 › 一般 › 已安裝的 App」中，標為「所在磁碟未連接」，磁碟一接回就能再用。以前它會連同工具列設定一起從列表中消失，直到你打開這個 App。感謝 [Lakeland97](https://github.com/Lakeland97)。([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 

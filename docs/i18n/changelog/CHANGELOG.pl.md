@@ -12,6 +12,7 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 ### Naprawiono
 - Linia ładowania przesuwa się tylko wtedy, gdy strona faktycznie się wczytuje. Przy witrynie, która przestała odpowiadać, stoi w miejscu zamiast pełznąć ku końcowi, a dopóki nic nie dociera, łagodnie przygasa i jaśnieje. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag nie kończy już czasem działania, gdy zamykasz kartę lub karta usypia, a Czas przed ekranem w macOS napotka problem przy zwalnianiu strony.
+- Zainstalowana aplikacja na dysku, który nie jest podłączony, zostaje w Ustawienia › Ogólne › Zainstalowane aplikacje z opisem „Na dysku, który nie jest podłączony” i działa znowu, gdy tylko dysk wróci. Wcześniej znikała z listy razem z wyborem paska narzędzi, dopóki nie otworzyło się aplikacji. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 

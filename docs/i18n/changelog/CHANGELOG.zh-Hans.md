@@ -20,6 +20,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 加载线只在网页真正有进展时才会前进。不再回应的网站会让它停在原处，不会慢慢爬向终点；没有新内容到达时，加载线会轻轻地明暗起伏。感谢 [Lakeland97](https://github.com/Lakeland97)。 ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - 关闭标签页或标签页进入休眠时，如果 macOS 的“屏幕使用时间”在释放网页时出了问题，Zigzag 不会再偶尔退出。
+- 所在磁盘未连接的已安装 App 会留在“设置 › 通用 › 已安装的 App”中，标为“所在磁盘未连接”，磁盘一接回就能再用。以前它会连同工具栏设置一起从列表中消失，直到你打开这个 App。感谢 [Lakeland97](https://github.com/Lakeland97)。([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 

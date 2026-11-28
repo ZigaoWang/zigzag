@@ -12,6 +12,7 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 ### Opgelost
 - De laadlijn beweegt alleen nog als de pagina vordert. Bij een site die niet meer antwoordt blijft ze staan in plaats van naar het einde te kruipen, en zolang er niets binnenkomt, wordt ze zacht lichter en donkerder. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag stopt niet meer af en toe als je een tabblad sluit of er een in de slaapstand gaat, wanneer Schermtijd van macOS een probleem heeft met het loslaten van de pagina.
+- Een geïnstalleerde app op een schijf die niet is aangesloten, blijft in Instellingen › Algemeen › Geïnstalleerde apps staan, gemarkeerd met Op een schijf die niet is aangesloten, en werkt weer zodra de schijf terug is. Eerder verdween hij uit de lijst, samen met de keuze voor de gereedschapsbalk, tot je de app opende. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 

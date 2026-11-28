@@ -12,6 +12,7 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 ### Corrections
 - La ligne de chargement n’avance plus que lorsque la page avance. Sur un site qui ne répond plus, elle reste immobile au lieu de ramper vers la fin, et tant que rien n’arrive, elle pâlit et se ravive doucement. Merci à [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag ne quitte plus de temps en temps quand vous fermez un onglet ou qu’un onglet se met en veille, lorsque Temps d’écran de macOS rencontre un problème en libérant la page.
+- Une app installée sur un disque qui n’est pas connecté reste dans Réglages › Général › Apps installées, marquée Sur un disque qui n’est pas connecté, et fonctionne de nouveau dès que le disque revient. Avant, elle quittait la liste, avec son choix de barre d’outils, jusqu’à ce que vous ouvriez l’app. Merci à [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 

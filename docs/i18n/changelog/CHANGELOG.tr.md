@@ -12,6 +12,7 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 ### Düzeltmeler
 - Yükleme çizgisi artık yalnızca sayfa ilerlediğinde ilerliyor. Yanıt vermeyi bırakan bir sitede sona doğru sürünmek yerine yerinde duruyor ve hiçbir şey gelmediği sürece hafifçe sönüp parlıyor. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Bir sekmeyi kapattığınızda veya bir sekme uykuya geçtiğinde, macOS’in Ekran Süresi sayfayı bırakırken bir sorunla karşılaşırsa Zigzag artık ara sıra kapanmaz.
+- Bağlı olmayan bir diskteki yüklü bir uygulama, Ayarlar › Genel › Yüklü Uygulamalar’da “Bağlı olmayan bir diskte” olarak işaretli kalır ve disk geri gelir gelmez yeniden çalışır. Önceden, uygulamayı açana kadar araç çubuğu seçimiyle birlikte listeden çıkıyordu. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 
 ## [0.10.0] - 2026-11-25
 
