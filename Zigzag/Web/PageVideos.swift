@@ -17,26 +17,40 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
       const post = (m) => { try { window.webkit.messageHandlers.\(messageName).postMessage(m); } catch (e) {} };
       let list = [], last = '[]', timer = 0, ticking = 0, saved = null;
       // The videos you started or changed the sound of yourself: one that plays or changes volume within a second of
-      // your own press or key on the page. A press on a link goes somewhere rather than plays, so it doesn't count:
-      // a card's preview playing under the pointer as you click through to its page isn't one you started.
+      // your own press on it, or a key while it's in view (not typing in a field). A press elsewhere on the page, a
+      // finger scrolling a feed or a click through a link to another page doesn't start the video that plays next.
       const started = new WeakSet();
-      let pressed = -Infinity;
+      let pressed = null;
       const press = (e) => {
         if (!e.isTrusted) return;
         const t = e.target;
+        if (e.type === 'keydown' && t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select, [contenteditable]')))) return;
         if (t && t.closest && t.closest('a[href]')) return;
-        pressed = performance.now();
+        pressed = { at: performance.now(), key: e.type === 'keydown', x: e.clientX, y: e.clientY };
       };
       addEventListener('pointerdown', press, true);
       addEventListener('keydown', press, true);
-      const engage = (e) => { if (e.target && e.target.tagName === 'VIDEO' && performance.now() - pressed < 1000) started.add(e.target); };
+      const pressedOn = (v) => {
+        if (!pressed || performance.now() - pressed.at >= 1000) return false;
+        const r = v.getBoundingClientRect();
+        if (pressed.key) return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+        return pressed.x >= r.left - 24 && pressed.x <= r.right + 24 && pressed.y >= r.top - 24 && pressed.y <= r.bottom + 24;
+      };
+      const engage = (e) => { if (e.target && e.target.tagName === 'VIDEO' && pressedOn(e.target)) started.add(e.target); };
+      // When each video began playing with its sound on, in ms since 1970; gone once it pauses or goes quiet.
+      const heard = new WeakMap();
+      const hearing = (v) => {
+        if (!v.paused && !v.ended && v.readyState >= 2 && !v.muted && v.volume > 0) { if (!heard.has(v)) heard.set(v, Date.now()); }
+        else heard.delete(v);
+        return heard.get(v) || 0;
+      };
       const describe = () => {
         list = Array.from(document.querySelectorAll('video')).slice(0, 12);
         return list.map((v, i) => {
           const r = v.getBoundingClientRect();
           return { i, x: r.left, y: r.top, w: r.width, h: r.height, vw: v.videoWidth, vh: v.videoHeight,
                    playing: !v.paused && !v.ended && v.readyState >= 2, ended: v.ended, muted: v.muted || v.volume === 0,
-                   loop: v.loop, autoplay: v.autoplay, controls: v.controls, user: started.has(v), link: !!v.closest('a[href]'), nopip: !!v.disablePictureInPicture, fit: getComputedStyle(v).objectFit || 'contain',
+                   loop: v.loop, autoplay: v.autoplay, controls: v.controls, user: started.has(v), a: hearing(v), link: !!v.closest('a[href]'), nopip: !!v.disablePictureInPicture, fit: getComputedStyle(v).objectFit || 'contain',
                    t: v.currentTime || 0, d: isFinite(v.duration) ? v.duration : -1 };
         });
       };
@@ -202,16 +216,20 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         return Array(entry.frames.values)
     }
 
-    /// The video that would follow you out of this page, and the frame it's in: one you were watching. `any`: any
-    /// video playing a picture, for a page the mini player already has.
+    /// A video playing in this page that the card goes on with (`MiniPlayerLayout.carriesOn`), and the frame it's in.
+    /// `any`: any video playing a picture.
     func playing(in webView: WKWebView, any: Bool = false) -> (frame: Frame, video: PageVideo)? {
         let all = frames(in: webView)
-        return MiniPlayerLayout.best(in: all.map { ($0.viewport, $0.videos) }, by: any ? MiniPlayerLayout.plays : MiniPlayerLayout.follows)
+        return MiniPlayerLayout.best(in: all.map { ($0.viewport, $0.videos) }, by: any ? MiniPlayerLayout.plays(_:in:) : MiniPlayerLayout.carriesOn)
             .map { (frame: all[$0.frame], video: $0.video) }
     }
 
     /// The video leaving this page takes along, by `MiniPlayerLayout.followed`.
     func followed(in webView: WKWebView, leavingPage: Bool) -> (frame: Frame, video: PageVideo)? {
+        #if DEBUG
+        // A test copy with ZIGZAG_MINI_ANY=1, whose pages are all muted: any playing video follows, to see the card.
+        if ProcessInfo.processInfo.environment["ZIGZAG_MINI_ANY"] == "1" { return leavingPage ? nil : playing(in: webView, any: true) }
+        #endif
         let all = frames(in: webView)
         return MiniPlayerLayout.followed(in: all.map { ($0.viewport, $0.videos) }, leavingPage: leavingPage, presentingItself: isPresentingItself(webView))
             .map { (frame: all[$0.frame], video: $0.video) }

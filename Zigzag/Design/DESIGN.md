@@ -522,9 +522,11 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   the line you were on in place.
 - **Mini player** (`MiniPlayer`): leave a tab while a video you were watching plays and it follows you in a card that
   floats in a panel of its own (`MiniPlayerPanel`, #172), over the window and other apps, on every space and beside a
-  full screen window, as Picture in Picture does: one you can hear, or one you started or turned up yourself; never a muted autoplay, a page's moving
-  background, a card's preview in a link, or anything on a page that's on its way out to another
-  (`MiniPlayerLayout.followed`). The tab's own live page moved in and scaled so only its video shows, never laid out
+  full screen window, as Picture in Picture does. Only a video you're watching, as Chrome's and Arc's automatic Picture
+  in Picture have it (#582): playing with its sound on, at least 320 by 180 with half of it in view, and pressed or
+  turned up by you, or a video of a minute or more (or live) heard for 10 seconds; never a muted autoplay feed, a
+  shop's small or short product video, a page's moving background, a card's preview in a link, or anything on a page
+  that's on its way out to another (`MiniPlayerLayout.followed`). The tab's own live page moved in and scaled so only its video shows, never laid out
   again. A third of the page area wide (240 to 480), the video's shape, never over half its height, until you resize
   it by any edge or corner, as a window: the video's shape kept, the opposite edge or corner staying put, from 200
   wide to 80% of the screen, its longer side kept for the next video; `Radius.panel` (the page clipped to it

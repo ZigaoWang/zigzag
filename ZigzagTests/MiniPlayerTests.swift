@@ -8,8 +8,9 @@ import Testing
 struct MiniPlayerTests {
     private let viewport = CGSize(width: 1280, height: 800)
 
-    private func video(_ index: Int, _ rect: CGRect, playing: Bool = true, muted: Bool = false) -> PageVideo {
-        PageVideo(index: index, rect: rect, natural: CGSize(width: 1920, height: 1080), isPlaying: playing, isMuted: muted)
+    /// Started by you unless `user` is false.
+    private func video(_ index: Int, _ rect: CGRect, playing: Bool = true, muted: Bool = false, user: Bool = true) -> PageVideo {
+        PageVideo(index: index, rect: rect, natural: CGSize(width: 1920, height: 1080), isPlaying: playing, isMuted: muted, isStartedByUser: user)
     }
 
     // MARK: Choosing the video
@@ -44,10 +45,11 @@ struct MiniPlayerTests {
     }
 
     @Test func oneYouCanHearComesFirst() {
+        // Once the card shows a page, it goes on with a silent video you started, but one you can hear first.
         var silentBig = video(0, CGRect(x: 0, y: 0, width: 960, height: 540), muted: true)
         silentBig.isStartedByUser = true
-        let audible = video(1, CGRect(x: 0, y: 560, width: 320, height: 180))
-        #expect(MiniPlayerLayout.choose([silentBig, audible], viewport: viewport)?.index == 1)
+        let audible = video(1, CGRect(x: 0, y: 560, width: 320, height: 180), user: false)
+        #expect(MiniPlayerLayout.choose([silentBig, audible], viewport: viewport, by: MiniPlayerLayout.carriesOn)?.index == 1)
     }
 
     @Test func aPagesMovingBackgroundAndThumbnailsNeverFollow() {
@@ -59,45 +61,90 @@ struct MiniPlayerTests {
         #expect(MiniPlayerLayout.choose([background, autoplaying, thumbnail], viewport: viewport) == nil)
         // Controls showing don't make a muted autoplay one you're watching.
         background.hasControls = true
-        #expect(!MiniPlayerLayout.follows(background))
+        #expect(!MiniPlayerLayout.follows(background, in: viewport))
     }
 
-    // MARK: Which video follows you out (#156)
+    // MARK: Which video follows you out (#156, #582)
 
     private func page(_ videos: PageVideo...) -> [(viewport: CGSize, videos: [PageVideo])] { [(viewport, videos)] }
-
-    @Test func aMutedVideoFollowsOnlyWhenYouStartedIt() {
-        var muted = video(0, CGRect(x: 0, y: 0, width: 960, height: 540), muted: true)
-        #expect(MiniPlayerLayout.followed(in: page(muted), leavingPage: false, presentingItself: false) == nil)
-        // Pressed play, or turned its sound on, yourself: a silent video you're watching follows.
-        muted.isStartedByUser = true
-        #expect(MiniPlayerLayout.followed(in: page(muted), leavingPage: false, presentingItself: false)?.video.index == 0)
+    private func follows(_ videos: PageVideo..., now: Date = Date()) -> Int? {
+        MiniPlayerLayout.followed(in: [(viewport, videos)], leavingPage: false, presentingItself: false, now: now)?.video.index
     }
 
-    @Test func aVideoYouCanHearFollows() {
-        let audible = video(0, CGRect(x: 0, y: 0, width: 960, height: 540))
-        #expect(MiniPlayerLayout.followed(in: page(audible), leavingPage: false, presentingItself: false)?.video.index == 0)
-        // Scrolled on past it to the comments, it still follows.
-        let below = video(0, CGRect(x: 0, y: -900, width: 960, height: 540))
-        #expect(MiniPlayerLayout.followed(in: page(below), leavingPage: false, presentingItself: false) != nil)
+    /// A feed's muted autoplay never follows, even one you pressed play on or one the page made silent.
+    @Test func aMutedAutoplayFeedNeverFollows() {
+        let feed = (0..<3).map { i in
+            PageVideo(index: i, rect: CGRect(x: 380, y: CGFloat(i) * 420 - 100, width: 516, height: 290), natural: CGSize(width: 1280, height: 720),
+                      isPlaying: true, isMuted: true, autoplays: true)
+        }
+        #expect(MiniPlayerLayout.followed(in: [(viewport, feed)], leavingPage: false, presentingItself: false) == nil)
+        var pressed = feed[1]
+        pressed.isStartedByUser = true
+        #expect(follows(pressed) == nil)
+    }
+
+    /// A shop's product video playing with its sound on by itself, small beside the product's pictures: never.
+    @Test func aSmallProductVideoNeverFollows() {
+        let now = Date()
+        let product = PageVideo(index: 0, rect: CGRect(x: 120, y: 160, width: 300, height: 170), natural: CGSize(width: 1280, height: 720),
+                                isPlaying: true, autoplays: true, heardSince: now.addingTimeInterval(-60), duration: 45)
+        #expect(follows(product, now: now) == nil)
+        // Pressed play on it yourself, still too small to be what you're watching.
+        var pressed = product
+        pressed.isStartedByUser = true
+        #expect(follows(pressed, now: now) == nil)
+        // Bigger, but short and never started by you: a product video, however long it's been heard.
+        var big = product
+        big.rect = CGRect(x: 120, y: 160, width: 420, height: 420)
+        #expect(follows(big, now: now) == nil)
+    }
+
+    /// A video you started, with its sound on, big enough and in view: it follows at once.
+    @Test func aVideoYouStartedFollows() {
+        let yours = video(0, CGRect(x: 0, y: 0, width: 960, height: 540))
+        #expect(follows(yours) == 0)
+        // Muted, it doesn't.
+        var muted = yours
+        muted.isMuted = true
+        #expect(follows(muted) == nil)
+        // Scrolled on past it to the comments: more than half out of view, it stays.
+        let below = video(0, CGRect(x: 0, y: -300, width: 960, height: 540))
+        #expect(follows(below) == nil)
+        let half = video(0, CGRect(x: 0, y: -200, width: 960, height: 540))
+        #expect(follows(half) == 0)
+    }
+
+    /// One the page started with its sound on (YouTube after a click on a thumbnail, Bilibili): a long or live video
+    /// follows once it has been heard a while.
+    @Test func aLongVideoHeardAWhileFollows() {
+        let now = Date()
+        var watch = video(0, CGRect(x: 0, y: 0, width: 854, height: 480), user: false)
+        watch.duration = 600
+        watch.heardSince = now.addingTimeInterval(-3)
+        #expect(follows(watch, now: now) == nil)
+        watch.heardSince = now.addingTimeInterval(-MiniPlayerLayout.heardLong)
+        #expect(follows(watch, now: now) == 0)
+        // Live, the same.
+        watch.duration = nil
+        #expect(follows(watch, now: now) == 0)
+        // Never heard: a silent start isn't watching.
+        watch.heardSince = nil
+        #expect(follows(watch, now: now) == nil)
     }
 
     @Test func aHomepagesHoverPreviewNeverFollows() {
         // A card's preview, playing under the pointer as you click through to the video's own page.
-        var preview = video(0, CGRect(x: 300, y: 200, width: 290, height: 163), muted: true)
+        var preview = video(0, CGRect(x: 300, y: 200, width: 290, height: 163), muted: true, user: false)
         preview.isInLink = true
-        #expect(MiniPlayerLayout.followed(in: page(preview), leavingPage: false, presentingItself: false) == nil)
-        // With its sound on by itself, still a preview.
+        #expect(follows(preview) == nil)
+        // With its sound on, or turned on by you: still a preview in a link.
         preview.isMuted = false
-        #expect(MiniPlayerLayout.followed(in: page(preview), leavingPage: false, presentingItself: false) == nil)
-        // Its sound turned on by you: you're watching it.
         preview.isStartedByUser = true
-        #expect(MiniPlayerLayout.followed(in: page(preview), leavingPage: false, presentingItself: false) != nil)
+        #expect(follows(preview) == nil)
         // A muted autoplay beside a video you started: yours follows, however much bigger the other is.
-        var mine = video(1, CGRect(x: 0, y: 600, width: 320, height: 180), muted: true)
-        mine.isStartedByUser = true
-        let other = video(2, CGRect(x: 0, y: 0, width: 960, height: 540), muted: true)
-        #expect(MiniPlayerLayout.followed(in: page(mine, other), leavingPage: false, presentingItself: false)?.video.index == 1)
+        let mine = video(1, CGRect(x: 0, y: 580, width: 320, height: 180))
+        let other = video(2, CGRect(x: 0, y: 0, width: 960, height: 540), muted: true, user: false)
+        #expect(follows(mine, other) == 1)
     }
 
     @Test func nothingFollowsAPageOnItsWayOut() {
@@ -120,13 +167,14 @@ struct MiniPlayerTests {
     @Test func readsWhatThePageSays() {
         let parsed = PageVideo(["i": 2, "x": 10, "y": 20.5, "w": 640, "h": 360, "vw": 1280, "vh": 720, "playing": true, "ended": false,
                                 "muted": false, "loop": false, "autoplay": true, "controls": false, "user": true, "link": true, "fit": "cover",
-                                "t": 12.5, "d": -1] as [String: Any])
+                                "t": 12.5, "d": -1, "a": 1_700_000_000_000] as [String: Any])
         #expect(parsed?.index == 2)
         #expect(parsed?.rect == CGRect(x: 10, y: 20.5, width: 640, height: 360))
         #expect(parsed?.fit == "cover")
         #expect(parsed?.isStartedByUser == true)
         #expect(parsed?.isInLink == true)
         #expect(parsed?.duration == nil)
+        #expect(parsed?.heardSince == Date(timeIntervalSince1970: 1_700_000_000))
         #expect(PageVideo(["x": 1]) == nil)
     }
 

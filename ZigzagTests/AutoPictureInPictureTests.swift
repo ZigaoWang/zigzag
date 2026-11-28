@@ -6,8 +6,9 @@ import Testing
 @MainActor struct AutoPictureInPictureTests {
     private typealias Model = AutoPictureInPictureModel
 
-    private static func video(playing: Bool = true, muted: Bool = false, user: Bool = false, link: Bool = false, blocks: Bool = false) -> PageVideo {
-        PageVideo(index: 0, rect: CGRect(x: 0, y: 0, width: 640, height: 360), natural: CGSize(width: 1280, height: 720), isPlaying: playing,
+    private static func video(playing: Bool = true, muted: Bool = false, user: Bool = true, link: Bool = false, blocks: Bool = false,
+                              size: CGSize = CGSize(width: 640, height: 360)) -> PageVideo {
+        PageVideo(index: 0, rect: CGRect(origin: .zero, size: size), natural: CGSize(width: 1280, height: 720), isPlaying: playing,
                   isMuted: muted, isStartedByUser: user, isInLink: link, blocksPictureInPicture: blocks)
     }
 
@@ -18,7 +19,28 @@ import Testing
 
     @Test func movesAPlayingVideoYouWereWatching() {
         #expect(Model.moves(Self.page(), isOn: true))
-        #expect(Model.moves(Self.page(video: Self.video(user: true)), isOn: true))
+        // A long one the page started, heard a while.
+        let now = Date()
+        var heard = Self.video(user: false)
+        heard.heardSince = now.addingTimeInterval(-30)
+        heard.duration = 900
+        #expect(Model.moves(Self.page(video: heard), isOn: true, now: now))
+    }
+
+    /// The same rule as switching tabs (#582): a muted autoplay, a small product video, or one the page started a
+    /// moment ago stays in its page.
+    @Test func leavesVideosYoureNotWatching() {
+        let now = Date()
+        #expect(!Model.moves(Self.page(video: Self.video(muted: true, user: false)), isOn: true, now: now))
+        #expect(!Model.moves(Self.page(video: Self.video(size: CGSize(width: 300, height: 170))), isOn: true, now: now))
+        var fresh = Self.video(user: false)
+        fresh.heardSince = now.addingTimeInterval(-2)
+        fresh.duration = 900
+        #expect(!Model.moves(Self.page(video: fresh), isOn: true, now: now))
+        var short = fresh
+        short.heardSince = now.addingTimeInterval(-30)
+        short.duration = 30
+        #expect(!Model.moves(Self.page(video: short), isOn: true, now: now))
     }
 
     @Test func leavesTheRestAlone() {
