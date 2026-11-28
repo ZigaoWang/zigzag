@@ -1470,7 +1470,7 @@ final class MiniPlayerView: NSView {
         let apply = {
             self.controls.animator().alphaValue = play
             rest.forEach { $0.animator().alphaValue = all }
-            self.placeholder.animator().alphaValue = 1 - all
+            self.placeholder.words.forEach { $0.animator().alphaValue = 1 - all }
         }
         // A change of state in place, as the Mac's Picture in Picture fades its controls; not a press's snap.
         if animated {
@@ -1479,7 +1479,7 @@ final class MiniPlayerView: NSView {
             Tokens.Motion.withoutAnimation {
                 self.controls.alphaValue = play
                 rest.forEach { $0.alphaValue = all }
-                self.placeholder.alphaValue = 1 - all
+                self.placeholder.words.forEach { $0.alphaValue = 1 - all }
             }
         }
     }
@@ -1786,6 +1786,8 @@ private final class MiniPlayerPlaceholder: NSView {
     private let glyph = NSImageView()
     private let label = Label("", font: Tokens.Font.small(.semibold), color: NSColor.white.withAlphaComponent(0.72))
     var title = "" { didSet { label.stringValue = title; needsLayout = true } }
+    /// The glyph and the name, which make way for the controls; the dark card stays under them.
+    var words: [NSView] { [glyph, label] }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
