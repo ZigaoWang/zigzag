@@ -1887,89 +1887,6 @@
         }
       }
     },
-    "File saves the download in Zigzag first, using the page’s session, then hands off the saved file; links still hand off their address." : {
-      "comment" : "Under the Hand off choice in a download rule's sheet: what File does, and that links are unaffected.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„Datei“ lädt den Download zuerst in Zigzag mit der Sitzung der Seite und übergibt dann die gesicherte Datei. Links übergeben weiterhin ihre Adresse."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Archivo guarda primero la descarga en Zigzag, con la sesión de la página, y después envía el archivo guardado; los enlaces siguen enviando su dirección."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fichier enregistre d’abord le téléchargement dans Zigzag, avec la session de la page, puis transfère le fichier enregistré. Les liens transfèrent toujours leur adresse."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "File salva prima il download in Zigzag, usando la sessione della pagina, poi trasferisce il file salvato; i link trasferiscono comunque il proprio indirizzo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「ファイル」を選ぶと、ページのセッションを使ってZigzagで先にダウンロードを保存してから、保存したファイルを渡します。リンクはこれまでどおりアドレスを渡します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "파일을 선택하면 페이지의 세션을 사용해 Zigzag에서 먼저 다운로드를 저장한 후 저장된 파일을 전달합니다. 링크는 계속 주소를 전달합니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bij Bestand bewaart Zigzag de download eerst, met de sessie van de pagina, en geeft daarna het bewaarde bestand door; bij links wordt nog steeds het adres doorgegeven."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opcja „Plik” najpierw zachowuje pobrany plik w Zigzag, używając sesji strony, a następnie przekazuje zachowany plik. Linki nadal przekazują swój adres."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A entrega de arquivo salva o download no Zigzag primeiro, usando a sessão da página, e depois entrega o arquivo salvo. Os links continuam entregando o endereço."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Файл сначала сохраняет загрузку в Zigzag, используя сеанс страницы, а затем передаёт сохранённый файл; ссылки по-прежнему передаются по адресу."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dosya, indirmeyi önce sayfanın oturumunu kullanarak Zigzag’e kaydeder, sonra kaydedilen dosyayı devreder; bağlantılar yine adresleriyle devredilir."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“文件”会先用网页的登录状态把下载保存到 Zigzag，再转交保存好的文件；链接仍然转交地址。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「檔案」會先用網頁的登入狀態在 Zigzag 中儲存下載項目，再轉交儲存好的檔案；連結仍然轉交網址。"
-          }
-        }
-      }
-    },
     "GitHub usernames have only letters, numbers and single hyphens." : {
       "comment" : "Tooltip on the username field of the New Live Folder sheet when what's typed can't be a GitHub username, so its button can't be pressed.",
       "localizations" : {
@@ -213450,6 +213367,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示方式"
+          }
+        }
+      }
+    },
+    "File saves the download in a temporary folder first, using the page’s session, then hands off the saved file; links still hand off their address. macOS clears that folder, so the file is not kept in Downloads." : {
+      "comment" : "Under the Hand off choice in a download rule's sheet: what File does, where the file waits (a temporary folder macOS clears), and that links are unaffected.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Datei“ lädt den Download zuerst in Zigzag mit der Sitzung der Seite und übergibt dann die gesicherte Datei. Links übergeben weiterhin ihre Adresse."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivo guarda primero la descarga en Zigzag, con la sesión de la página, y después envía el archivo guardado; los enlaces siguen enviando su dirección."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichier enregistre d’abord le téléchargement dans Zigzag, avec la session de la page, puis transfère le fichier enregistré. Les liens transfèrent toujours leur adresse."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File salva prima il download in Zigzag, usando la sessione della pagina, poi trasferisce il file salvato; i link trasferiscono comunque il proprio indirizzo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「ファイル」を選ぶと、ページのセッションを使ってZigzagで先にダウンロードを保存してから、保存したファイルを渡します。リンクはこれまでどおりアドレスを渡します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일을 선택하면 페이지의 세션을 사용해 Zigzag에서 먼저 다운로드를 저장한 후 저장된 파일을 전달합니다. 링크는 계속 주소를 전달합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bij Bestand bewaart Zigzag de download eerst, met de sessie van de pagina, en geeft daarna het bewaarde bestand door; bij links wordt nog steeds het adres doorgegeven."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opcja „Plik” najpierw zachowuje pobrany plik w Zigzag, używając sesji strony, a następnie przekazuje zachowany plik. Linki nadal przekazują swój adres."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A entrega de arquivo salva o download no Zigzag primeiro, usando a sessão da página, e depois entrega o arquivo salvo. Os links continuam entregando o endereço."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файл сначала сохраняет загрузку в Zigzag, используя сеанс страницы, а затем передаёт сохранённый файл; ссылки по-прежнему передаются по адресу."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dosya, indirmeyi önce sayfanın oturumunu kullanarak Zigzag’e kaydeder, sonra kaydedilen dosyayı devreder; bağlantılar yine adresleriyle devredilir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“文件”会先用网页的登录状态把下载保存到 Zigzag，再转交保存好的文件；链接仍然转交地址。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「檔案」會先用網頁的登入狀態在 Zigzag 中儲存下載項目，再轉交儲存好的檔案；連結仍然轉交網址。"
           }
         }
       }

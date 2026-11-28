@@ -174,6 +174,20 @@ final class DownloadManager: NSObject {
         }
     }
 
+    /// Where a File handoff's download waits for the action to be given it (#589): the system's temporary folder,
+    /// in a folder of Zigzag's own. macOS empties it — `tmp_cleaner` removes what is three days old, and nothing
+    /// survives a reboot — so it is temporary by design, while the file is still there to be found and opened if you
+    /// want it, which deleting it five minutes after the handoff would not allow. It is deliberately not Downloads:
+    /// a metafile handed to rTorrent is a carrier, not something you asked to keep.
+    static var handoffFolder: URL {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("Handoffs", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: base.path) {
+            try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true,
+                                                      attributes: [.posixPermissions: 0o700])
+        }
+        return base
+    }
+
     /// Ask with a save sheet each time instead of saving straight to Downloads.
     static var asksWhereToSave: Bool {
         get { UserDefaults.standard.bool(forKey: "DownloadsAskWhere") }
@@ -720,7 +734,11 @@ extension DownloadManager: WKDownloadDelegate {
         }
         var replacing: URL?
         var opensWhenFinished = false
-        if let folder = Self.aiAppsFolder(for: item(for: download)) {
+        if fileHandoff != nil {
+            // A File handoff's file goes where the handoff will look for it, never into Downloads (#589): it is a
+            // carrier for the app or service, and macOS clears the temporary folder it waits in.
+            destination = Self.uniqueDestination(for: name, in: Self.handoffFolder, avoiding: inProgress)
+        } else if let folder = Self.aiAppsFolder(for: item(for: download)) {
             // AI apps' files stay in their profile's own folder, and no one is asked where.
             let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
             destination = Self.uniqueDestination(for: chosen?.lastPathComponent ?? name, in: folder, avoiding: inProgress)
@@ -844,7 +862,9 @@ extension DownloadManager: WKDownloadDelegate {
             item.totalBytes = size
             item.completedBytes = size
         }
-        if let destination = item.destination {
+        if let destination = item.destination, item.fileHandoff == nil {
+            // A File handoff's file is a carrier, not a download you asked to keep (#589): it is not marked as
+            // downloaded — no Downloads stack entry, no history — since it waits in the system's temporary folder.
             Self.markDownloaded(destination, from: item.sourceURL, page: download.originalRequest?.mainDocumentURL, isPrivate: item.isPrivate)
             // Bounce the Downloads stack in the Dock, like every Mac browser.
             if !item.isForAIApps { DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path) }

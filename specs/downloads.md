@@ -76,7 +76,12 @@
   Test: DownloadRuleTests.aDestinationIsTheFirstThatMatches
 - A handoff rule by file type → sends every download whose own name ends in one of its extensions, whatever its address says; links have no name, so they never match.
   Test: DownloadRuleTests.aFileTypeHandoffMatchesTheDownloadsNameAndNeverALink
-- A rule's Hand off set to File → Zigzag saves the download in Downloads first, then hands the saved file to the action; a link still hands off its address.
+- A rule's Hand off set to File → Zigzag saves the download in the system's temporary folder, then hands the saved file to the action; a link still hands off its address.
+  Test: HandoffFolderTests.theHandoffFolderIsInTheSystemTemporaryFolderAndPrivate
+  Test: HandoffFolderTests.theHandoffFolderIsNotWhereDownloadsGo
+- A File handoff's file → kept only as long as the system keeps its temporary folder: `tmp_cleaner` empties what is three days old and nothing survives a reboot, so a handed-on metafile is temporary by design while still there to be found and opened. It never lands in Downloads, and it is not deleted the moment the handoff returns, so an app given `{file}` can still read it.
+  Test: HandoffFolderTests.askingAgainKeepsTheFolderAndItsFiles
+  Test: HandoffFolderTests.twoFilesOfOneNameGetTheirOwnPlaces
   Test: DownloadRuleTests.onlyDownloadsHandOffASavedFile
 - A File handoff's templates → `{file}` is the saved file's path and `{file_url}` its file URL, while `{link}` stays the address.
   Test: DownloadRuleTests.fileTokensAreTheSavedFileAndNothingWithoutOne
