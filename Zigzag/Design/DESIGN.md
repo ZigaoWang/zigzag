@@ -534,11 +534,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   wide to 80% of the screen, its longer side kept for the next video; `Radius.panel` (the page clipped to it
   with `clipsToBounds`, which a web view's layers obey), the floating layer's hairline and the window's own shadow, first
   12pt into the page area's bottom right. It grows out of where the video was (`Motion.zoom`; a fade with Reduce Motion) and fades as it closes. Pointing at it brings its
-  controls in a quick fade over a 38% dim, deeper at the top and bottom, so white reads over any picture, words in
+  controls in a short fade over a 28% dim, deeper at the top and bottom, so white reads over any picture, words in
   it too: the arrow and the site's name at the top left (one button back to the tab), minimize and close at the top
   right, back 15 seconds, play or pause and forward 15 seconds in the middle (36pt, semibold 20 to 24pt white glyphs
   on a soft shadow), a thin time line to press or drag along the bottom (no skipping or time line for a live
-  stream). They go 2.5 seconds after the pointer stops. Drag it anywhere on screen, 4pt in from the edges of its usable
+  stream). They go 2.5 seconds after the pointer stops. A tap with a finger shows them as hovering does, and another
+  tap hides them. A picture the card can't show (protected, or in a frame it can't find on the page) gives way to the
+  site's name under a quiet video glyph on a dark card, its controls working as ever. Drag it anywhere on screen, 4pt in from the edges of its usable
   part (clear of the menu bar and the Dock); let go over its window, it glides (`Motion.snappy`) into the page area's
   nearest corner, 12pt in, and keeps to that corner as the window moves and changes; let go anywhere else, into the
   screen's nearest corner, 12pt in, as the Mac's Picture in Picture does, and stays there whatever the window does.
