@@ -60,6 +60,11 @@
   Test: DownloadsPanelListTests.aFinishedDownloadIsShownAloneWithTheRestBehindShowAll
 - The panel's width → wide enough for every label, at the narrowest sidebar, in English and Chinese.
   Test: DownloadsPanelLayoutTests.everyLabelFitsAtTheNarrowestSidebar
+- A download that stops arriving → the ring and the row keep the progress it last reached, not the figure from before it stopped, because the throttle that keeps the panel to four updates a second sends the last sample it held when that second ends.
+  Test: ProgressThrottleTests.theLastSampleOfAStallIsTheOneThatArrives
+  Test: ProgressThrottleTests.aReportAfterTheWindowSendsAtOnceAndDropsTheFoldedOne
+- A download completing → the whole ring at once, even inside that second.
+  Test: ProgressThrottleTests.theFinishIsNeverHeldBack
 - A row → the file's icon, name and progress or size; Pause and Cancel while coming in, Show in Finder when done, Try Again when a failed one can be, Download Again when the file was moved or deleted.
   No test yet.
 

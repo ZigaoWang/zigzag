@@ -22,6 +22,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - The loading line moves only when the page does. A site that has stopped answering holds still instead of creeping toward the end, and while nothing arrives the line softly fades in and out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
+- A download that stalls shows the progress it actually reached, in the panel's row and the sidebar's ring, instead of the figure from a quarter of a second before it stopped. ([#571](https://github.com/ZigaoWang/zigzag/issues/571))
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
 - An installed app on a disk that isn’t connected stays in Settings › General › Installed Apps, marked On a disk that isn’t connected, and works again as soon as the disk is back. Before, it left the list, with its toolbar choice, until you opened the app. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 - Pressing ⌘Z after typing in a page no longer quits Zigzag now and then.

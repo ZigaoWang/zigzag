@@ -164,6 +164,7 @@
 		33E706A12F4E2336AF5BA09E /* PageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E2214E6363E199754548C38 /* PageState.swift */; };
 		35D7E0C77E5DE66D9B871D4F /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = E35F3B1C28D9313BCCFA9CA4 /* LICENSE */; };
 		362CDB35E2739BCEFA79410B /* DownloadRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC12F553CEF782A3F8900CE /* DownloadRulesTests.swift */; };
+		8B6A63ACDA568D16D34688B1 /* ProgressThrottleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F88151DFFCA9D856C48928EE /* ProgressThrottleTests.swift */; };
 		3690704E0C2C6021A3E511D7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16FC91D0E7086B1EC211FD6F /* AppDelegate.swift */; };
 		3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */; };
 		36BC4DAF8C508734F781BA47 /* TabPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66958B9657E4B52FE56AA408 /* TabPreview.swift */; };
@@ -461,6 +462,7 @@
 		A25128EAA13B9A069E8A0598 /* BridgeBookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D77B180834B8F01E59D50DF /* BridgeBookmarks.swift */; };
 		A25CD0F7F3F6516C2D48EA8D /* SidebarEdgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A53B7FA15165C41D80113E1 /* SidebarEdgeTests.swift */; };
 		A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */; };
+		706DE1167B422E0FD5706BEB /* ProgressThrottle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A541D9BD592B6215567A4520 /* ProgressThrottle.swift */; };
 		A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31A2391B831DAAD2A652FCA /* Onboarding.swift */; };
 		A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */; };
 		A4D71BE5761D2F335B0787EA /* OrionImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7520635385AA4E5E5C5AC9FB /* OrionImporter.swift */; };
@@ -1030,6 +1032,7 @@
 		6B6C77CFE33BFCD7CC963266 /* ChromeProfilesImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromeProfilesImportTests.swift; sourceTree = "<group>"; };
 		6B89CCE006086C641D713AAB /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
 		6CC12F553CEF782A3F8900CE /* DownloadRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadRulesTests.swift; sourceTree = "<group>"; };
+		F88151DFFCA9D856C48928EE /* ProgressThrottleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressThrottleTests.swift; sourceTree = "<group>"; };
 		6CE05E70848504F5FE346B61 /* ZigzagRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZigzagRelease.entitlements; sourceTree = "<group>"; };
 		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		6E41E2FFAB5C045AC7D0D6C2 /* DarkReaderFixes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkReaderFixes.swift; sourceTree = "<group>"; };
@@ -1267,6 +1270,7 @@
 		CD2C91E2BA65EF3F426B22F9 /* audio-routes.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "audio-routes.js"; sourceTree = "<group>"; };
 		CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarModel.swift; sourceTree = "<group>"; };
 		CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
+		A541D9BD592B6215567A4520 /* ProgressThrottle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressThrottle.swift; sourceTree = "<group>"; };
 		CDE5F88B8769F540831A7940 /* DownloadRuleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadRuleSheet.swift; sourceTree = "<group>"; };
 		CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePermissions.swift; sourceTree = "<group>"; };
 		CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarHistoryTests.swift; sourceTree = "<group>"; };
@@ -1802,6 +1806,7 @@
 				A69950C3F8014CFB7FAB861A /* DarkSeen.swift */,
 				79CD40A1F162A94D5678E5FE /* DownloadHandoff.swift */,
 				CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */,
+				A541D9BD592B6215567A4520 /* ProgressThrottle.swift */,
 				DAC9B2535F5F2C950BA4096B /* DownloadPlace.swift */,
 				9DCD89005ED4EBEF80B7EA13 /* DownloadPolicy.swift */,
 				952EA6156D08723DCA5FA765 /* DownloadRules.swift */,
@@ -2074,6 +2079,7 @@
 				98160990FBB7DDACDE7DEF3E /* DownloadPolicyTests.swift */,
 				C81FFBD3A6B1DEE26D521B61 /* DownloadReplaceTests.swift */,
 				6CC12F553CEF782A3F8900CE /* DownloadRulesTests.swift */,
+				F88151DFFCA9D856C48928EE /* ProgressThrottleTests.swift */,
 				FFDA1E0EB0FD9E32176DFF97 /* DragZoneTests.swift */,
 				7F945D7E0BF21B2E2FD7A4C7 /* EmojiSearchTests.swift */,
 				02E61EC3537FA9842B9EC140 /* EmptyPageTests.swift */,
@@ -2740,6 +2746,7 @@
 				65BFE923B15D9B75D0349C50 /* DockProgress.swift in Sources */,
 				FB3B815BBF654594C6051CD3 /* DownloadHandoff.swift in Sources */,
 				A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */,
+				706DE1167B422E0FD5706BEB /* ProgressThrottle.swift in Sources */,
 				16533A8F18B300E1F88BEEB7 /* DownloadPlace.swift in Sources */,
 				8EA95217D924645FA2CB7FF8 /* DownloadPolicy.swift in Sources */,
 				6FAA00CCE4CED77788B5D1C3 /* DownloadRuleSheet.swift in Sources */,
@@ -3067,6 +3074,7 @@
 				3C7D596D2205FA8C83362D04 /* DownloadPolicyTests.swift in Sources */,
 				54A9A3723030A1E1F7B634BB /* DownloadReplaceTests.swift in Sources */,
 				362CDB35E2739BCEFA79410B /* DownloadRulesTests.swift in Sources */,
+				8B6A63ACDA568D16D34688B1 /* ProgressThrottleTests.swift in Sources */,
 				116E2D6D84EACA50E7C273EC /* DragZoneTests.swift in Sources */,
 				E137A0DE21BBDB974852712E /* EmojiSearchTests.swift in Sources */,
 				AC649C66E6B26BD48595D221 /* EmptyPageTests.swift in Sources */,
