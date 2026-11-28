@@ -4,6 +4,12 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Corrections
+- Quand les onglets épinglés d’un espace sont repliés, seules les pages chargées s’affichent. Un onglet épinglé fermé avec ⌘W ou son × garde sa ligne jusqu’à ce que le pointeur quitte la barre latérale, pour que rien ne bouge sous lui, et un onglet en veille ou non chargé depuis la réouverture de Zigzag ne s’affiche plus. Les pages sous un dossier fermé fonctionnent de la même façon. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Les onglets épinglés, les vignettes épinglées et les favoris dont la page n’est pas chargée sont estompés, icône et nom, pour que vous les distinguiez des onglets ouverts, dans la barre latérale, la barre latérale flottante et la barre latérale depuis le bord de l’écran. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- Le nom du profil à côté du nom d’un espace ne s’affiche que lorsque vos espaces sont sur plusieurs profils, il disparaît donc dès qu’un espace doté de son propre profil est supprimé, et un clic dessus ouvre Réglages › Profils. La flèche qui replie les onglets épinglés est alignée sur le nom de l’espace. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- L’adresse dans la barre latérale commence au même bord gauche que les lignes en dessous. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
+
 ## [0.10.0] - 2026-11-25
 
 Synchroniser avec iCloud garde vos espaces, onglets épinglés, favoris et réglages identiques sur chaque Mac, et la barre latérale depuis le bord de l’écran affiche un aperçu des pages à côté d’elle. Zigzag est aussi disponible dans onze langues de plus, le mode de compatibilité désactive d’un seul interrupteur ce qui pourrait gêner un site, et les règles de téléchargement peuvent transférer le fichier enregistré.

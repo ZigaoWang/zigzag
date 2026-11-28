@@ -4,6 +4,12 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ## [Unreleased]
 
+### Correzioni
+- Con i pannelli fissati di uno spazio ripiegati, si vedono solo le pagine caricate. Un pannello fissato chiuso con ⌘W o con la sua × mantiene la sua riga finché il puntatore non lascia la barra laterale, così sotto il puntatore non si sposta nulla, e uno sospeso o non caricato dalla riapertura di Zigzag non si vede più. Le pagine sotto una cartella chiusa funzionano allo stesso modo. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- I pannelli fissati, i riquadri fissati e i preferiti la cui pagina non è caricata appaiono attenuati, icona e nome, così puoi distinguerli da quelli aperti, nella barra laterale, nella barra laterale fluttuante e nella barra laterale dal bordo dello schermo. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- Il nome del profilo accanto al nome di uno spazio appare solo finché i tuoi spazi sono su più di un profilo, quindi scompare quando viene eliminato uno spazio con un proprio profilo, e un clic sul nome apre Impostazioni › Profili. La freccia che ripiega i pannelli fissati è allineata al nome dello spazio. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- L’indirizzo nella barra laterale inizia dallo stesso bordo sinistro delle righe sottostanti. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
+
 ## [0.10.0] - 2026-11-25
 
 Sincronizza con iCloud mantiene uguali su ogni Mac i tuoi spazi, i pannelli fissati, i preferiti e le impostazioni, e la barra laterale dal bordo dello schermo mostra le pagine in anteprima accanto a sé. Zigzag è anche in altre undici lingue, la modalità compatibilità disattiva con un solo interruttore ciò che potrebbe guastare un sito, e le regole di download possono trasferire il file salvato.

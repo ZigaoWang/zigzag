@@ -4,6 +4,12 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
+### Opgelost
+- Als de vastgezette tabbladen van een space zijn ingeklapt, staan alleen geladen pagina’s er. Een vastgezet tabblad dat je sluit met ⌘W of zijn × houdt zijn rij tot de aanwijzer de navigatiekolom verlaat, zodat er onder de aanwijzer niets verschuift, en een tabblad in slaapstand of dat sinds het heropenen van Zigzag niet geladen is, staat er niet meer. Pagina’s onder een gesloten map werken net zo. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Vastgezette tabbladen, vastgezette tegels en favorieten waarvan de pagina niet geladen is, zijn gedimd, pictogram en naam, zodat je ze van open tabbladen onderscheidt, in de navigatiekolom, de zwevende navigatiekolom en de navigatiekolom vanaf de schermrand. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- De profielnaam naast de naam van een space staat er alleen zolang je spaces op meer dan één profiel staan, dus hij verdwijnt zodra een space met een eigen profiel wordt verwijderd, en een klik erop opent Instellingen › Profielen. De pijl die de vastgezette tabbladen inklapt, staat op gelijke hoogte met de naam van de space. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- Het adres in de navigatiekolom begint op dezelfde linkerrand als de rijen eronder. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
+
 ## [0.10.0] - 2026-11-25
 
 Synchroniseer met iCloud houdt je spaces, vastgezette tabbladen, favorieten en instellingen gelijk op elke Mac, en de navigatiekolom vanaf de schermrand toont voorbeelden van pagina’s ernaast. Zigzag is ook in elf extra talen, de compatibiliteitsmodus zet met één schakelaar uit wat een website kan breken, en downloadregels kunnen het bewaarde bestand doorgeven.

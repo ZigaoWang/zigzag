@@ -4,6 +4,12 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 
 ## [Unreleased]
 
+### Correcciones
+- Con las pestañas fijadas de un espacio plegadas, solo se ven las páginas cargadas. Una pestaña fijada cerrada con ⌘W o con su × conserva su fila hasta que el puntero sale de la barra lateral, para que nada se mueva bajo él, y una que está suspendida o sin cargar desde que Zigzag se volvió a abrir ya no aparece. Las páginas bajo una carpeta cerrada funcionan igual. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Las pestañas fijadas, los mosaicos fijados y los favoritos cuya página no está cargada se ven atenuados, icono y nombre, para que los distingas de los abiertos, en la barra lateral, la barra lateral flotante y la barra lateral desde el borde de la pantalla. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- El nombre del perfil junto al nombre de un espacio solo aparece mientras tus espacios están en más de un perfil, así que desaparece al eliminar un espacio con perfil propio, y un clic en él abre Ajustes › Perfiles. La flecha que pliega las pestañas fijadas queda a la altura del nombre del espacio. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- La dirección en la barra lateral empieza en el mismo borde izquierdo que las filas de debajo. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
+
 ## [0.10.0] - 2026-11-25
 
 Sincronizar con iCloud mantiene iguales tus espacios, pestañas fijadas, favoritos y ajustes en todos tus Mac, y la barra lateral desde el borde de la pantalla muestra vistas previas de las páginas a su lado. Zigzag también está en once idiomas más, el modo de compatibilidad desactiva con un solo interruptor lo que puede romper un sitio y las reglas de descarga pueden enviar el archivo guardado.

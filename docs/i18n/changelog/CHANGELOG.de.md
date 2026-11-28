@@ -4,6 +4,12 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 
 ## [Unreleased]
 
+### Behoben
+- Sind die fixierten Tabs eines Space eingeklappt, erscheinen nur geladene Seiten. Ein fixierter Tab, den du mit ⌘W oder seinem × schließt, behält seine Zeile, bis der Zeiger die Seitenleiste verlässt, sodass sich unter dem Zeiger nichts verschiebt, und einer, der ruht oder seit dem erneuten Öffnen von Zigzag nicht geladen wurde, erscheint nicht mehr. Seiten unter einem geschlossenen Ordner verhalten sich genauso. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Fixierte Tabs, fixierte Kacheln und Favoriten, deren Seite nicht geladen ist, sind mit Symbol und Name abgeblendet, sodass du sie von offenen unterscheiden kannst, in der Seitenleiste, der schwebenden Seitenleiste und der Seitenleiste vom Bildschirmrand. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- Der Name des Profils neben dem Namen eines Space erscheint nur, solange deine Spaces auf mehr als einem Profil liegen, und verschwindet also, sobald ein Space mit eigenem Profil gelöscht wird, und ein Klick darauf öffnet „Einstellungen“ › „Profile“. Der Pfeil, der die fixierten Tabs einklappt, steht auf einer Höhe mit dem Namen des Space. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- Die Adresse in der Seitenleiste beginnt an derselben linken Kante wie die Zeilen darunter. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
+
 ## [0.10.0] - 2026-11-25
 
 „Mit iCloud synchronisieren“ hält deine Spaces, fixierten Tabs, Favoriten und Einstellungen auf jedem Mac gleich, und die Seitenleiste vom Bildschirmrand zeigt Seiten als Vorschau daneben. Außerdem gibt es Zigzag in elf weiteren Sprachen, der Kompatibilitätsmodus schaltet mit einem Schalter ab, was eine Website stören könnte, und Downloadregeln können die gesicherte Datei übergeben.
