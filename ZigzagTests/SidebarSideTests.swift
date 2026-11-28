@@ -246,6 +246,77 @@ struct SidebarSideTests {
         header.layoutSubtreeIfNeeded()
         #expect(abs(header.label.frame.minX + Label.inset + bearing - SidebarRowView.inset) < 0.01)
     }
+
+    /// The profile's name at the end of the space's line is a link to Settings › Profiles; the rest of the line
+    /// isn't, and with no name nothing is (#578).
+    @Test func theProfilesNameOpensProfiles() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 80), styleMask: [.borderless], backing: .buffered, defer: true)
+        let header = SpaceHeaderView(frame: NSRect(x: 0, y: 0, width: width - Tokens.Sidebar.edge * 2, height: SpaceHeaderView.rowHeight))
+        window.contentView?.addSubview(header)
+        header.name = "School"
+        header.profileName = "Work"
+        header.layoutSubtreeIfNeeded()
+        let frame = try #require(header.debugProfileFrame)
+        #expect(header.isOnProfile(header.convert(NSPoint(x: frame.midX, y: frame.midY), to: nil)))
+        #expect(!header.isOnProfile(header.convert(NSPoint(x: header.label.frame.midX, y: header.label.frame.midY), to: nil)))
+        header.profileName = nil
+        header.layoutSubtreeIfNeeded()
+        #expect(!header.isOnProfile(header.convert(NSPoint(x: frame.midX, y: frame.midY), to: nil)))
+        _ = window
+    }
+
+    /// The window opens Settings on Profiles for it.
+    @Test func theWindowOpensSettingsOnProfiles() throws {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: nil, title: "Tab", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        controller.listShowProfiles()
+        #expect(manager.selectedTab?.url == SettingsPage.url(for: .profiles))
+    }
+
+    /// The fold chevron's ink centers on the name's capitals, measured in a render, at both name sizes (#578).
+    @Test func theFoldChevronCentersOnTheNamesCaps() throws {
+        let large = SpaceHeaderView.isLarge
+        defer { SpaceHeaderView.isLarge = large }
+        for isLarge in [true, false] {
+            SpaceHeaderView.isLarge = isLarge
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 80), styleMask: [.borderless], backing: .buffered, defer: true)
+            window.appearance = NSAppearance(named: .aqua)
+            let header = SpaceHeaderView(frame: NSRect(x: 0, y: 0, width: width - Tokens.Sidebar.edge * 2, height: SpaceHeaderView.rowHeight))
+            window.contentView?.addSubview(header)
+            header.name = "School"
+            header.canCollapse = true
+            header.isCollapsed = true
+            header.layoutSubtreeIfNeeded()
+            let chevron = header.debugChevronFrame
+            // Drawn at 2x, as on a Retina display.
+            let rep = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(header.bounds.width * 2), pixelsHigh: Int(header.bounds.height * 2),
+                                                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                                    bytesPerRow: 0, bitsPerPixel: 0))
+            rep.size = header.bounds.size
+            header.cacheDisplay(in: header.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsHigh) / header.bounds.height
+            // The chevron's ink: the rows with any dark pixel between its frame's sides.
+            var top = -1, bottom = -1
+            for y in 0..<rep.pixelsHigh {
+                var inked = false
+                for x in Int(chevron.minX * scale)..<Int(chevron.maxX * scale) where (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.3 { inked = true; break }
+                if inked { if top < 0 { top = y }; bottom = y }
+            }
+            #expect(top >= 0)
+            let ink = (CGFloat(top) + CGFloat(bottom + 1)) / 2 / scale
+            let span = header.label.capsSpan
+            let caps = header.label.frame.minY + (span.top + span.bottom) / 2
+            let capsFromTop = header.isFlipped ? caps : header.bounds.height - (header.label.frame.maxY - (span.top + span.bottom) / 2)
+            #expect(abs(ink - capsFromTop) <= 0.5, "large=\(isLarge): chevron ink \(ink), caps \(capsFromTop)")
+            _ = window
+        }
+    }
 }
 
 /// The space name stays at the top while scrolling, as in Arc.

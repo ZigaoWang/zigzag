@@ -4460,6 +4460,8 @@ extension BrowserWindowController: SidebarDelegate {
         return listMenu(for: item)
     }
 
+    func listShowProfiles() { SettingsPage.open(.profiles, in: self) }
+
     func listMenu(for item: SidebarItem) -> NSMenu? {
         switch item {
         case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID, anchor: sidebar.list.headerView)

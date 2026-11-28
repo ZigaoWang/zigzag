@@ -71,6 +71,8 @@
 - Spaces all on one profile → no space names it, even with other profiles kept; with spaces on two or more, every space says which it's on.
   Test: SpaceProfileTests.withOneProfileNothingNamesIt
   Test: SpaceProfileTests.aProfileNoSpaceIsOnNamesNothing
+- The profile's name by the space's name in the sidebar → a click opens Settings › Profiles.
+  Test: SidebarSideTests.theProfilesNameOpensProfiles
 - Delete a space with a profile of its own → nothing asks; the profile and its data stay in Settings › Profiles, where you can remove it, so ⌘Z brings the space back whole.
   No test yet.
 
