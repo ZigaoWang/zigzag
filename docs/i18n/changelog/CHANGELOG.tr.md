@@ -24,6 +24,10 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 - Bir sekmeyi kapattığınızda veya bir sekme uykuya geçtiğinde, macOS’in Ekran Süresi sayfayı bırakırken bir sorunla karşılaşırsa Zigzag artık ara sıra kapanmaz.
 - Bağlı olmayan bir diskteki yüklü bir uygulama, Ayarlar › Genel › Yüklü Uygulamalar’da “Bağlı olmayan bir diskte” olarak işaretli kalır ve disk geri gelir gelmez yeniden çalışır. Önceden, uygulamayı açana kadar araç çubuğu seçimiyle birlikte listeden çıkıyordu. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 - Bir sayfada yazdıktan sonra ⌘Z artık Zigzag'ı zaman zaman kapatmıyor.
+- Bir Space’in sabitlenmiş sekmeleri katlanmışken yalnızca yüklenmiş sayfalar görünür. ⌘W ile veya × düğmesiyle kapatılan bir sabitlenmiş sekme, imleç kenar çubuğundan ayrılana kadar satırını korur, böylece imlecin altında hiçbir şey kaymaz; uykuda olan ya da Zigzag yeniden açıldığından beri yüklenmemiş olan bir sekme ise artık görünmez. Kapalı bir klasörün altındaki sayfalar da aynı şekilde çalışır. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Sayfası yüklenmemiş sabitlenmiş sekmeler, sabitlenmiş kutucuklar ve favoriler, açık olanlardan ayırt edebilmeniz için simgesi ve adıyla soluk görünür; kenar çubuğunda, yüzen kenar çubuğunda ve ekranın kenarından açılan kenar çubuğunda. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- Bir Space’in adının yanındaki profil adı yalnızca Space’leriniz birden fazla profile dağılmışken görünür; bu yüzden kendi profili olan bir Space silindiğinde kaybolur ve üzerine tıklamak Ayarlar › Profiller’i açar. Sabitlenmiş sekmeleri katlayan ok, Space’in adıyla aynı hizada durur. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- Kenar çubuğundaki adres, altındaki satırlarla aynı sol kenardan başlar. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 
 ## [0.10.0] - 2026-11-25
 

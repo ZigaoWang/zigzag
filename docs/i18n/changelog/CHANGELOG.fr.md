@@ -24,6 +24,10 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 - Zigzag ne quitte plus de temps en temps quand vous fermez un onglet ou qu’un onglet se met en veille, lorsque Temps d’écran de macOS rencontre un problème en libérant la page.
 - Une app installée sur un disque qui n’est pas connecté reste dans Réglages › Général › Apps installées, marquée Sur un disque qui n’est pas connecté, et fonctionne de nouveau dès que le disque revient. Avant, elle quittait la liste, avec son choix de barre d’outils, jusqu’à ce que vous ouvriez l’app. Merci à [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 - ⌘Z après une saisie dans une page ne fait plus quitter Zigzag de temps en temps.
+- Quand les onglets épinglés d’un espace sont repliés, seules les pages chargées s’affichent. Un onglet épinglé fermé avec ⌘W ou son × garde sa ligne jusqu’à ce que le pointeur quitte la barre latérale, pour que rien ne bouge sous lui, et un onglet en veille ou non chargé depuis la réouverture de Zigzag ne s’affiche plus. Les pages sous un dossier fermé fonctionnent de la même façon. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Les onglets épinglés, les vignettes épinglées et les favoris dont la page n’est pas chargée sont estompés, icône et nom, pour que vous les distinguiez des onglets ouverts, dans la barre latérale, la barre latérale flottante et la barre latérale depuis le bord de l’écran. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- Le nom du profil à côté du nom d’un espace ne s’affiche que lorsque vos espaces sont sur plusieurs profils, il disparaît donc dès qu’un espace doté de son propre profil est supprimé, et un clic dessus ouvre Réglages › Profils. La flèche qui replie les onglets épinglés est alignée sur le nom de l’espace. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- L’adresse dans la barre latérale commence au même bord gauche que les lignes en dessous. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 
 ## [0.10.0] - 2026-11-25
 

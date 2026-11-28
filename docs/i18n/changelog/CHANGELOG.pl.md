@@ -24,6 +24,10 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 - Zigzag nie kończy już czasem działania, gdy zamykasz kartę lub karta usypia, a Czas przed ekranem w macOS napotka problem przy zwalnianiu strony.
 - Zainstalowana aplikacja na dysku, który nie jest podłączony, zostaje w Ustawienia › Ogólne › Zainstalowane aplikacje z opisem „Na dysku, który nie jest podłączony” i działa znowu, gdy tylko dysk wróci. Wcześniej znikała z listy razem z wyborem paska narzędzi, dopóki nie otworzyło się aplikacji. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 - ⌘Z po pisaniu na stronie nie zamyka już czasem Zigzaga.
+- Gdy przypięte karty przestrzeni są zwinięte, widać tylko wczytane strony. Przypięta karta zamknięta skrótem ⌘W lub swoim × zachowuje swój wiersz, dopóki wskaźnik nie opuści paska bocznego, więc nic nie przesuwa się pod wskaźnikiem, a karta uśpiona lub niewczytana od ponownego otwarcia Zigzaga nie jest już widoczna. Strony pod zamkniętym folderem działają tak samo. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Przypięte karty, przypięte kafelki i ulubione, których strona nie jest wczytana, mają przyciemnioną ikonę i nazwę, aby dało się je odróżnić od otwartych, w pasku bocznym, w pływającym pasku bocznym i w pasku bocznym wysuwanym od krawędzi ekranu. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- Nazwa profilu obok nazwy przestrzeni jest widoczna tylko wtedy, gdy twoje przestrzenie są w więcej niż jednym profilu, więc znika po usunięciu przestrzeni z własnym profilem, a kliknięcie jej otwiera „Ustawienia” › „Profile”. Strzałka, która zwija przypięte karty, jest na wysokości nazwy przestrzeni. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- Adres w pasku bocznym zaczyna się przy tej samej lewej krawędzi co wiersze pod nim. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 
 ## [0.10.0] - 2026-11-25
 

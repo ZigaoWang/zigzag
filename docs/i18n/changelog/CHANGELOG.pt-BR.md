@@ -24,6 +24,10 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 - O Zigzag não fecha mais de vez em quando ao fechar uma aba ou quando uma é suspensa, se o Tempo de Uso do macOS tiver um problema ao liberar a página.
 - Um app instalado em um disco que não está conectado continua em Ajustes › Geral › Apps instalados, marcado como Em um disco que não está conectado, e volta a funcionar assim que o disco volta. Antes, ele saía da lista, junto com a opção da barra de ferramentas, até você abrir o app. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 - ⌘Z depois de digitar em uma página não fecha mais o Zigzag de vez em quando.
+- Com as abas fixadas de um espaço recolhidas, só aparecem as páginas carregadas. Uma aba fixada fechada com ⌘W ou com o × dela mantém a linha até o ponteiro sair da barra lateral, para que nada se mova sob ele, e uma suspensa ou não carregada desde que o Zigzag foi reaberto não aparece mais. As páginas sob uma pasta fechada funcionam da mesma forma. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Abas fixadas, blocos fixados e favoritos cuja página não está carregada aparecem esmaecidos, ícone e nome, para você distingui-los dos abertos, na barra lateral, na barra lateral flutuante e na barra lateral a partir da borda da tela. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- O nome do perfil ao lado do nome de um espaço só aparece enquanto seus espaços estão em mais de um perfil, então ele some quando um espaço com perfil próprio é excluído, e um clique nele abre Ajustes › Perfis. A seta que recolhe as abas fixadas fica na altura do nome do espaço. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- O endereço na barra lateral começa na mesma borda esquerda que as linhas abaixo dele. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 
 ## [0.10.0] - 2026-11-25
 

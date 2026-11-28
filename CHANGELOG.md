@@ -25,6 +25,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
 - An installed app on a disk that isn’t connected stays in Settings › General › Installed Apps, marked On a disk that isn’t connected, and works again as soon as the disk is back. Before, it left the list, with its toolbar choice, until you opened the app. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 - Pressing ⌘Z after typing in a page no longer quits Zigzag now and then.
+- With a space's pinned tabs folded, only pages that are loaded show. A pinned tab closed with ⌘W or its × keeps its row until the pointer leaves the sidebar, so nothing moves under it, and one that's asleep or not loaded since Zigzag reopened no longer shows. Pages under a shut folder work the same way. ([#576](https://github.com/ZigaoWang/zigzag/issues/576))
+- Pinned tabs, pinned tiles and favorites whose page isn't loaded are dimmed, icon and name, so you can tell them from open ones, in the sidebar, the floating sidebar and the sidebar from the screen edge. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
+- The profile's name beside a space's name shows only while your spaces are on more than one profile, so it goes once a space with its own profile is deleted, and a click on it opens Settings › Profiles. The arrow that folds the pinned tabs sits level with the space's name. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
+- The address in the sidebar starts on the same left edge as the rows below it. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 
 ## [0.10.0] - 2026-11-25
 
