@@ -171,6 +171,14 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [net.daringfireball.markdown]
+          # Shown read-only in Quick Look in a tab (QuickLookPage.swift), from Finder's Open With.
+          - CFBundleTypeName: Office or Apple document
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [com.microsoft.word.doc, org.openxmlformats.wordprocessingml.document, com.microsoft.excel.xls,
+                                 org.openxmlformats.spreadsheetml.sheet, com.microsoft.powerpoint.ppt,
+                                 org.openxmlformats.presentationml.presentation, com.apple.iwork.pages.sffpages,
+                                 com.apple.iwork.numbers.sffnumbers, com.apple.iwork.keynote.sffkey, public.rtf]
           # Opened from Finder: the Import window asks before restoring it.
           - CFBundleTypeName: Zigzag Backup
             CFBundleTypeRole: Viewer

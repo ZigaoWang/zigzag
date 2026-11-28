@@ -11,11 +11,12 @@ enum HistoryPage {
     static func isHistory(_ url: URL?) -> Bool { isInternal(url) && url?.host() == "history" }
     /// One of Zigzag's own pages (History, Settings): never a visit, never fetched from the network.
     static func isInternal(_ url: URL?) -> Bool { url?.scheme == scheme }
-    /// Zigzag's own pages that are part of the app, not a document: History, the Archive, Settings. Light or dark
-    /// with the window, as the sidebar and Settings' views are, never with the Mac alone.
+    /// Zigzag's own pages that are part of the app, not a document: History, the Archive, Settings, a folder's list
+    /// and the blank under Quick Look. Light or dark with the window, as the sidebar and Settings' views are, never
+    /// with the Mac alone.
     static func followsWindow(_ url: URL?) -> Bool {
         guard isInternal(url), let host = url?.host() else { return false }
-        return host == "history" || host == ArchivePage.host || host == SettingsPage.host
+        return host == "history" || host == ArchivePage.host || host == SettingsPage.host || host == FolderPage.host || host == QuickLookPage.host
     }
 
     /// Lets a page configuration show History. A configuration WebKit hands over for a popup already has it.
@@ -54,6 +55,10 @@ enum HistoryPage {
             // A Markdown file, and the pictures beside it: read and set off the main thread, answered when ready.
             if url.host() == MarkdownPage.host { MarkdownPage.serve(task, in: webView); return }
             if url.host() == MarkdownPage.pictureHost { MarkdownPage.servePicture(task); return }
+            // A folder's list, its files' icons, and the blank under Quick Look.
+            if url.host() == FolderPage.host { FolderPage.serve(task, in: webView); return }
+            if url.host() == FolderPage.iconHost { FolderPage.serveIcon(task); return }
+            if url.host() == QuickLookPage.host { QuickLookPage.serve(task, in: webView); return }
             let data: Data
             let type: String
             if url.host() == "icon", let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value.flatMap(URL.init(string:)),
@@ -93,7 +98,10 @@ enum HistoryPage {
             task.didFinish()
         }
 
-        func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) { MarkdownPage.stop(task) }
+        func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {
+            MarkdownPage.stop(task)
+            FolderPage.stop(task)
+        }
     }
 
     /// A site icon for the page. PNGs are cached while the store returns the same icon, so a new or cleared icon is

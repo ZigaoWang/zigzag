@@ -150,6 +150,11 @@ final class FaviconStore {
         if let source = MarkdownPage.source(of: url) {
             return (source.isFileURL ? nil : cachedIcon(for: source)) ?? Tokens.Symbol.image("doc.text", size: Tokens.Symbol.row)
         }
+        // A document in Quick Look likewise, as a page of rich text; a folder's list, a folder.
+        if let source = QuickLookPage.source(of: url) {
+            return (source.isFileURL ? nil : cachedIcon(for: source)) ?? Tokens.Symbol.image("doc.richtext", size: Tokens.Symbol.row)
+        }
+        if FolderPage.source(of: url) != nil { return Tokens.Symbol.image("folder", size: Tokens.Symbol.row) }
         if url.scheme == HistoryPage.scheme { return Tokens.Symbol.image("clock.arrow.circlepath", size: Tokens.Symbol.row) }
         guard let key = key(for: url) else { return nil }
         if let image = memory[key] { return image }

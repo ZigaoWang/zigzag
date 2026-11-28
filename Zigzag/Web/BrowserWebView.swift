@@ -19,6 +19,7 @@ final class BrowserWebView: WKWebView {
     /// Covered by the PDF viewer or Settings: typing (arrows, space, ⌘F's text) goes to that instead.
     override func becomeFirstResponder() -> Bool {
         let cover: NSView? = owner?.pdfViewer.flatMap { $0.superview != nil ? $0.pdfView : nil }
+            ?? owner?.quickLookViewer.flatMap { $0.superview != nil ? $0.preview ?? $0 : nil }
             ?? owner?.settingsView.flatMap { $0.superview != nil ? $0 : nil }
         if let cover {
             // Only if the page still has the keyboard by then: a click elsewhere in between keeps it there.

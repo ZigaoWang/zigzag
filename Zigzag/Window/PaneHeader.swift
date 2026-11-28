@@ -278,7 +278,7 @@ final class PaneHeaderView: NSView {
 
     /// A web page's address; a file or Zigzag page by its sidebar name, never a cut "file:".
     static func addressText(_ url: URL) -> String {
-        if let source = MarkdownPage.source(of: url) { return addressText(source) }
+        if let source = FilePages.source(of: url) { return addressText(source) }
         let name = AddressView.name(of: url)
         guard let host = url.host(), !url.isFileURL, name == AddressView.site(host, port: url.port, scheme: url.scheme) else { return name }
         return CommandRanker.displayURL(url)

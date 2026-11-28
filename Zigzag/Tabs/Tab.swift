@@ -63,7 +63,7 @@ final class Tab: NSObject {
         case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language, document
         /// You renamed it (it also sends `.title`).
         case renamed
-        /// Its PDF viewer came or went.
+        /// Its PDF or Quick Look viewer came or went.
         case pdf
         /// Settings came or went over its page.
         case settings
@@ -116,7 +116,7 @@ final class Tab: NSObject {
     /// background (a site's theme color can be its header's, and stay light on a page that turned dark), else its
     /// theme color. None with no page, or under what covers it with a color of its own (a PDF, Settings).
     var pageColor: NSColor? {
-        guard let webView, pdfViewer == nil, settingsView == nil else { return nil }
+        guard let webView, pdfViewer == nil, quickLookViewer == nil, settingsView == nil else { return nil }
         return Self.pageColor(dark: darkPage, under: webView.underPageBackgroundColor, theme: themeColor)
     }
 
@@ -141,6 +141,8 @@ final class Tab: NSObject {
     private(set) var isClosed = false
     /// A PDF shows in Zigzag's own viewer, over WebKit's; nil for any other page.
     private(set) var pdfViewer: PDFViewerView?
+    /// An Office or Apple document shows in Quick Look, over a blank page of Zigzag's; nil for any other page.
+    private(set) var quickLookViewer: QuickLookViewerView?
     /// The page is a PDF, in either viewer: saved as itself, not as a web archive.
     private(set) var showsPDF = false
     /// The viewer's fetch, cancelled when the viewer goes.
@@ -598,8 +600,8 @@ final class Tab: NSObject {
         return url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet.")
     }
     var isBlank: Bool { url == nil }
-    /// The address you see and copy: a Markdown file's own, not its viewer's.
-    var shownURL: URL? { MarkdownPage.source(of: url) ?? url }
+    /// The address you see and copy: a file's own, not its viewer's (Markdown, Quick Look, a folder's list).
+    var shownURL: URL? { FilePages.source(of: url) ?? url }
 
     // MARK: Web view lifecycle
 
@@ -717,6 +719,7 @@ final class Tab: NSObject {
         if isDevelopment { PageErrors.counts(in: webView, true) }
         isPlaybackPaused = false
         refreshSettingsPage()
+        refreshQuickLook()
         changed.send(.webView)
         return webView
     }
@@ -823,7 +826,7 @@ final class Tab: NSObject {
     /// Reads where you are on the page and what you've typed (`pageState`), as you leave it and before it sleeps.
     /// `includingSession`: its sessionStorage too, for a tab going to sleep.
     func readPageState(includingSession: Bool = false, _ completion: ((PageState?) -> Void)? = nil) {
-        guard let webView, hasLoadedOnce, !Self.isExtensionPage(url), pdfViewer == nil, settingsView == nil else { completion?(pageState); return }
+        guard let webView, hasLoadedOnce, !Self.isExtensionPage(url), pdfViewer == nil, quickLookViewer == nil, settingsView == nil else { completion?(pageState); return }
         webView.evaluateJavaScript(includingSession ? PageState.sleepReader : PageState.reader, in: nil, in: .defaultClient) { [weak self, weak webView] result in
             guard let self, let webView, self.webView === webView else { completion?(nil); return }
             // A page that won't say (still loading, or its process gone) keeps what was read before.
@@ -952,6 +955,7 @@ final class Tab: NSObject {
         // Tabs that shared the rule keep their images.
         PageImages.set(false, in: webView)
         setPDFViewer(nil)
+        setQuickLookViewer(nil)
         if settingsView != nil, !keepingSettings {
             settingsView = nil
             changed.send(.settings)
@@ -1013,7 +1017,19 @@ final class Tab: NSObject {
     /// `httpFallback`: `url` is https chosen for a scheme-less address; retry once over http if unreachable
     /// (`CommandRanker.Destination`).
     func load(_ url: URL, by sender: LoadSender = .zigzag, httpFallback: Bool = false) {
-        let url = Self.extensionPageAddress(url)
+        // A folder or an Office or Apple document on your Mac goes to Zigzag's list or Quick Look (#566).
+        let viewer = FilePages.viewer(forLocal: url)
+        let url = viewer ?? Self.extensionPageAddress(url)
+        let sender: LoadSender = viewer != nil && sender == .page ? .zigzag : sender
+        // A tab with no page yet: its new web view loads the viewer once, as Zigzag's own load. Loaded twice, the
+        // second would no longer be Zigzag's, and one of Zigzag's pages is refused then.
+        if viewer != nil, webView == nil {
+            self.url = url
+            changed.send(.url)
+            firstLoad = FirstLoad(sender: sender, httpFallback: false)
+            ensureWebView()
+            return
+        }
         if let webView { dropSessionScript(from: webView) }
         leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
@@ -1035,6 +1051,7 @@ final class Tab: NSObject {
         let webView = ensureWebView()
         load(url, in: webView, by: sender, httpFallback: httpFallback)
         refreshSettingsPage()
+        refreshQuickLook()
     }
 
     /// Who sent a tab to an address. Only you can let a link open another app without asking, and only Zigzag (you
@@ -1058,7 +1075,7 @@ final class Tab: NSObject {
     static func route(forPageLink url: URL, from page: URL?) -> PageLinkRoute {
         let scheme = url.scheme?.lowercased() ?? ""
         if ["http", "https", "about", "blob"].contains(scheme) { return .load }
-        if scheme == "file" { return page?.isFileURL == true || MarkdownPage.source(of: page)?.isFileURL == true ? .load : .refuse }
+        if scheme == "file" { return page?.isFileURL == true || FilePages.source(of: page)?.isFileURL == true ? .load : .refuse }
         if scheme.isEmpty || ["javascript", "data", "webkit-extension", "chrome-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
         return .app
     }
@@ -1205,6 +1222,10 @@ final class Tab: NSObject {
     /// `httpFallback`: retry once over http if https is unreachable. Without it, a pending fallback holds only for the
     /// same address (a reload).
     private func load(_ url: URL, in webView: WKWebView, by sender: LoadSender, httpFallback: Bool = false) {
+        // A file the tab was allowed to go to, shown in Zigzag's own viewer: a load of Zigzag's.
+        let viewer = FilePages.viewer(forLocal: url)
+        let url = viewer ?? url
+        let sender: LoadSender = viewer != nil && sender == .page ? .zigzag : sender
         startsQuietly = false
         ownLoadPending = sender == .page ? nil : OwnLoad(sender: sender, url: url)
         if httpFallback {
@@ -1358,6 +1379,7 @@ final class Tab: NSObject {
         }
         self.changed.send(.url)
         self.refreshSettingsPage()
+        self.refreshQuickLook()
     }
 
     func goBack() {
@@ -1473,7 +1495,8 @@ final class Tab: NSObject {
         guard let webView, webView.window != nil, webView.bounds.width > 0, hasLoadedOnce else { completion?(); return }
         // A PDF's picture is of Zigzag's viewer, as you see it (dark pages and all), not WebKit's underneath.
         // Settings likewise: the picture is of what covers the page, not the empty page under it.
-        if let image = pdfViewer.flatMap({ $0.window != nil ? $0.snapshot() : nil }) ?? settingsView.flatMap({ $0.window != nil ? $0.snapshot() : nil }) {
+        if let image = pdfViewer.flatMap({ $0.window != nil ? $0.snapshot() : nil }) ?? quickLookViewer.flatMap({ $0.window != nil ? $0.snapshot() : nil })
+            ?? settingsView.flatMap({ $0.window != nil ? $0.snapshot() : nil }) {
             snapshot = image
             // Window appearance, as covering views draw in it.
             snapshotIsDark = webView.window?.effectiveAppearance.isDark
@@ -1504,7 +1527,7 @@ final class Tab: NSObject {
     func captureSnapshotOutOfSight(in host: NSView, size: NSSize, _ completion: @escaping () -> Void) {
         // Settings or the PDF viewer over the page: briefly placed in the window so it draws in the window's
         // appearance.
-        let cover: NSView? = pdfViewer ?? settingsView
+        let cover: NSView? = pdfViewer ?? quickLookViewer ?? settingsView
         if let cover, cover.window == nil, host.window != nil, size.width > 0, size.height > 0 {
             let home = cover.superview, frame = cover.frame, resizing = cover.autoresizingMask
             let above = home.flatMap { home in home.subviews.firstIndex(of: cover).map { home.subviews.dropFirst($0 + 1).first } } ?? nil
@@ -1512,7 +1535,7 @@ final class Tab: NSObject {
             cover.frame = NSRect(origin: .zero, size: size)
             host.addSubview(cover)
             cover.layoutSubtreeIfNeeded()
-            let image = pdfViewer?.snapshot() ?? settingsView?.snapshot()
+            let image = pdfViewer?.snapshot() ?? quickLookViewer?.snapshot() ?? settingsView?.snapshot()
             cover.removeFromSuperview()
             if let above { home?.addSubview(cover, positioned: .below, relativeTo: above) } else { home?.addSubview(cover) }
             cover.frame = frame
@@ -1595,7 +1618,7 @@ final class Tab: NSObject {
     /// Compared with the page's appearance (app or Dark Pages), or the window's when Settings or the PDF viewer covers
     /// it.
     func snapshotIsStale(windowDark: Bool) -> Bool {
-        let covered = pdfViewer != nil || settingsView != nil
+        let covered = pdfViewer != nil || quickLookViewer != nil || settingsView != nil
         let dark = covered ? windowDark : webView?.effectiveAppearance.isDark ?? windowDark
         return Self.pictureIsStale(takenDark: snapshotIsDark, dark: dark)
     }
@@ -1615,8 +1638,8 @@ final class Tab: NSObject {
     /// `countsVisit`: false for same-document URL changes; kept in history without raising its rank.
     private func recordHistory(_ url: URL, title: String?, countsVisit: Bool = true) {
         // Zigzag's own pages (History, Settings) aren't visits, and neither is a page that failed to load.
-        // A Markdown file is remembered at its own address.
-        let url = MarkdownPage.source(of: url)?.withoutFragment ?? url
+        // A file in one of Zigzag's viewers is remembered at its own address.
+        let url = FilePages.source(of: url)?.withoutFragment ?? url
         guard !isPrivate, url != lastRecorded, url != errorShownFor, !HistoryPage.isInternal(url) else { return }
         lastRecorded = url
         // PDFs have no title; use the response name (`pdfName`).
@@ -2030,7 +2053,12 @@ extension Tab: WKNavigationDelegate {
         if url.scheme?.lowercased() == HistoryPage.scheme,
            !Self.mayGoToInternalPage(ownLoad: ownLoad, ownHistory: ownHistory, isBackForward: navigationAction.navigationType == .backForward,
                                      fromInternalPage: navigationAction.sourceFrame.securityOrigin.protocol == HistoryPage.scheme
-                                        && MarkdownPage.mayLink(fromHost: navigationAction.sourceFrame.securityOrigin.host, current: webView.url, to: url)) {
+                                        && FilePages.mayLink(fromHost: navigationAction.sourceFrame.securityOrigin.host, current: webView.url, to: url)) {
+            return (.cancel, preferences)
+        }
+        // A folder's list opening a file in it: the tab goes to the file, as a local page's link would.
+        if navigationAction.targetFrame?.isMainFrame ?? true, let file = FolderPage.opening(url) {
+            DispatchQueue.main.async { [weak self] in self?.load(file, by: .page) }
             return (.cancel, preferences)
         }
         // Chrome's address for an extension's page: opened from Zigzag or that extension's own pages, refused from others.
@@ -2112,9 +2140,18 @@ extension Tab: WKNavigationDelegate {
                 return (.cancel, preferences)
             }
         }
-        // A local Markdown file's link to another file opens it as a file page's link would; WebKit won't from here.
-        if isMainFrame, isLinkClick, url.isFileURL, MarkdownPage.source(of: webView.url)?.isFileURL == true {
+        // A local Markdown file's or folder's link to another file opens it as a file page's link would; WebKit won't
+        // from here.
+        if isMainFrame, isLinkClick, url.isFileURL, FilePages.source(of: webView.url)?.isFileURL == true {
             DispatchQueue.main.async { [weak self] in self?.load(url, by: .page) }
+            return (.cancel, preferences)
+        }
+        // A folder on your Mac, or an Office or Apple document: Zigzag's list or Quick Look shows it instead (#566).
+        // Only where the tab was already going (a load of Zigzag's or yours, Back, a local page's link), never a
+        // website's try at a file, which WebKit refuses.
+        if isMainFrame, url.isFileURL, ownLoad || ownHistory || navigationAction.sourceFrame.securityOrigin.protocol == "file",
+           let viewer = FilePages.viewer(forLocal: url) {
+            DispatchQueue.main.async { [weak self] in self?.load(viewer, by: .zigzag) }
             return (.cancel, preferences)
         }
         if isMainFrame {
@@ -2270,6 +2307,14 @@ extension Tab: WKNavigationDelegate {
             DispatchQueue.main.async { [weak self, weak webView] in
                 guard let self, let webView, self.webView === webView else { return }
                 self.load(MarkdownPage.address(for: source), by: .zigzag)
+            }
+            return .cancel
+        }
+        // An Office or Apple document from the web: fetched again and shown in Quick Look, at its own address (#566).
+        if navigationResponse.isForMainFrame, let name = QuickLookPage.shows(response, isGet: pageIsGet), let source = response.url {
+            DispatchQueue.main.async { [weak self, weak webView] in
+                guard let self, let webView, self.webView === webView else { return }
+                self.load(QuickLookPage.address(for: source, name: name), by: .zigzag)
             }
             return .cancel
         }
@@ -3164,6 +3209,35 @@ extension Tab {
         // Its PDF's connection to the helper ends with it.
         pdfViewer?.document?.close()
         pdfViewer = viewer
+        changed.send(.pdf)
+    }
+}
+
+// MARK: - Quick Look
+
+extension Tab {
+    /// Quick Look comes and goes with the tab's address: an Office or Apple document's viewer over its blank page.
+    fileprivate func refreshQuickLook() {
+        guard let webView, let source = QuickLookPage.source(of: url) else {
+            setQuickLookViewer(nil)
+            return
+        }
+        guard quickLookViewer?.source != source else { return }
+        let viewer = QuickLookViewerView(source: source, name: QuickLookPage.name(of: url), isPrivate: isPrivate, profile: profile.id)
+        // Its fetch failed: Download fetches it as any download, from the page.
+        viewer.onDownloadFromPage = { [weak webView] in
+            guard let webView else { return }
+            let window = webView.window
+            webView.startDownload(using: URLRequest(url: source)) { DownloadManager.shared.track($0, window: window) }
+        }
+        setQuickLookViewer(viewer)
+        viewer.load(from: webView)
+    }
+
+    fileprivate func setQuickLookViewer(_ viewer: QuickLookViewerView?) {
+        guard viewer !== quickLookViewer else { return }
+        quickLookViewer?.close()
+        quickLookViewer = viewer
         changed.send(.pdf)
     }
 }

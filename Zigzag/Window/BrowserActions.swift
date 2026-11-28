@@ -48,7 +48,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     /// Copies a link without tracking parameters, with its title as rich text, and shows a toast.
     func copyLink(_ url: URL, title: String?) {
-        CleanLink.write(MarkdownPage.source(of: url) ?? url, title: title)
+        CleanLink.write(FilePages.source(of: url) ?? url, title: title)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
     }
 
@@ -153,6 +153,11 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// the tab is saved as itself.
     @objc func savePageAs(_ sender: Any?) {
         if let pdf = selectedTab?.pdfViewer { pdf.save(); return }
+        // A document in Quick Look: one from the web downloads; one on your Mac is already a file.
+        if let document = selectedTab?.quickLookViewer {
+            if !document.source.isFileURL { document.download() }
+            return
+        }
         guard let webView = selectedWebView, let window, let tab = selectedTab, let url = tab.url else { return }
         let ext = url.pathExtension.lowercased()
         let isFile = tab.showsPDF || ["pdf", "png", "jpg", "jpeg", "gif", "webp", "svg", "mp4", "mov", "txt"].contains(ext)
