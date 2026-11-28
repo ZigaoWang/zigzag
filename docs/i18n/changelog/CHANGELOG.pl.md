@@ -10,6 +10,7 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 - Klucze dostępu zachowane na Macu pojawiają się pod polami logowania w witrynach, które je obsługują, tak jak w Safari: wybierz jeden i zaloguj się za pomocą Touch ID. Zigzag prosi macOS o dostęp dopiero wtedy, gdy wybierzesz tam „Użyj zachowanego klucza dostępu” lub „Zezwól” w „Ustawienia” › „Hasła”, a potem pojawia się w „Ustawienia systemowe” › „Prywatność i ochrona”, gdzie możesz to zmienić. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Naprawiono
+- Linia ładowania przesuwa się tylko wtedy, gdy strona faktycznie się wczytuje. Przy witrynie, która przestała odpowiadać, stoi w miejscu zamiast pełznąć ku końcowi, a dopóki nic nie dociera, łagodnie przygasa i jaśnieje. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag nie kończy już czasem działania, gdy zamykasz kartę lub karta usypia, a Czas przed ekranem w macOS napotka problem przy zwalnianiu strony.
 
 ## [0.10.0] - 2026-11-25

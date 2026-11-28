@@ -10,6 +10,7 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 - Mac’inizde kayıtlı geçiş anahtarları, Safari’de olduğu gibi bunları sunan sitelerde giriş alanlarının altında görünür: birini seçin ve Touch ID ile giriş yapın. Zigzag, macOS’ten yalnızca orada “Kayıtlı Geçiş Anahtarı Kullan”ı ya da Ayarlar › Parolalar’da “İzin Ver”i seçtiğinizde erişim ister ve ardından Sistem Ayarları › Gizlilik ve Güvenlik’te listelenir; bunu orada değiştirebilirsiniz. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Düzeltmeler
+- Yükleme çizgisi artık yalnızca sayfa ilerlediğinde ilerliyor. Yanıt vermeyi bırakan bir sitede sona doğru sürünmek yerine yerinde duruyor ve hiçbir şey gelmediği sürece hafifçe sönüp parlıyor. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Bir sekmeyi kapattığınızda veya bir sekme uykuya geçtiğinde, macOS’in Ekran Süresi sayfayı bırakırken bir sorunla karşılaşırsa Zigzag artık ara sıra kapanmaz.
 
 ## [0.10.0] - 2026-11-25

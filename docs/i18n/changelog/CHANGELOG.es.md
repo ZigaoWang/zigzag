@@ -10,6 +10,7 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 - Las llaves de acceso guardadas en tu Mac aparecen bajo los campos de inicio de sesión en los sitios que las admiten, como en Safari: elige una e inicia sesión con Touch ID. Zigzag solo pide acceso a macOS cuando eliges Usar una llave de acceso guardada ahí o Permitir en Ajustes › Contraseñas, y después aparece en Ajustes del Sistema › Privacidad y seguridad, donde puedes cambiarlo. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Correcciones
+- La línea de carga solo avanza cuando la página avanza. Si un sitio deja de responder, se queda quieta en vez de arrastrarse hacia el final, y mientras no llega nada se atenúa y se aviva suavemente. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag ya no se cierra de vez en cuando al cerrar una pestaña o cuando una se suspende, si Tiempo de uso de macOS tiene un problema al soltar la página.
 
 ## [0.10.0] - 2026-11-25

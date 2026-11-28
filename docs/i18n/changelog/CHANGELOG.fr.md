@@ -10,6 +10,7 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 - Les clés d’identification enregistrées sur votre Mac apparaissent sous les champs de connexion des sites qui les prennent en charge, comme dans Safari : choisissez-en une et connectez-vous avec Touch ID. Zigzag ne demande l’accès à macOS que lorsque vous choisissez Utiliser une clé d’identification enregistrée à cet endroit ou Autoriser dans Réglages › Mots de passe, puis apparaît dans Réglages Système › Confidentialité et sécurité, où vous pouvez modifier ce choix. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Corrections
+- La ligne de chargement n’avance plus que lorsque la page avance. Sur un site qui ne répond plus, elle reste immobile au lieu de ramper vers la fin, et tant que rien n’arrive, elle pâlit et se ravive doucement. Merci à [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag ne quitte plus de temps en temps quand vous fermez un onglet ou qu’un onglet se met en veille, lorsque Temps d’écran de macOS rencontre un problème en libérant la page.
 
 ## [0.10.0] - 2026-11-25

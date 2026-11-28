@@ -10,6 +10,7 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 - Passkeys die op je Mac zijn bewaard, verschijnen zoals in Safari onder aanmeldvelden op websites die ze aanbieden: kies er een en meld je aan met Touch ID. Zigzag vraagt macOS pas om toegang als je daar Gebruik bewaarde passkey kiest of Sta toe in Instellingen › Wachtwoorden, en staat daarna in Systeeminstellingen › Privacy en beveiliging, waar je het kunt wijzigen. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Opgelost
+- De laadlijn beweegt alleen nog als de pagina vordert. Bij een site die niet meer antwoordt blijft ze staan in plaats van naar het einde te kruipen, en zolang er niets binnenkomt, wordt ze zacht lichter en donkerder. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag stopt niet meer af en toe als je een tabblad sluit of er een in de slaapstand gaat, wanneer Schermtijd van macOS een probleem heeft met het loslaten van de pagina.
 
 ## [0.10.0] - 2026-11-25

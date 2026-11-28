@@ -18,6 +18,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 和 Safari 一样，在支持通行密钥的网站上，Mac 上存储的通行密钥会显示在登录框下方：选一个，用触控 ID 登录。只有当你在那里选择“使用存储的通行密钥”，或在“设置 › 密码”中点按“允许”时，Zigzag 才会向 macOS 请求访问权限，之后它会列在“系统设置 › 隐私与安全性”中，你可以在那里更改。([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### 修复
+- 加载线只在网页真正有进展时才会前进。不再回应的网站会让它停在原处，不会慢慢爬向终点；没有新内容到达时，加载线会轻轻地明暗起伏。感谢 [Lakeland97](https://github.com/Lakeland97)。 ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - 关闭标签页或标签页进入休眠时，如果 macOS 的“屏幕使用时间”在释放网页时出了问题，Zigzag 不会再偶尔退出。
 
 ## [0.10.0] - 2026-11-25

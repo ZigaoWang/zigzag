@@ -10,6 +10,7 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 - Le passkey salvate sul Mac appaiono sotto i campi di accesso dei siti che le supportano, come in Safari: scegline una e accedi con Touch ID. Zigzag chiede l’accesso a macOS solo quando scegli Usa una passkey salvata lì o Consenti in Impostazioni › Password, e poi compare in Impostazioni di Sistema › Privacy e sicurezza, dove puoi cambiarlo. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Correzioni
+- La linea di caricamento avanza solo quando avanza la pagina. Con un sito che non risponde più resta ferma invece di strisciare verso la fine, e finché non arriva nulla si attenua e si ravviva piano. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag non si chiude più di tanto in tanto quando chiudi un pannello o uno va in sospensione, se Tempo di utilizzo di macOS ha un problema nel rilasciare la pagina.
 
 ## [0.10.0] - 2026-11-25
