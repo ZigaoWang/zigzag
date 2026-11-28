@@ -11,6 +11,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Passkeys saved on your Mac show up under sign-in fields on sites that offer them, as in Safari: pick one and sign in with Touch ID. Zigzag asks macOS for access only when you choose Use a Saved Passkey there or Allow in Settings › Passwords, and is then listed in System Settings › Privacy & Security, where you can change it. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 - Site Search in Settings › Search lists the sites you can search by typing their keyword in the address bar and pressing Tab, like yt for YouTube. Add your own with a name, a keyword and its search address, edit or delete them, and switch off any of Zigzag's own you don't use. They sync and are backed up with your other settings. ([#583](https://github.com/ZigaoWang/zigzag/issues/583))
 
+### Changed
+- Site Controls is shorter and calmer. Zoom, ad blocking, dark page, what the site asked for, like the camera, and Compatibility mode come right after the actions, and the connection is a row under the site's name. Keep tabs awake, User agent, Keep full screen in the window, Apps on this Mac and Open in moved to More for This Site, a page of the panel. Your extensions come last, pinned ones first, and the rows are taller when you open the panel with a finger. ([#384](https://github.com/ZigaoWang/zigzag/issues/384))
+
 ### Fixed
 - The loading line moves only when the page does. A site that has stopped answering holds still instead of creeping toward the end, and while nothing arrives the line softly fades in and out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
