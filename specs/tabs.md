@@ -381,7 +381,13 @@
   Test: SwipeGestureTests.aPlainPageGoesBackAndEndsClean
   Test: SwipeGestureTests.aFlickGoesShortOfTheDistance
   Test: SwipeGestureTests.aShortSwipeSpringsBackAndEndsClean
-- While the fingers are down, the arrow's ring follows how far they've gone, and the arrow fills the moment letting go would go back or forward: at the full distance, or while a flick is going fast enough a third of the way. Filled at the full distance, it stays filled while the fingers rest, and empties only when they come back a little from the furthest they got. Filled by a flick, it stays filled while the flick keeps going and empties as soon as the fingers slow right down or stop, so a swipe short of the distance, a pause, then letting go springs back, as in Safari. Letting go goes exactly when it's filled.
+- During a swipe the arrow is a round bubble on the page, a little inside its moving edge and centered up and down, so it never sits across the page's edge, over the sidebar, the next pane or the window's edge: sidebar shown, hidden, or in a split. It never takes the pointer.
+  Test: BookmarkFolderTests.swipeArrowStaysInsideTheCard
+  Test: SwipeGestureTests.theArrowNeverTakesThePointer
+- While the fingers are down, the page moves with them point for point at first, then holds back more the further they go.
+  Test: SwipeGestureTests.thePageFollowsTheFingersPointForPointAtFirst
+- While the fingers are down, the bubble's accent wash grows from its middle with how far they've gone, and the bubble fills the moment letting go would go back or forward: at the full distance, or while a flick is going fast enough a third of the way. Filled at the full distance, it stays filled while the fingers rest, and empties only when they come back a little from the furthest they got. Filled by a flick, it stays filled while the flick keeps going and empties as soon as the fingers slow right down or stop, so a swipe short of the distance, a pause, then letting go springs back, as in Safari. Letting go goes exactly when it's filled.
+  Test: SwipeGestureTests.theWashFollowsTheDistanceAndFillsWhenArmed
   Test: BookmarkFolderTests.aFlickFillsOnlyWhileTheFingersKeepGoing
   Test: BookmarkFolderTests.aFlickDisarmsOnlyPastTheMarginBack
   Test: SwipeGestureTests.aFlickArmsWithOneTapBeforeLettingGo
@@ -400,15 +406,18 @@
   Test: SwipeGestureTests.upAndDownAndTurningSidewaysLaterScroll
 - While the arrow leans in, the page gets only the sideways part of the scroll: it doesn't move up or down under the swipe.
   Test: SwipeGestureTests.whileTheArrowLeansInThePageOnlyGetsTheSidewaysPart
-- A swipe whose end never arrives → it ends as the next gesture starts or its glide comes, when the pointer moves, a click, a key, the window or app going to the back, or after 3 seconds still; no arrow, shifted page or page listener is left. The same in a tab, a split pane, Zigzag Mini and a web app.
+- A swipe whose end never arrives → it is let go as the fingers touch down again or its glide comes (filled, it goes back or forward; otherwise it springs back), and it ends when the pointer moves, a click, a key, the window or app going to the back, or after 3 seconds still; no arrow, shifted page or page listener is left. The same in a tab, a split pane, Zigzag Mini and a web app.
   Test: SwipeGestureTests.aLostEndIsClearedByTheNextGesture
+  Test: SwipeGestureTests.aLostEndWithTheArrowFilledGoesWhenTheFingersTouchAgain
+  Test: SwipeGestureTests.aGlideWhileDecidingEndsClean
   Test: SwipeGestureTests.momentumWithNoEndIsTheRelease
   Test: SwipeGestureTests.aRestHoldsUntilTheWindowGoesOrItRunsOut
   Test: SwipeGestureTests.aRestEndsWhenThePointerMovesInAWindowThatDoesntTrackIt
   Test: SwipeGestureTests.leavingTheWindowMidSwipeEndsClean
   Test: SwipeGestureTests.aPageInACardSwipesTheSameWay
-- A new swipe straight after one called off or one that went → it tracks from its first step.
+- A new swipe straight after one called off or one that went → it tracks from its first step. A scroll straight after one that went leaves the page carried on until the next one arrives.
   Test: SwipeGestureTests.aNewSwipeTracksAtOnceAfterOneCalledOff
+  Test: SwipeGestureTests.scrollingAfterGoingLeavesThePageCarriedOn
 - Each step of a swipe only moves layers: the backdrop and the page's shadow are set up once as it starts.
   Test: SwipeGestureTests.eachStepOfASwipeIsCheap
   Test: SwipeSmoothnessTests.aSwipeAtTheTrackpadsRate

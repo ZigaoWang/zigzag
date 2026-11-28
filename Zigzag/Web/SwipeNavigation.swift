@@ -109,7 +109,9 @@ final class SwipeNavigator {
     /// covering the page (a zoomed-in PDF), is which way it can still scroll sideways, in place of asking the page.
     func handle(_ event: NSEvent, room: (left: Bool, right: Bool)? = nil) -> Bool {
         // Fingers touching down: the page is asked about the spot now, so it has answered by the time they move.
-        if event.phase == .mayBegin, room == nil, state != .tracking, state != .leaning { probeEarly(event); return false }
+        // Fingers touching down again while a swipe still tracks: they lifted and its end was lost, so this is the release.
+        if event.phase == .mayBegin, state == .tracking || state == .leaning { release(at: event.timestamp, ended: true) }
+        if event.phase == .mayBegin, room == nil { probeEarly(event); return false }
         if event.phase == .ended || event.phase == .cancelled { stopPageListening() }
         // Mid-scroll with no swipe under way: nothing to decide, so no settings are read for it.
         if state == .idle || state == .ignoring, Self.isMidGesture(event.phase) { return false }
@@ -120,16 +122,17 @@ final class SwipeNavigator {
         if !event.momentumPhase.isEmpty {
             // Still tracking: the fingers lifted and the gesture's end was lost, so this is the release.
             if state == .tracking || state == .leaning { release(at: event.timestamp, ended: true) }
+            // Still deciding when the fingers lifted: nothing was shown, and nothing is left listening.
+            if state == .deciding { state = .idle; stopPageListening() }
             if event.momentumPhase == .ended || event.momentumPhase == .cancelled { if state == .finishing { state = .idle } }
             return state == .finishing
         }
         switch event.phase {
         case .began:
-            // A new gesture: anything left from the last one goes now, a page left shifted included.
-            if state == .tracking || state == .leaning { cancel() }
-            if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
+            // A new gesture with the last one's end lost: that one is let go now. A page carried on after going stays
+            // carried until the next one arrives, unless this gesture turns out to be a swipe too (`showArrow`).
+            if state == .tracking || state == .leaning { release(at: event.timestamp, ended: true) }
             stopPageListening()
-            pageArrived()
             stopWatchdog()
             stopWatchingRest()
             guard webView.window != nil else { state = .idle; stopPageListening(); return false }
@@ -597,6 +600,8 @@ final class SwipeNavigator {
     // MARK: The arrow
 
     private func showArrow() {
+        // A page still carried on from the last swipe is back in place before this one moves it.
+        pageArrived()
         guard let webView, let overlay = (webView.window?.windowController as? SwipeArrowHost)?.swipeArrowLayer else { return }
         arrow?.removeFromSuperview()
         let arrow = SwipeArrowView(back: direction < 0)
@@ -612,21 +617,33 @@ final class SwipeNavigator {
         return card
     }
 
-    /// How far the page has moved with the fingers, at most `maxShift`, with resistance so it slows as it goes.
+    /// How far the page has moved with the fingers, at most `maxShift`.
     private var shift: CGFloat {
         // Reduce Motion: the page stays put and the arrow alone shows the swipe.
         guard !Tokens.Motion.reduceMotion else { return 0 }
-        let pulled = max(0, CGFloat(-direction) * dx)
-        return Self.maxShift * (1 - exp(-pulled / (Self.maxShift * 1.6)))
+        return Self.shift(pulled: max(0, CGFloat(-direction) * dx))
     }
-    private static let maxShift: CGFloat = 72
+    nonisolated private static let maxShift: CGFloat = 72
+
+    /// How far the page moves for fingers `pulled` points along: with them point for point at first, then holding
+    /// back more the further they go, toward `maxShift`.
+    nonisolated static func shift(pulled: CGFloat) -> CGFloat { maxShift * (1 - exp(-max(0, pulled) / maxShift)) }
 
     /// Points a second the page moves (positive to the right) with the fingers going `fingers` the swipe's way:
     /// slower than they do, as it holds back more the further it goes.
     private func pageSpeed(_ fingers: CGFloat) -> CGFloat {
         guard !Tokens.Motion.reduceMotion else { return 0 }
         let pulled = max(0, CGFloat(-direction) * dx)
-        return CGFloat(-direction) * exp(-pulled / (Self.maxShift * 1.6)) / 1.6 * fingers
+        return CGFloat(-direction) * exp(-pulled / Self.maxShift) * fingers
+    }
+
+    /// The part of the page that shows, in `overlay`'s terms: within its card (and pane in a split), not the parts of
+    /// the web view under the bar or past the card's edge.
+    private func visiblePage(in overlay: NSView) -> NSRect {
+        guard let webView else { return .zero }
+        var page = overlay.convert(webView.visibleRect, from: webView)
+        if let card { page = page.intersection(overlay.convert(card.bounds, from: card)) }
+        return page.isEmpty ? overlay.convert(webView.bounds, from: webView) : page
     }
 
     /// `time`: the moment of the step that moved the fingers, whose speed can arm it as a flick.
@@ -641,10 +658,9 @@ final class SwipeNavigator {
             webView.layer?.removeAnimation(forKey: "swipe.settle")
             Tokens.Motion.withoutAnimation { webView.layer?.setAffineTransform(CGAffineTransform(translationX: offset, y: 0)) }
         }
-        let page = overlay.convert(webView.bounds, from: webView)
-        let frame = SwipeArrowView.frame(in: page, offset: offset, back: direction < 0)
+        let frame = SwipeArrowView.frame(in: visiblePage(in: overlay), offset: offset, back: direction < 0)
         if arrow.frame != frame { arrow.frame = frame }
-        // The ring follows the distance. The fill shows letting go would go, by distance or a flick (#377), and only
+        // The wash follows the distance. The fill shows letting go would go, by distance or a flick (#377), and only
         // once the swipe is Zigzag's: while the page may still keep it, nothing fills or taps.
         if state == .tracking {
             let fingers = time.map(speed(at:)) ?? 0
@@ -1133,41 +1149,41 @@ protocol SwipeArrowHost: AnyObject {
     var swipeArrowLayer: NSView { get }
 }
 
-/// The round arrow at the page's edge during a swipe: a small floating button in the panel's surface whose accent ring
-/// closes as you swipe, filled in the accent once letting go will navigate.
+/// The round arrow during a swipe, as Chrome shows it: a small bubble on the panel's surface, over the page just inside
+/// its leading edge so nothing ever clips it, whose accent wash grows from the middle as the swipe goes and turns solid
+/// once letting go will navigate. It never takes the pointer, so a gesture's steps keep going to the page under it.
 final class SwipeArrowView: NSView {
     static let size = Tokens.Metric.floatingButton
-    /// The panel's surface at rest; the accent once armed.
-    private let fill = ColorView()
+    /// The panel's surface, with its hairline edge.
+    private let disc = CALayer()
+    /// The accent, growing from the middle with the distance; solid once armed.
+    private let wash = CALayer()
     private let symbol = NSImageView()
-    /// How far along the swipe is, drawn around the edge.
-    private let ring = CAShapeLayer()
     var progress: CGFloat = 0 { didSet { if progress != oldValue { refreshProgress() } } }
-    var isArmed = false { didSet { refresh(animated: true) } }
+    var isArmed = false { didSet { if isArmed != oldValue { refresh(animated: true) } } }
 
-    /// The arrow, for a page at `page` shifted `offset` points: centered in the gap at its edge, at least a margin
-    /// from that edge so it never overlaps the sidebar, the next pane or the window edge. Floats over the page while
-    /// the gap is narrower than the arrow.
+    /// The bubble for a page whose visible part is `page` (the window's terms), shifted `offset` points by the swipe:
+    /// a margin inside the page's leading edge as it moves, vertically centered, and never past either side of `page`,
+    /// so it can't sit across the page's edge, over the sidebar, the next pane or the window's edge.
     static func frame(in page: NSRect, offset: CGFloat, back: Bool) -> NSRect {
         let margin = Tokens.Space.x2
-        let edge = back ? page.minX : page.maxX
-        let middle = edge + offset / 2 - size / 2
-        let x = back ? max(middle, edge + margin) : min(middle, edge - margin - size)
-        return NSRect(x: round(x), y: round(page.midY - size / 2), width: size, height: size)
+        let x = back ? page.minX + max(0, offset) + margin : page.maxX + min(0, offset) - margin - size
+        let lowest = page.minX + margin, highest = max(lowest, page.maxX - margin - size)
+        return NSRect(x: round(min(max(x, lowest), highest)), y: round(page.midY - size / 2), width: size, height: size)
     }
+
+    /// How much of the bubble the wash covers, `progress` along the distance: none at the start, all of it at the end.
+    static func washScale(progress: CGFloat, armed: Bool) -> CGFloat { armed ? 1 : min(max(progress, 0), 1) }
 
     init(back: Bool) {
         super.init(frame: NSRect(x: 0, y: 0, width: Self.size, height: Self.size))
         wantsLayer = true
         layer?.masksToBounds = false
-        fill.wantsLayer = true
-        fill.layer?.cornerRadius = Self.size / 2
-        fill.layer?.borderWidth = Tokens.Metric.hairline
-        addSubview(fill)
-        ring.fillColor = nil
-        ring.lineWidth = Tokens.Metric.focusRing
-        ring.lineCap = .round
-        fill.layer?.addSublayer(ring)
+        disc.borderWidth = Tokens.Metric.hairline
+        disc.cornerRadius = Self.size / 2
+        wash.cornerRadius = Self.size / 2
+        layer?.addSublayer(disc)
+        layer?.addSublayer(wash)
         symbol.image = Tokens.Symbol.image(back ? "arrow.left" : "arrow.right", size: Tokens.Symbol.glyph)
         symbol.imageScaling = .scaleNone
         addSubview(symbol)
@@ -1176,17 +1192,16 @@ final class SwipeArrowView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
     override func layout() {
         super.layout()
-        fill.frame = bounds
         symbol.frame = bounds
-        // From the top, clockwise.
-        let inset = bounds.insetBy(dx: ring.lineWidth / 2, dy: ring.lineWidth / 2)
-        let path = CGMutablePath()
-        let top = fill.isFlipped ? -CGFloat.pi / 2 : CGFloat.pi / 2
-        path.addArc(center: CGPoint(x: inset.midX, y: inset.midY), radius: inset.width / 2, startAngle: top,
-                    endAngle: top + (fill.isFlipped ? 2 : -2) * .pi, clockwise: !fill.isFlipped)
-        Tokens.Motion.withoutAnimation { ring.frame = bounds; ring.path = path }
+        Tokens.Motion.withoutAnimation {
+            disc.frame = bounds
+            wash.bounds = bounds
+            wash.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        }
         layer?.shadowPath = CGPath(ellipseIn: bounds, transform: nil)
     }
 
@@ -1198,9 +1213,10 @@ final class SwipeArrowView: NSView {
     private func refresh(animated: Bool = false) {
         let theme = Brand.Theme.for(self)
         let apply = {
-            self.fill.layer?.backgroundColor = self.cgColor(self.isArmed ? theme.accent : theme.panel)
-            self.fill.layer?.borderColor = self.cgColor(self.isArmed ? .clear : Tokens.Color.panelEdge)
-            self.ring.strokeColor = self.cgColor(theme.accent)
+            self.disc.backgroundColor = self.cgColor(theme.panel)
+            self.disc.borderColor = self.cgColor(Tokens.Color.panelEdge)
+            self.wash.backgroundColor = self.cgColor(theme.accent.withAlphaComponent(self.isArmed ? 1 : Tokens.Color.selectionPressedAlpha))
+            self.wash.setAffineTransform(Self.scale(Self.washScale(progress: self.progress, armed: self.isArmed)))
             // The one panel shadow, as every floating thing has.
             self.layer?.shadowColor = self.cgColor(Tokens.Color.panelShadow)
             self.layer?.shadowOpacity = 1
@@ -1220,12 +1236,23 @@ final class SwipeArrowView: NSView {
         refreshProgress()
     }
 
-    /// Each step of the swipe: the ring and opacity only.
+    /// A scale of zero can't be undone by the next step's transform.
+    private static func scale(_ value: CGFloat) -> CGAffineTransform {
+        let s = max(value, 0.001)
+        return CGAffineTransform(scaleX: s, y: s)
+    }
+
+    /// Each step of the swipe: the wash and opacity only, with no animation.
     private func refreshProgress() {
-        Tokens.Motion.withoutAnimation { ring.strokeEnd = min(max(progress, 0), 1) }
+        if !isArmed { Tokens.Motion.withoutAnimation { wash.setAffineTransform(Self.scale(Self.washScale(progress: progress, armed: false))) } }
         let opacity = Self.opacity(progress: progress, armed: isArmed)
         if alphaValue != opacity { alphaValue = opacity }
     }
+
+    #if DEBUG
+    /// The wash's share of the bubble now.
+    var debugWashScale: CGFloat { wash.affineTransform().a }
+    #endif
 
     /// Shows at once as the swipe starts and is fully there a fifth of the way; once letting go will move, it fills.
     static func opacity(progress: CGFloat, armed: Bool) -> CGFloat {

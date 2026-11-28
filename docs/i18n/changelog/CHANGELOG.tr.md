@@ -9,6 +9,7 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 - Sayfası yüklenmemiş sabitlenmiş sekmeler, sabitlenmiş kutucuklar ve favoriler, açık olanlardan ayırt edebilmeniz için simgesi ve adıyla soluk görünür; kenar çubuğunda, yüzen kenar çubuğunda ve ekranın kenarından açılan kenar çubuğunda. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
 - Bir Space’in adının yanındaki profil adı yalnızca Space’leriniz birden fazla profile dağılmışken görünür; bu yüzden kendi profili olan bir Space silindiğinde kaybolur ve üzerine tıklamak Ayarlar › Profiller’i açar. Sabitlenmiş sekmeleri katlayan ok, Space’in adıyla aynı hizada durur. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
 - Kenar çubuğundaki adres, altındaki satırlarla aynı sol kenardan başlar. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
+- Geri ve ileri kaydırma daha sakin görünüyor ve artık takılı kalmıyor. Ok, sayfanın kenarının hemen içinde duran yuvarlak bir baloncuk; kenar çubuğunda ya da sayfanın kenarında hiç kesilmiyor ve kaydırdıkça ortadan dolmaya başlıyor. Kaydırma başlarken sayfa parmaklarınızı noktası noktasına izliyor. Baloncuk doluyken parmaklarınızı kaldırdığınızda Mac bunu kaçırsa bile, ekranda kalmak yerine izleme dörtgenine yeniden dokunduğunuzda geçiş yapılıyor; geri gittikten hemen sonra kaydırmak da artık eski sayfayı bir an göstermiyor. ([#579](https://github.com/ZigaoWang/zigzag/issues/579))
 
 ## [0.10.0] - 2026-11-25
 
