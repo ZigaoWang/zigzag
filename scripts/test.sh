@@ -39,11 +39,13 @@ else
 import json, os, sys
 tests, times_file, workers, logs = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
 pseudo = sys.argv[5:]
+# Suites this machine can't run (ZZ_SKIP_SUITES, e.g. keychain suites in the test VM) are left out.
+skipped = os.environ.get("ZZ_SKIP_SUITES", "").split()
 counts = {}
 for value in json.load(open(tests))["values"]:
     for test in value["enabledTests"]:
         suite = test["identifier"].split("/")[1]
-        if suite not in pseudo: counts[suite] = counts.get(suite, 0) + 1
+        if suite not in pseudo and suite not in skipped: counts[suite] = counts.get(suite, 0) + 1
 times = {}
 if os.path.exists(times_file):
     for line in open(times_file):
@@ -55,7 +57,7 @@ for suite in sorted(counts, key=lambda s: -times.get(s, 0.1 * counts[s])):
     shard[0] += times.get(suite, 0.1 * counts[suite])
     shard[1].append(suite)
 # The first worker runs everything the others don't, so a test -only-testing can't name still runs.
-others = [s for _, suites in shards[1:] for s in suites] + pseudo
+others = [s for _, suites in shards[1:] for s in suites] + pseudo + skipped
 open(f"{logs}/shard-0", "w").write(" ".join(f"-skip-testing:ZigzagTests/{s}" for s in others))
 open(f"{logs}/shard-pseudo", "w").write(" ".join(f"-only-testing:ZigzagTests/{s}" for s in pseudo))
 for i, (_, suites) in enumerate(shards[1:], 1):
