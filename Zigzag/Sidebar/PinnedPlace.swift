@@ -21,6 +21,8 @@ nonisolated struct PinnedLine {
     let folderOf: [UUID: UUID]
     /// The first page anywhere inside each folder, its subfolders' with it.
     private let first: [UUID: Int]
+    /// The places of the pages right under each parent (nil: the top level), in order.
+    private let pagesUnder: [UUID?: [Int]]
 
     init(pages: [UUID], folders: [BookmarkFolder], riders: Set<UUID> = []) {
         self.pages = pages
@@ -47,6 +49,9 @@ nonisolated struct PinnedLine {
             }
         }
         self.first = first
+        var pagesUnder: [UUID?: [Int]] = [:]
+        for (place, id) in pages.enumerated() { pagesUnder[folderOf[id], default: []].append(place) }
+        self.pagesUnder = pagesUnder
     }
 
     func pageIndex(of id: UUID) -> Int? { index[id] }
@@ -57,10 +62,7 @@ nonisolated struct PinnedLine {
 
     /// The first page at or under a parent: where the parent's children begin on the page line.
     func topPage(of parent: UUID?) -> Int? {
-        var best: Int?
-        for (place, id) in pages.enumerated() where folderOf[id] == parent {
-            best = best.map { min($0, place) } ?? place
-        }
+        var best: Int? = pagesUnder[parent]?.first
         for folder in inside[parent] ?? [] {
             if let first = first[folder.id] { best = best.map { min($0, first) } ?? first }
         }
@@ -80,8 +82,8 @@ nonisolated struct PinnedLine {
     /// first when the two land in one spot. Equal folder places keep the folders' own order, so the rows are stable.
     func children(of parent: UUID?) -> [SidebarItem] {
         var rows: [(key: Double, isPage: Bool, order: Int, item: SidebarItem)] = []
-        for (place, id) in pages.enumerated() where folderOf[id] == parent && !riders.contains(id) {
-            rows.append((Double(place), true, 0, .bookmark(id)))
+        for place in pagesUnder[parent] ?? [] where !riders.contains(pages[place]) {
+            rows.append((Double(place), true, 0, .bookmark(pages[place])))
         }
         for (order, folder) in (inside[parent] ?? []).enumerated() {
             rows.append((place(of: folder, order: order), false, order, .folder(folder.id)))
