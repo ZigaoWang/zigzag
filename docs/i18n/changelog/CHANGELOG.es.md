@@ -13,6 +13,9 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 ### Cambios
 - Los ajustes del sitio son más cortos y tranquilos. El zoom, el bloqueo de anuncios, la página oscura, lo que ha pedido el sitio, como la cámara, y el modo de compatibilidad aparecen justo después de las acciones, y la conexión es una fila bajo el nombre del sitio. Mantener pestañas activas, Agente de usuario, Mantener la pantalla completa en la ventana, Apps de este Mac y Abrir en pasan a Más para este sitio, una página del panel. Tus extensiones van al final, las fijadas primero, y las filas son más altas si abres el panel con el dedo. ([#384](https://github.com/ZigaoWang/zigzag/issues/384))
 
+### Cambios
+- La barra de menús es más corta: Archivo y Visualización conservan lo que usas a diario, y recorrer y ordenar pestañas, espacios y Split View tienen cada uno un submenú en Visualización, junto a Desarrollo. Duplicar pestaña, Mover pestaña a una ventana nueva y Suspender página ahora están en Visualización › Pestañas. Todos los atajos funcionan como antes, y Ajustes › Atajos muestra cada uno con su submenú, como Pestañas › Anidar pestaña. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+
 ### Correcciones
 - La línea de carga solo avanza cuando la página avanza. Si un sitio deja de responder, se queda quieta en vez de arrastrarse hacia el final, y mientras no llega nada se atenúa y se aviva suavemente. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag ya no se cierra de vez en cuando al cerrar una pestaña o cuando una se suspende, si Tiempo de uso de macOS tiene un problema al soltar la página.

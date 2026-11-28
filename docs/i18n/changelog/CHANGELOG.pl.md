@@ -13,6 +13,9 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 ### Zmieniono
 - Ustawienia witryny są krótsze i spokojniejsze. Powiększenie, blokowanie reklam, ciemna strona, to, o co prosiła witryna, na przykład kamera, oraz tryb zgodności są zaraz po akcjach, a połączenie to wiersz pod nazwą witryny. Nie usypiaj kart, Agent użytkownika, Pełny ekran w oknie, Aplikacje na tym Macu i Otwórz w trafiły do strony Więcej dla tej witryny w panelu. Rozszerzenia są na końcu, przypięte najpierw, a wiersze są wyższe, gdy otworzysz panel palcem. ([#384](https://github.com/ZigaoWang/zigzag/issues/384))
 
+### Zmieniono
+- Pasek menu jest krótszy: „Plik” i „Widok” zachowują to, czego używasz na co dzień, a przechodzenie i porządkowanie kart, przestrzeni i Split View mają każde własne podmenu w „Widoku”, obok „Programisty”. „Duplikuj kartę”, „Przenieś kartę do nowego okna” i „Uśpij stronę” są teraz w „Widok” › „Karty”. Każdy skrót działa jak wcześniej, a „Ustawienia” › „Skróty” pokazują każdy razem z jego podmenu, na przykład „Karty › Zagnieźdź kartę”. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+
 ### Naprawiono
 - Linia ładowania przesuwa się tylko wtedy, gdy strona faktycznie się wczytuje. Przy witrynie, która przestała odpowiadać, stoi w miejscu zamiast pełznąć ku końcowi, a dopóki nic nie dociera, łagodnie przygasa i jaśnieje. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag nie kończy już czasem działania, gdy zamykasz kartę lub karta usypia, a Czas przed ekranem w macOS napotka problem przy zwalnianiu strony.

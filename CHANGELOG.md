@@ -14,6 +14,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Changed
 - Site Controls is shorter and calmer. Zoom, ad blocking, dark page, what the site asked for, like the camera, and Compatibility mode come right after the actions, and the connection is a row under the site's name. Keep tabs awake, User agent, Keep full screen in the window, Apps on this Mac and Open in moved to More for This Site, a page of the panel. Your extensions come last, pinned ones first, and the rows are taller when you open the panel with a finger. ([#384](https://github.com/ZigaoWang/zigzag/issues/384))
 
+### Changed
+- The menu bar is shorter: File and View keep what you use every day, and going through and arranging tabs, spaces and split view each have a submenu in View, beside Developer. Duplicate Tab, Move Tab to New Window and Suspend Page are now in View › Tabs. Every shortcut works as before, and Settings › Shortcuts lists each one with its submenu, like Tabs › Nest Tab. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+
 ### Fixed
 - The loading line moves only when the page does. A site that has stopped answering holds still instead of creeping toward the end, and while nothing arrives the line softly fades in and out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.

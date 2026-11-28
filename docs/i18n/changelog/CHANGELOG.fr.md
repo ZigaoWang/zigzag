@@ -13,6 +13,9 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 ### Modifications
 - Les réglages du site sont plus courts et plus calmes. Le zoom, le blocage des publicités, la page sombre, ce que le site a demandé, comme la caméra, et le mode de compatibilité viennent juste après les actions, et la connexion est une ligne sous le nom du site. Garder les onglets actifs, Agent utilisateur, Garder le plein écran dans la fenêtre, Apps de ce Mac et Ouvrir dans passent dans Plus pour ce site, une page du panneau. Vos extensions viennent en dernier, les épinglées d’abord, et les lignes sont plus hautes quand vous ouvrez le panneau du doigt. ([#384](https://github.com/ZigaoWang/zigzag/issues/384))
 
+### Modifications
+- La barre des menus est plus courte : Fichier et Présentation gardent ce que vous utilisez tous les jours, et parcourir et ranger les onglets, les espaces et Split View ont chacun un sous-menu dans Présentation, à côté de Développeur. Dupliquer l’onglet, Déplacer l’onglet vers une nouvelle fenêtre et Mettre la page en veille sont désormais dans Présentation › Onglets. Chaque raccourci fonctionne comme avant, et Réglages › Raccourcis les liste tous avec leur sous-menu, comme Onglets › Imbriquer l’onglet. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+
 ### Corrections
 - La ligne de chargement n’avance plus que lorsque la page avance. Sur un site qui ne répond plus, elle reste immobile au lieu de ramper vers la fin, et tant que rien n’arrive, elle pâlit et se ravive doucement. Merci à [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag ne quitte plus de temps en temps quand vous fermez un onglet ou qu’un onglet se met en veille, lorsque Temps d’écran de macOS rencontre un problème en libérant la page.

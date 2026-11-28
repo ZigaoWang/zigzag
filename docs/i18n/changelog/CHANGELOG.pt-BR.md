@@ -13,6 +13,9 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 ### Alterado
 - Os ajustes do site estão mais curtos e calmos. Zoom, bloqueio de anúncios, página escura, o que o site pediu, como a câmera, e o modo de compatibilidade vêm logo após as ações, e a conexão é uma linha sob o nome do site. Manter abas ativas, Agente de usuário, Manter tela cheia na janela, Apps neste Mac e Abrir em foram para Mais para este site, uma página do painel. Suas extensões vêm por último, as fixadas primeiro, e as linhas ficam mais altas quando você abre o painel com o dedo. ([#384](https://github.com/ZigaoWang/zigzag/issues/384))
 
+### Alterado
+- A barra de menus ficou mais curta: Arquivo e Visualizar mantêm o que você usa todo dia, e navegar e organizar abas, espaços e Split View têm cada um um submenu em Visualizar, ao lado de Desenvolvedor. Duplicar aba, Mover aba para nova janela e Suspender página agora ficam em Visualizar › Abas. Todo atalho funciona como antes, e Ajustes › Atalhos lista cada um com o seu submenu, como Abas › Aninhar aba. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+
 ### Corrigido
 - A linha de carregamento só avança quando a página avança. Num site que parou de responder, ela fica parada em vez de se arrastar até o fim, e enquanto nada chega ela esmaece e volta suavemente. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - O Zigzag não fecha mais de vez em quando ao fechar uma aba ou quando uma é suspensa, se o Tempo de Uso do macOS tiver um problema ao liberar a página.

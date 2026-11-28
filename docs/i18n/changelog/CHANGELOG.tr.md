@@ -13,6 +13,9 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 ### Değişiklikler
 - Site ayarları daha kısa ve sakin. Yakınlaştırma, reklam engelleme, koyu sayfa, sitenin istediği izinler (örneğin kamera) ve uyumluluk modu eylemlerin hemen ardından geliyor; bağlantı da sitenin adının altında bir satır. Sekmeleri uyanık tut, Kullanıcı aracısı, Tam ekranı pencerede tut, Bu Mac’teki uygulamalar ve Şurada aç, panelin bir sayfası olan Bu Site İçin Diğer’e taşındı. Uzantılar en sonda, sabitlenenler önce geliyor; paneli parmakla açtığınızda satırlar daha yüksek oluyor. ([#384](https://github.com/ZigaoWang/zigzag/issues/384))
 
+### Değişiklikler
+- Menü çubuğu kısaldı: Dosya ve Görünüm her gün kullandıklarınızı tutuyor; sekmeler, Space’ler ve Bölünmüş Görünüm arasında gezinme ve bunları düzenleme ise Görünüm’de, Geliştirici’nin yanında kendi alt menülerinde. Sekmeyi Çoğalt, Sekmeyi Yeni Pencereye Taşı ve Sayfayı Uykuya Al artık Görünüm › Sekmeler’de. Her kısayol eskisi gibi çalışıyor ve Ayarlar › Kısayollar her birini alt menüsüyle birlikte listeliyor, örneğin Sekmeler › Sekmeyi İç İçe Yerleştir. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+
 ### Düzeltmeler
 - Yükleme çizgisi artık yalnızca sayfa ilerlediğinde ilerliyor. Yanıt vermeyi bırakan bir sitede sona doğru sürünmek yerine yerinde duruyor ve hiçbir şey gelmediği sürece hafifçe sönüp parlıyor. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Bir sekmeyi kapattığınızda veya bir sekme uykuya geçtiğinde, macOS’in Ekran Süresi sayfayı bırakırken bir sorunla karşılaşırsa Zigzag artık ara sıra kapanmaz.

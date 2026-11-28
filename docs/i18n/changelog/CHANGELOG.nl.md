@@ -13,6 +13,9 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 ### Gewijzigd
 - Website-instellingen zijn korter en rustiger. Zoom, advertentieblokkering, donkere pagina, waar de website om vroeg, zoals de camera, en compatibiliteitsmodus staan direct na de acties, en de verbinding is een rij onder de naam van de website. Houd tabbladen actief, User-agent, Houd schermvullende weergave in het venster, Apps op deze Mac en Openen in staan nu onder Meer voor deze website, een pagina van het paneel. Je extensies komen als laatste, vastgezette eerst, en de rijen zijn hoger als je het paneel met een vinger opent. ([#384](https://github.com/ZigaoWang/zigzag/issues/384))
 
+### Gewijzigd
+- De menubalk is korter: Archief en Weergave houden wat je elke dag gebruikt, en het doorlopen en ordenen van tabbladen, spaces en Split View hebben elk een submenu in Weergave, naast Ontwikkelaar. Dupliceer tabblad, Verplaats tabblad naar nieuw venster en Zet pagina in slaapstand staan nu in Weergave › Tabbladen. Elke toetscombinatie werkt zoals eerst, en Instellingen › Toetscombinaties toont ze allemaal met hun submenu, zoals Tabbladen › Zet onder tabblad erboven. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+
 ### Opgelost
 - De laadlijn beweegt alleen nog als de pagina vordert. Bij een site die niet meer antwoordt blijft ze staan in plaats van naar het einde te kruipen, en zolang er niets binnenkomt, wordt ze zacht lichter en donkerder. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag stopt niet meer af en toe als je een tabblad sluit of er een in de slaapstand gaat, wanneer Schermtijd van macOS een probleem heeft met het loslaten van de pagina.
