@@ -171,10 +171,11 @@ enum DarkPages {
         wants(mode: mode, systemIsDark: systemIsDark, site: choice(for: url))
     }
 
-    /// Only web pages, files and Zigzag's own pages; an extension's own page is its own business.
+    /// Only web pages, files and Zigzag's own documents; an extension's own page is its own business. History, the
+    /// Archive and Settings follow the window instead (`HistoryPage.followsWindow`).
     static func applies(to url: URL?) -> Bool {
         guard let scheme = url?.scheme?.lowercased() else { return true }
-        return ["http", "https", "file", "about", HistoryPage.scheme].contains(scheme)
+        return ["http", "https", "file", "about", HistoryPage.scheme].contains(scheme) && !HistoryPage.followsWindow(url)
     }
 
     // MARK: Pages
@@ -466,8 +467,11 @@ enum DarkPages {
         // Forced dark, the site is asked for its light look, which is darkened as a light site's is: its own dark
         // look, which drew parts of it light, is what Force dark is for. A look chosen for the page is the page's,
         // whatever dark pages would have asked.
-        let look = chosenLook(of: webView) ?? Self.look(wanted: wanted, forced: isForced(url), siteOff: choice(for: url) == false, systemIsDark: systemIsDark)
-        let appearance = NSAppearance(named: look)
+        let chosen = chosenLook(of: webView)
+        let look = chosen ?? Self.look(wanted: wanted, forced: isForced(url), siteOff: choice(for: url) == false, systemIsDark: systemIsDark)
+        // History, the Archive and Settings are light or dark with the window, as Settings' own views are: nil
+        // leaves the web view following its window.
+        let appearance = chosen == nil && HistoryPage.followsWindow(url) ? nil : NSAppearance(named: look)
         if webView.appearance?.name != appearance?.name { webView.appearance = appearance }
         let tab = (webView as? BrowserWebView)?.owner
         // Not wanted here, the page isn't darkened any more: until its script says how it looks on its own, the bar

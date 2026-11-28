@@ -11,6 +11,12 @@ enum HistoryPage {
     static func isHistory(_ url: URL?) -> Bool { isInternal(url) && url?.host() == "history" }
     /// One of Zigzag's own pages (History, Settings): never a visit, never fetched from the network.
     static func isInternal(_ url: URL?) -> Bool { url?.scheme == scheme }
+    /// Zigzag's own pages that are part of the app, not a document: History, the Archive, Settings. Light or dark
+    /// with the window, as the sidebar and Settings' views are, never with the Mac alone.
+    static func followsWindow(_ url: URL?) -> Bool {
+        guard isInternal(url), let host = url?.host() else { return false }
+        return host == "history" || host == ArchivePage.host || host == SettingsPage.host
+    }
 
     /// Lets a page configuration show History. A configuration WebKit hands over for a popup already has it.
     static func attach(to configuration: WKWebViewConfiguration) {

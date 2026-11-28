@@ -111,6 +111,19 @@ struct HistoryPageTests {
         #expect(store.recent().count == 3)
     }
 
+    /// History, the Archive and Settings are light or dark with the window, as Settings' own views are: never darkened
+    /// as a web page, never set to the Mac's look alone. A Markdown file stays a document.
+    @Test func ownPagesFollowTheWindow() {
+        for url in [HistoryPage.url, ArchivePage.url, SettingsPage.url, SettingsPage.url(for: .privacy)] {
+            #expect(HistoryPage.followsWindow(url), "\(url)")
+            #expect(!DarkPages.applies(to: url), "\(url)")
+        }
+        let markdown = URL(string: "\(HistoryPage.scheme)://\(MarkdownPage.host)/notes.md")!
+        #expect(!HistoryPage.followsWindow(markdown))
+        #expect(DarkPages.applies(to: markdown))
+        #expect(!HistoryPage.followsWindow(URL(string: "https://history.example.com/")))
+    }
+
     // MARK: The page
 
     /// Stands in for the browser: serves `entries` and keeps what the page asked for.

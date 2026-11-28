@@ -40,3 +40,7 @@
   No test yet.
 - Remove All Pages from a site → every page on it goes, with or without "www.", and ⌘Z brings them back.
   Test: HistoryPageTests.removingASiteTakesAllItsPagesAndComesBack
+
+## Look
+- History and the Archive → light or dark with the window, as Settings is, never with the Mac alone, and never darkened as a web page.
+  Test: HistoryPageTests.ownPagesFollowTheWindow
