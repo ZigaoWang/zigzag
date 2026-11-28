@@ -297,6 +297,10 @@
   Test: TouchMovesTests.twoFingersOnAPageGoBackAndForward
 - One finger on a page is the page's, two go back or forward; each decides only after the fingers have moved ten points.
   Test: TouchMovesTests.fingersOnAPageRouteByCount
+- Fingers on a page keep to the axis they start on, as on an iPad: started within 50° of level, the page never scrolls up or down under them, and two of them go back or forward even when the first is already moving as the second lands; steeper than 65°, the page never scrolls sideways; in between, it scrolls as they go.
+  Test: TouchMovesTests.fingersOnAPageKeepToTheAxisTheyStartOn
+  Test: TouchMovesTests.aTouchScrollThatStartsSidewaysNeverScrollsThePageUpOrDown
+  Test: TouchMovesTests.aSwipeWhoseFirstFingerLandsMovingGoesBackOrForward
 - Three fingers on a page are left to macOS, which takes them for switching desktops.
   Test: TouchMovesTests.threeFingersRouteNowhere
 - Two fingers sideways across the sidebar → the previous or next space, as one does.

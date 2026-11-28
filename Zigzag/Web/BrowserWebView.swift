@@ -184,7 +184,36 @@ final class BrowserWebView: WKWebView {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
         if TouchSwipeRecognizer.claims(event) || swipe.handle(event) { return }
         owner?.scrolledSinceSave = true
-        super.scrollWheel(with: swipe.forPage(event))
+        super.scrollWheel(with: swipe.forPage(touchLocked(event)))
+    }
+
+    /// Fingers on the screen scrolling this gesture, and the axis they keep to (`TouchScrollLock`).
+    private var touchLock: TouchScrollLock?
+
+    /// `event` as the page gets it: a finger's scroll on the screen keeps to the axis it started on, as on an iPad
+    /// (#581); the trackpad's and a wheel's scrolls are left as they are.
+    func touchLocked(_ event: NSEvent) -> NSEvent {
+        if event.phase == .began || event.phase == .mayBegin {
+            touchLock = TouchPress.isTouchScroll(at: event.timestamp) ? TouchScrollLock() : nil
+        } else if event.phase.isEmpty, event.momentumPhase.isEmpty {
+            // A wheel's turn: no gesture of fingers.
+            touchLock = nil
+        }
+        guard touchLock != nil, event.phase != .mayBegin else { return event }
+        let x = event.scrollingDeltaX, y = event.scrollingDeltaY
+        guard let kept = touchLock?.step(began: event.phase == .began, dx: x, dy: y), kept.x != x || kept.y != y,
+              let copy = event.cgEvent?.copy() else { return event }
+        if kept.y == 0 {
+            copy.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
+            copy.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
+            copy.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0)
+        }
+        if kept.x == 0 {
+            copy.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
+            copy.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: 0)
+            copy.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: 0)
+        }
+        return NSEvent(cgEvent: copy) ?? event
     }
 
     // Keys (space, arrows, Page Down) and clicks (the scroll bar, a link to a heading) move the page too: the next

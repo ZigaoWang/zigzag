@@ -30,6 +30,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The profile's name beside a space's name shows only while your spaces are on more than one profile, so it goes once a space with its own profile is deleted, and a click on it opens Settings › Profiles. The arrow that folds the pinned tabs sits level with the space's name. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
 - The address in the sidebar starts on the same left edge as the rows below it. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 - Swiping back and forward looks calmer and no longer gets stuck. The arrow is a round bubble that sits on the page just inside its edge, never cut off at the sidebar or the page's edge, and fills in from the middle as you swipe. The page moves with your fingers point for point as the swipe starts. If you lift your fingers with the bubble filled and the Mac misses it, the swipe still goes when you touch the trackpad again, instead of staying on screen, and scrolling right after going back no longer flashes the old page. ([#579](https://github.com/ZigaoWang/zigzag/issues/579))
+- On a touch display, a swipe keeps to the direction it starts in, as on an iPad: a sideways swipe no longer scrolls the page up and down, and two fingers go back or forward even when one is already moving as the other lands. A swipe that starts up or down still scrolls. ([#581](https://github.com/ZigaoWang/zigzag/issues/581))
 
 ## [0.10.0] - 2026-11-25
 

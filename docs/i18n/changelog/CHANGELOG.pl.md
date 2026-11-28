@@ -29,6 +29,7 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 - Nazwa profilu obok nazwy przestrzeni jest widoczna tylko wtedy, gdy twoje przestrzenie są w więcej niż jednym profilu, więc znika po usunięciu przestrzeni z własnym profilem, a kliknięcie jej otwiera „Ustawienia” › „Profile”. Strzałka, która zwija przypięte karty, jest na wysokości nazwy przestrzeni. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
 - Adres w pasku bocznym zaczyna się przy tej samej lewej krawędzi co wiersze pod nim. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 - Przesuwanie wstecz i dalej wygląda spokojniej i już się nie zawiesza. Strzałka to okrągły dymek na stronie, tuż przy jej krawędzi, nigdy nieucięty przy pasku bocznym ani krawędzi strony, który wypełnia się od środka w miarę przesuwania. Na początku strona podąża za palcami punkt w punkt. Jeśli podniesiesz palce przy wypełnionym dymku, a Mac tego nie zauważy, gest i tak zostanie wykonany przy następnym dotknięciu gładzika, zamiast zostawać na ekranie, a przewijanie zaraz po cofnięciu nie pokazuje już na chwilę poprzedniej strony. ([#579](https://github.com/ZigaoWang/zigzag/issues/579))
+- Na ekranie dotykowym przesunięcie trzyma się kierunku, w którym się zaczęło, jak na iPadzie: przesunięcie w bok nie przewija już strony w górę i w dół, a dwa palce cofają lub idą dalej, nawet gdy jeden już się porusza, kiedy drugi dotyka ekranu. Przesunięcie zaczęte w górę lub w dół nadal przewija stronę. ([#581](https://github.com/ZigaoWang/zigzag/issues/581))
 
 ## [0.10.0] - 2026-11-25
 
