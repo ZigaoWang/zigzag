@@ -1555,6 +1555,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return Self.browserWindow()
     }
 
+    /// Tab and space commands that aren't this window's own — ⌘1–9, the next and previous tab, and the rest — reach the
+    /// browser window the page belongs to, as they do from the edge panel. The Mini's own commands answer first, so its
+    /// ⌘T, ⌘W and ⌘L stay its own; this only fills in what it does not do itself.
+    override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
+        let browser = source ?? WindowManager.shared.controllers.last { $0.tabManager.isPrivate == tab.isPrivate }
+        if let browser, browser !== self, browser.responds(to: action) { return browser }
+        return super.supplementalTarget(forAction: action, sender: sender)
+    }
+
     /// Moves the page, live, into a browser window as its selected tab, in the space chosen on the strip: this window
     /// fades away first, then the page is there. A borrowed preview page is already a browser tab: it goes back to it.
     @objc func openInZigzag(_ sender: Any? = nil) {
