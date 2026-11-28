@@ -91,9 +91,9 @@
 ## Pinned tabs
 - ⌘W on a pinned tab → it unloads and stays pinned.
   Test: EverydayFlowsTests.aClosedPinnedTabStaysWhereItShows
-- A pinned tab, pinned tile or favorite whose page isn't loaded → its icon and name are dimmed, in the sidebar, the floating sidebar and the sidebar from the screen edge; loaded, or the one you're on, they're at full strength.
-  Test: PinnedGroupTests.anUnloadedPinsRowIsDimmedAndALoadedOneIsnt
-  Test: FavoriteTileStateTests.aTileIconIsDimmedOnlyWhileItsPageIsntLoaded
+- A pinned tab, pinned tile or favorite whose page isn't loaded → its icon wears the sleeping ring an unloaded tab has, in the sidebar, the floating sidebar and the sidebar from the screen edge; loaded, it has none. Icons and names are at full strength either way.
+  Test: PinnedGroupTests.anUnloadedPinsRowWearsTheRingAndALoadedOneIsnt
+  Test: FavoriteTileStateTests.aTileIconWearsTheRingOnlyWhileItsPageIsntLoaded
 - A pinned tab that wandered off its address → its menu leads with Back to Pinned Page, Set Current Page as Pinned and Separate from Pinned Tab.
   Test: SidebarRowMenuTests.aPinnedPageThatWanderedOffLeadsWithGoingBackOrKeepingIt
 - The × on a pinned tab that wandered off → it says Back to Pinned Page and goes back; a middle-click still unloads.
