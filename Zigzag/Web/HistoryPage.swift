@@ -69,6 +69,10 @@ enum HistoryPage {
                 // rather than guessing from whichever window happens to be key.
                 data = Data(ViewportPage.html(for: url).utf8)
                 type = "text/html"
+            } else if let mark = ViewportPage.markRequest(in: url),
+                      let png = ViewportPage.markPNG(onPicture: mark.onPicture, dark: mark.dark, scale: mark.scale) {
+                data = png
+                type = "image/png"
             } else if let name = ViewportPage.pictureName(in: url),
                       let jpeg = try? Data(contentsOf: SpaceBackground.folder.appendingPathComponent(name)) {
                 // The stored picture as it was saved: already scaled for the screen when it was chosen.

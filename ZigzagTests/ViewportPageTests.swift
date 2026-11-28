@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -16,11 +17,42 @@ struct ViewportPageTests {
     }
 
     @Test func theBlankPageDrawsTheWordmarkItSays() {
-        // The page carries the same drawing the app uses, from the same geometry (`WordmarkView.svg`).
+        // The page shows the native mark's own drawing, light and dark, cut into a ground or lifted on a picture.
         let html = ViewportPage.blankHTML(for: nil, isPrivate: false)
-        #expect(html.contains("<svg"))
-        #expect(html.contains("stroke-linecap=\"round\""))
-        #expect(html.contains("var(--mark)"))
+        #expect(html.contains("zigzag://blank-mark?on=ground&dark=0&scale=2 2x"))
+        #expect(html.contains("zigzag://blank-mark?on=ground&dark=1&scale=1 1x"))
+        #expect(html.contains("prefers-color-scheme: dark"))
+    }
+
+    @Test func theMarkIsTheNativeMarksSize() throws {
+        // The page draws over the native mark once it loads, so the two have to be the same pixels to swap unseen.
+        let html = ViewportPage.blankHTML(for: nil, isPrivate: false)
+        #expect(html.contains(String(format: "width:%.3fpx;height:%.3fpx", EmptySpaceMark.size.width, EmptySpaceMark.size.height)))
+        let png = try #require(ViewportPage.markPNG(onPicture: false, dark: false, scale: 2))
+        let rep = try #require(NSBitmapImageRep(data: png))
+        #expect(rep.pixelsHigh == Int(EmptySpaceMark.size.height) * 2)
+        #expect(ViewportPage.markRequest(in: URL(string: "zigzag://blank-mark?on=picture&dark=1&scale=2")!)! == (true, true, 2))
+        #expect(ViewportPage.markRequest(in: URL(string: "zigzag://blank-mark?on=ground&dark=0&scale=9")!) == nil)
+    }
+
+    @Test func theAddressCarriesTheGroundTheWindowDraws() {
+        // A look being edited isn't saved yet, so the page takes the window's ground from its address.
+        let id = UUID()
+        let url = ViewportPage.blankURL(for: id, isPrivate: false, ground: "11223344,AABBCCDD")
+        #expect(ViewportPage.blankRequest(in: url)?.ground?.light == "#11223344")
+        #expect(ViewportPage.blankRequest(in: url)?.ground?.dark == "#AABBCCDD")
+        let html = ViewportPage.html(for: url) { _ in SpaceInfo(name: "Sky", color: .sky) }
+        #expect(html.contains("--ground:#11223344"))
+        #expect(html.contains("--ground:#AABBCCDD"))
+        // Anything but two colors is ignored, never written into the page.
+        let bad = ViewportPage.blankURL(for: id, isPrivate: false, ground: "red;}body{x,11223344")
+        #expect(ViewportPage.blankRequest(in: bad)?.ground == nil)
+        #expect(ViewportPage.ground(.white).count == 17)
+    }
+
+    @Test func theBlankPageLoadsNothingButZigzags() {
+        let html = ViewportPage.blankHTML(for: nil, isPrivate: false)
+        #expect(html.contains("default-src 'none'; img-src zigzag:;"))
     }
 
     @Test func theBlankPageIsWrittenForBothAppearances() {
