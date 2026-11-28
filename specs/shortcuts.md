@@ -90,6 +90,12 @@
   Test: SettingsLazyBuildTests.findASettingOpensTheMenuAShortcutIsIn
 
 ## Menus
+- File and View → their everyday items at the top; going through and arranging tabs, spaces, split view and the developer tools each in a submenu of View: Tabs, Spaces, Split View and Developer.
+  Test: MenuShortcutsTests.fileAndViewKeepTheirCoreAndGroupTheRest
+- An item's keys, in a submenu or not → do what the item does, as from the top of a menu.
+  Test: MenuShortcutsTests.everyShortcutIsReachableFromTheMenuBar
+- A shortcut in a submenu → listed in Settings › Shortcuts under its menu, named with its submenu, like Tabs › Nest Tab.
+  Test: SettingsLazyBuildTests.aShortcutInASubmenuIsListedWithItsPath
 - An item in a sidebar menu, the + or the sidebar's empty space that the menu bar also has → it shows the menu bar's keys, as Settings › Shortcuts has them now.
   Test: SidebarRowMenuTests.everySidebarMenuShowsTheMenuBarsKeysForTheSameAction
 - The menu bar as Zigzag ships it, the developer tools' items included → no two items share keys.

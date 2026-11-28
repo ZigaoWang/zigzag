@@ -137,7 +137,7 @@
   Test: NestedTabRowsTests.draggedRightTheLineSetsInRightUnderTheRowAbove
 - The last tab under a tab leaves → that tab's chevron goes too.
   Test: NestedTabRowsTests.theChevronGoesWithTheLastTabUnderIt
-- ⌃⇧→ (View › Nest Tab) → the tab you're on goes under the tab above it at its level, with the tabs under it; ⌃⇧← (Unnest Tab) → it goes a level out, just after the tab it was under and that tab's run.
+- ⌃⇧→ (View › Tabs › Nest Tab) → the tab you're on goes under the tab above it at its level, with the tabs under it; ⌃⇧← (Unnest Tab) → it goes a level out, just after the tab it was under and that tab's run.
   Test: NestedTabsTests.nestTabGoesUnderTheTabAboveAtItsLevel
 - ⌘Z after nesting or unnesting → the tab is back where it was; a relaunch keeps the nesting.
   Test: NestedTabsTests.nestAndUnnestTabUndoAndAreSaved

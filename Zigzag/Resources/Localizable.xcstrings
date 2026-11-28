@@ -46004,7 +46004,7 @@
       }
     },
     "Suspend Page" : {
-      "comment" : "File menu item: puts the tab's page to sleep; it loads again when you click the tab.\nItem in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.",
+      "comment" : "Item in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.\nView › Tabs menu item: puts the tab's page to sleep; it loads again when you click the tab.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -80694,7 +80694,7 @@
       }
     },
     "Duplicate Tab" : {
-      "comment" : "File menu item.\nItem in a tab's context menu in the sidebar.",
+      "comment" : "Item in a tab's context menu in the sidebar.\nView › Tabs menu item.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -105698,7 +105698,7 @@
       }
     },
     "Move Tab to New Window" : {
-      "comment" : "File menu item.",
+      "comment" : "View › Tabs menu item.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -156884,7 +156884,7 @@
       }
     },
     "Spaces" : {
-      "comment" : "A section of Settings.\nVoiceOver name of the space switcher: the list of spaces to pick one from with the keyboard.",
+      "comment" : "A section of Settings.\nSubmenu of the View menu: going to, making and editing spaces.\nVoiceOver name of the space switcher: the list of spaces to pick one from with the keyboard.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -157299,7 +157299,7 @@
       }
     },
     "Split View" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Split View.",
+      "comment" : "Submenu of the View menu: the choices for two or more pages shown side by side.\nUndo action name, shown in the Edit menu as Undo Split View.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -159967,7 +159967,7 @@
       }
     },
     "Tabs" : {
-      "comment" : "A section of Settings.\nThe quiet label above today's tabs in the sidebar, below the pinned tabs.",
+      "comment" : "A section of Settings.\nSubmenu of the View menu: going through, moving and arranging tabs.\nThe quiet label above today's tabs in the sidebar, below the pinned tabs.",
       "localizations" : {
         "de" : {
           "stringUnit" : {

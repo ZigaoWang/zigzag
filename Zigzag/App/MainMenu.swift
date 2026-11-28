@@ -123,18 +123,9 @@ enum MainMenu {
             item(String(localized: "Open Location…", comment: "File menu item."), #selector(C.openLocation(_:)), "l"),
             item(String(localized: "Open File…", comment: "File menu item."), #selector(C.openDocument(_:)), "o"),
             .separator(),
-            item(String(localized: "Import from Another Browser…", comment: "File menu item."), #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
-            item(DataExport.title, #selector(AppDelegate.exportData(_:)), ""),
-            .separator(),
-            item(String(localized: "Suspend Page", comment: "File menu item: puts the tab's page to sleep; it loads again when you click the tab."), #selector(C.suspendPage(_:)), ""),
-            // No key: ⌥⌘D belongs to macOS (hide the Dock) and always wins.
-            item(String(localized: "Duplicate Tab", comment: "File menu item."), #selector(C.duplicateTab(_:)), ""),
-            // One verb for saving (#326): ⌘D saves into the space you're in with no question, and its ⇧ twin asks where
-            // in that space. Two items, so neither depends on a key held down.
             item(String(localized: "Pin Tab", comment: "File menu item, with ⌘D: pins the page you're on, into the space you're in, without asking."), #selector(C.toggleBookmark(_:)), "d"),
             item(String(localized: "Pin Tab to Folder…", comment: "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called."), #selector(C.savePageToFolder(_:)), "d", [.command, .shift]),
             item(String(localized: "Add to Favorites", comment: "File menu item."), #selector(C.addToFavorites(_:)), ""),
-            item(String(localized: "Move Tab to New Window", comment: "File menu item."), #selector(C.moveTabToNewWindow(_:)), ""),
             item(WebAppInstallSheet.title, #selector(C.installAsApp(_:)), ""),
             .separator(),
             item(String(localized: "Close Tab", comment: "File menu item."), #selector(C.closeTab(_:)), "w"),
@@ -146,17 +137,21 @@ enum MainMenu {
             item(String(localized: "Export as PDF…", comment: "File menu item."), #selector(C.exportAsPDF(_:)), ""),
             item(String(localized: "Capture…", comment: "File menu item, with ⇧⌘2: a mode over the page to take a picture of an area, an element, the whole page or what's on screen."), #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
             item(String(localized: "Print…", comment: "File menu item."), #selector(C.printPage(_:)), "p"),
+            .separator(),
+            item(String(localized: "Import from Another Browser…", comment: "File menu item."), #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
+            item(DataExport.title, #selector(AppDelegate.exportData(_:)), ""),
         ]))
 
         main.addItem(submenu(String(localized: "Edit", comment: "A menu in the menu bar."), editItems(browser: true)))
 
+        // The everyday core stays in View; tabs, spaces and splits each have a submenu, as Safari's Develop does for
+        // its tools (#585). Keys work from a submenu as from the menu itself.
+        let down = String(UnicodeScalar(NSDownArrowFunctionKey)!), up = String(UnicodeScalar(NSUpArrowFunctionKey)!)
+        let right = String(UnicodeScalar(NSRightArrowFunctionKey)!), left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
         var viewItems: [NSMenuItem] = [
             item(String(localized: "Hide Sidebar", comment: "View menu item."), #selector(C.toggleBrowserSidebar(_:)), "s", [.control]),
             item(String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge."), #selector(C.toggleSidebarSide(_:)), ""),
             item(String(localized: "Show All Tabs", comment: "View menu item."), #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
-            item(String(localized: "Stack Vertically", comment: "View menu item."), #selector(C.toggleSplitOrientation(_:)), ""),
-            item(String(localized: "Separate Tabs", comment: "View menu item."), #selector(C.closeSplitView(_:)), "\\", [.control, .command]),
-            item(PaneHeaderView.zoomTitle(false), #selector(C.zoomPane(_:)), "\r", [.command, .shift]),
             .separator(),
             item(String(localized: "Back", comment: "View menu item."), #selector(C.goBack(_:)), "["),
             item(String(localized: "Forward", comment: "View menu item."), #selector(C.goForward(_:)), "]"),
@@ -165,29 +160,46 @@ enum MainMenu {
             item(DeveloperTool.reloadIgnoringCache.title, #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .shift]),
             item(String(localized: "Stop", comment: "View menu item."), #selector(C.stopLoading(_:)), "."),
             .separator(),
-            item(String(localized: "Next Tab", comment: "View menu item."), #selector(C.selectNextTab(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.command, .option]),
-            item(String(localized: "Previous Tab", comment: "View menu item."), #selector(C.selectPreviousTab(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.command, .option]),
-            item(String(localized: "Move Tab Up", comment: "View menu item."), #selector(C.moveTabUp(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.control, .shift]),
-            item(String(localized: "Move Tab Down", comment: "View menu item."), #selector(C.moveTabDown(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.control, .shift]),
-            item(String(localized: "Nest Tab", comment: "View menu item: puts the tab you're on under the tab above it in the sidebar."), #selector(C.nestTab(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.control, .shift]),
-            item(String(localized: "Unnest Tab", comment: "View menu item: moves the tab you're on out from under the tab it's nested under in the sidebar."), #selector(C.unnestTab(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.control, .shift]),
-            item(String(localized: "Next Space", comment: "View menu item."), #selector(C.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]),
-            item(String(localized: "Previous Space", comment: "View menu item."), #selector(C.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]),
-            item(String(localized: "Switch Space…", comment: "View menu item: lists the spaces to pick one with the arrow keys."), #selector(C.showSpaceSwitcher(_:)), "s", [.command, .option]),
-            item(String(localized: "New Space", comment: "View menu item."), #selector(C.newSpace(_:)), "n", [.command, .option]),
-            item(String(localized: "Edit Space…", comment: "View menu item."), #selector(C.renameSpace(_:)), ""),
-            item(SidebarMenus.collapseAllFoldersTitle, #selector(C.collapseAllFolders(_:)), ""),
-            item(SidebarMenus.expandAllFoldersTitle, #selector(C.expandAllFolders(_:)), ""),
-            .separator(),
             item(String(localized: "Actual Size", comment: "View menu item."), #selector(C.actualSize(_:)), "0"),
             item(String(localized: "Zoom In", comment: "View menu item."), #selector(C.zoomIn(_:)), "+"),
             item(String(localized: "Zoom Out", comment: "View menu item."), #selector(C.zoomOut(_:)), "-"),
-            item(String(localized: "Mute Tab", comment: "View menu item."), #selector(C.toggleMute(_:)), "m", [.command, .shift]),
-            item(String(localized: "Picture in Picture", comment: "View menu item."), #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
+            .separator(),
             item(String(localized: "Show Reader", comment: "View menu item."), #selector(C.toggleReader(_:)), "r", [.command, .option]),
             item(String(localized: "Reader Text and Colors", comment: "View menu item: opens Reader's text size, typeface, column width and color choices."), #selector(C.showReaderOptions(_:)), ""),
             item(String(localized: "Translate Page", comment: "View menu item."), #selector(C.translatePage(_:)), "t", [.command, .option]),
+            item(String(localized: "Mute Tab", comment: "View menu item."), #selector(C.toggleMute(_:)), "m", [.command, .shift]),
+            item(String(localized: "Picture in Picture", comment: "View menu item."), #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
             .separator(),
+            submenu(String(localized: "Tabs", comment: "Submenu of the View menu: going through, moving and arranging tabs."), [
+                item(String(localized: "Next Tab", comment: "View menu item."), #selector(C.selectNextTab(_:)), down, [.command, .option]),
+                item(String(localized: "Previous Tab", comment: "View menu item."), #selector(C.selectPreviousTab(_:)), up, [.command, .option]),
+                .separator(),
+                item(String(localized: "Move Tab Up", comment: "View menu item."), #selector(C.moveTabUp(_:)), up, [.control, .shift]),
+                item(String(localized: "Move Tab Down", comment: "View menu item."), #selector(C.moveTabDown(_:)), down, [.control, .shift]),
+                item(String(localized: "Nest Tab", comment: "View menu item: puts the tab you're on under the tab above it in the sidebar."), #selector(C.nestTab(_:)), right, [.control, .shift]),
+                item(String(localized: "Unnest Tab", comment: "View menu item: moves the tab you're on out from under the tab it's nested under in the sidebar."), #selector(C.unnestTab(_:)), left, [.control, .shift]),
+                .separator(),
+                // No key: ⌥⌘D belongs to macOS (hide the Dock) and always wins.
+                item(String(localized: "Duplicate Tab", comment: "View › Tabs menu item."), #selector(C.duplicateTab(_:)), ""),
+                item(String(localized: "Move Tab to New Window", comment: "View › Tabs menu item."), #selector(C.moveTabToNewWindow(_:)), ""),
+                item(String(localized: "Suspend Page", comment: "View › Tabs menu item: puts the tab's page to sleep; it loads again when you click the tab."), #selector(C.suspendPage(_:)), ""),
+                .separator(),
+                item(SidebarMenus.collapseAllFoldersTitle, #selector(C.collapseAllFolders(_:)), ""),
+                item(SidebarMenus.expandAllFoldersTitle, #selector(C.expandAllFolders(_:)), ""),
+            ]),
+            submenu(String(localized: "Spaces", comment: "Submenu of the View menu: going to, making and editing spaces."), [
+                item(String(localized: "Next Space", comment: "View menu item."), #selector(C.nextSpace(_:)), right, [.command, .option]),
+                item(String(localized: "Previous Space", comment: "View menu item."), #selector(C.previousSpace(_:)), left, [.command, .option]),
+                item(String(localized: "Switch Space…", comment: "View menu item: lists the spaces to pick one with the arrow keys."), #selector(C.showSpaceSwitcher(_:)), "s", [.command, .option]),
+                .separator(),
+                item(String(localized: "New Space", comment: "View menu item."), #selector(C.newSpace(_:)), "n", [.command, .option]),
+                item(String(localized: "Edit Space…", comment: "View menu item."), #selector(C.renameSpace(_:)), ""),
+            ]),
+            submenu(String(localized: "Split View", comment: "Submenu of the View menu: the choices for two or more pages shown side by side."), [
+                item(String(localized: "Stack Vertically", comment: "View menu item."), #selector(C.toggleSplitOrientation(_:)), ""),
+                item(String(localized: "Separate Tabs", comment: "View menu item."), #selector(C.closeSplitView(_:)), "\\", [.control, .command]),
+                item(PaneHeaderView.zoomTitle(false), #selector(C.zoomPane(_:)), "\r", [.command, .shift]),
+            ]),
             submenu(String(localized: "Developer", comment: "Submenu of the View menu."), [
                 item(String(localized: "Web Inspector", comment: "View › Developer menu item."), #selector(C.showWebInspector(_:)), "i", [.command, .option]),
                 // Chrome's keys, so its habits work here too.

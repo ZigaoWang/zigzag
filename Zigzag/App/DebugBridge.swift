@@ -2118,6 +2118,17 @@ enum DebugBridge {
             // long each took goes to the debug log (#170). minisidebutton and webapp sidebutton do the same there.
             if let window = controller.window { sendSideButton(arg, to: window) }
         case "downloads": controller.showDownloads(nil)
+        case "menupanel":
+            // menupanel View/Tabs: that menu of the menu bar, or a submenu of it, drawn as Zigzag draws menus near the
+            // window's top, for a picture of what it holds without opening the menu bar.
+            let path = arg.split(separator: "/").map(String.init)
+            var menu = NSApp.mainMenu?.items.first { $0.title == path.first }?.submenu
+            for name in path.dropFirst() { menu = menu?.items.first { $0.title == name }?.submenu }
+            guard let menu, let host = controller.window?.contentView else { debugLog("menupanel \(arg): none"); break }
+            menu.update()
+            let anchor = NSView(frame: NSRect(x: 340, y: host.bounds.height - 40, width: 1, height: 1))
+            host.addSubview(anchor)
+            _ = MenuPanel.show(MenuPanel.entries(from: menu), from: anchor) { anchor.removeFromSuperview() }
         case "dl":
             // dl pause|resume|state: acts on the newest download.
             guard let item = DownloadManager.shared.items.first else { debugLog("dl => none"); break }

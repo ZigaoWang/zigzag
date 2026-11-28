@@ -90,6 +90,80 @@ import Testing
         #expect(owners.count > 50)
     }
 
+    /// What each menu shows at its top level, submenus as "Name ›" and lines as "-", hidden key aliases left out.
+    private func outline(_ menu: NSMenu) -> [String] {
+        menu.items.filter { !$0.isHidden }.map { $0.isSeparatorItem ? "-" : $0.submenu != nil ? $0.title + " ›" : $0.title }
+    }
+
+    /// File and View keep the everyday core at their top level; tabs, spaces, splits and the developer tools are
+    /// submenus of View (#585).
+    @Test func fileAndViewKeepTheirCoreAndGroupTheRest() throws {
+        let main = MainMenu.build()
+        let file = try #require(main.items[1].submenu), view = try #require(main.items[3].submenu)
+        #expect(outline(file) == ["New Tab", "New Window", "New Private Window", "New Zigzag Mini", "Open Location…", "Open File…", "-",
+                                  "Pin Tab", "Pin Tab to Folder…", "Add to Favorites", WebAppInstallSheet.title, "-",
+                                  "Close Tab", "Close Other Tabs", "Close Window", "-",
+                                  "Share…", "Save Page As…", "Export as PDF…", "Capture…", "Print…", "-",
+                                  "Import from Another Browser…", DataExport.title])
+        #expect(outline(view) == ["Hide Sidebar", "Move Sidebar to Right", "Show All Tabs", "-",
+                                  "Back", "Forward", "Reload Page", DeveloperTool.reloadIgnoringCache.title, "Stop", "-",
+                                  "Actual Size", "Zoom In", "Zoom Out", "-",
+                                  "Show Reader", "Reader Text and Colors", "Translate Page", "Mute Tab", "Picture in Picture", "-",
+                                  "Tabs ›", "Spaces ›", "Split View ›", "Developer ›", "-", "Enter Full Screen"])
+        func sub(_ title: String) throws -> [String] { try outline(#require(view.items.first { $0.title == title }?.submenu)) }
+        #expect(try sub("Tabs") == ["Next Tab", "Previous Tab", "-", "Move Tab Up", "Move Tab Down", "Nest Tab", "Unnest Tab", "-",
+                                    "Duplicate Tab", "Move Tab to New Window", "Suspend Page", "-",
+                                    SidebarMenus.collapseAllFoldersTitle, SidebarMenus.expandAllFoldersTitle])
+        #expect(try sub("Spaces") == ["Next Space", "Previous Space", "Switch Space…", "-", "New Space", "Edit Space…"])
+        #expect(try sub("Split View") == ["Stack Vertically", "Separate Tabs", PaneHeaderView.zoomTitle(false)])
+    }
+
+    /// Every item with keys, in a submenu or not, answers them through the menu bar, as a key press does; and
+    /// Settings › Shortcuts lists each one.
+    @Test func everyShortcutIsReachableFromTheMenuBar() {
+        final class Recorder: NSObject {
+            var sender: NSMenuItem?
+            @objc func record(_ item: NSMenuItem) { sender = item }
+        }
+        let main = MainMenu.build()
+        MainMenu.setDeveloperTools(true, in: main)
+        let recorder = Recorder()
+        var keyed: [NSMenuItem] = []
+        func walk(_ menu: NSMenu) {
+            for item in menu.items {
+                if let sub = item.submenu { walk(sub); continue }
+                guard !item.keyEquivalent.isEmpty else { continue }
+                item.target = recorder
+                item.action = #selector(Recorder.record(_:))
+                if !item.isHidden { keyed.append(item) }
+            }
+        }
+        walk(main)
+        #expect(keyed.count > 50)
+        #expect(keyed.contains { $0.menu?.supermenu?.supermenu != nil }, "some shortcuts are in submenus")
+        // Each item alone with its keys, the others' set aside: a made-up event can't tell ⇧ apart the way a real
+        // key press does, and that's AppKit's matching, not where the item sits.
+        let keys = keyed.map { ($0.keyEquivalent, $0.keyEquivalentModifierMask) }
+        for (i, item) in keyed.enumerated() {
+            for (j, other) in keyed.enumerated() { other.keyEquivalent = i == j ? keys[j].0 : "" }
+            recorder.sender = nil
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: keys[i].1, timestamp: 0, windowNumber: 0,
+                                         context: nil, characters: keys[i].0, charactersIgnoringModifiers: keys[i].0,
+                                         isARepeat: false, keyCode: 0)
+            guard let event else { Issue.record("no event for \(item.title)"); continue }
+            _ = main.performKeyEquivalent(with: event)
+            #expect(recorder.sender === item, "\(item.menu?.title ?? "") › \(item.title) didn't answer its keys")
+        }
+        // Settings › Shortcuts walks the submenus too.
+        func all(_ menu: NSMenu) -> [NSMenuItem] { menu.items.flatMap { $0.submenu.map(all) ?? [$0] } }
+        let listed = Set(all(MainMenu.build()).filter(Shortcuts.isListed).compactMap { $0.action.map(NSStringFromSelector) })
+        for action in [#selector(BrowserWindowController.selectNextTab(_:)), #selector(BrowserWindowController.nestTab(_:)),
+                       #selector(BrowserWindowController.newSpace(_:)), #selector(BrowserWindowController.closeSplitView(_:)),
+                       #selector(BrowserWindowController.showWebInspector(_:))] {
+            #expect(listed.contains(NSStringFromSelector(action)), "\(action)")
+        }
+    }
+
     /// The command bar's commands are named as their menu bar items are.
     @Test func theCommandBarsCommandsAreNamedAsInTheMenuBar() {
         let main = MainMenu.build()

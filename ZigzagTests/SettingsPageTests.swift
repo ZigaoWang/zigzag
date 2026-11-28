@@ -813,6 +813,14 @@ struct SettingsLazyBuildTests {
         #expect(first.headerRow.debugDetail.stringValue == SettingsView.shortcutsSummary(first.content.count))
     }
 
+    /// A shortcut in a submenu is listed under its menu, named with the submenu it's in (#585).
+    @Test func aShortcutInASubmenuIsListedWithItsPath() throws {
+        let settings = settings(.general)
+        settings.debugFind("Nest Tab")
+        let titles = settings.debugShortcutBoxes.filter(\.isBuilt).flatMap(\.shownContent).compactMap { ($0 as? ShortcutRow)?.debugTitle }
+        #expect(titles.contains("Tabs › Nest Tab"), "\(titles)")
+    }
+
     @Test func findASettingOpensTheMenuAShortcutIsIn() throws {
         let settings = settings(.general)
         // The longest name of a shortcut straight in a menu, so few other menus have every word of it.
