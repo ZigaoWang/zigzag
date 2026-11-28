@@ -1456,13 +1456,50 @@ final class Tab: NSObject {
 
     // MARK: Camera and microphone
 
-    var isUsingCamera: Bool { webView?.cameraCaptureState == .active }
-    var isUsingMicrophone: Bool { webView?.microphoneCaptureState == .active }
+    var isUsingCamera: Bool { CaptureToggle.shows(cameraCaptureState) }
+    var isUsingMicrophone: Bool { CaptureToggle.shows(microphoneCaptureState) }
+    /// Whether the tab holds a device at all, muted included: the sidebar says so from any tab you're on, so a call
+    /// running elsewhere isn't invisible.
+    var holdsCapture: Bool { isUsingCamera || isUsingMicrophone }
 
-    func stopCapture() {
-        webView?.setCameraCaptureState(.none) { }
-        webView?.setMicrophoneCaptureState(.none) { }
+    /// Muted is still in use: the page keeps its device, and the button shows so it can be picked up again.
+    var isCameraMuted: Bool { CaptureToggle.isMuted(cameraCaptureState) }
+    var isMicrophoneMuted: Bool { CaptureToggle.isMuted(microphoneCaptureState) }
+
+    /// The soft controls: silence a device without ending its stream, so a call carries on and can be picked up
+    /// again. `.muted` keeps the capture the page holds.
+    func muteCamera(_ muted: Bool) {
+        webView?.setCameraCaptureState(muted ? .muted : .active) { }
     }
+
+    func muteMicrophone(_ muted: Bool) {
+        webView?.setMicrophoneCaptureState(muted ? .muted : .active) { }
+    }
+
+    private var cameraCaptureState: WKMediaCaptureState {
+        #if DEBUG
+        if let state = debugCameraCapture { return state }
+        #endif
+        return webView?.cameraCaptureState ?? .none
+    }
+
+    private var microphoneCaptureState: WKMediaCaptureState {
+        #if DEBUG
+        if let state = debugMicrophoneCapture { return state }
+        #endif
+        return webView?.microphoneCaptureState ?? .none
+    }
+
+    #if DEBUG
+    /// A device as if the page held it, the page itself left as it is (screenshots and the sidebar's dot).
+    func debugShowCapture(camera: WKMediaCaptureState? = nil, microphone: WKMediaCaptureState? = nil) {
+        debugCameraCapture = camera
+        debugMicrophoneCapture = microphone
+        changed.send(.capture)
+    }
+    private var debugCameraCapture: WKMediaCaptureState?
+    private var debugMicrophoneCapture: WKMediaCaptureState?
+    #endif
 
     // MARK: Snapshots
 

@@ -237,30 +237,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
             return nil
         }
-        // Its menu opens as the press goes down, as a pop-up button's does.
-        sidebar.address.captureButton.clicksOnMouseDown = true
-        sidebar.address.captureButton.onClick = { [weak self] _ in
-            guard let self, let tab = self.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { return }
-            var items: [MenuPanel.Entry] = [
-                .item(.init(title: String(localized: "Stop Camera and Microphone", comment: "Menu item of the address bar's camera button: stops the page using the camera and microphone."), symbol: "stop.circle") { tab.stopCapture() }),
-            ]
-            // Ask holds for this page only; Always Allow saves for the site and Ask Every Time removes that. Private
-            // windows save nothing. Only what's in use now: an audio call never grants the camera permanently or
-            // overrides a Block.
-            let inUse = [tab.isUsingCamera ? SitePermission.camera : nil, tab.isUsingMicrophone ? SitePermission.microphone : nil].compactMap { $0 }
-            if !tab.isPrivate, !inUse.isEmpty {
-                let allAllowed = inUse.allSatisfy { SitePermissions.choice($0, origin: origin) == .allow }
-                if allAllowed {
-                    items.append(.item(.init(title: String(localized: "Ask Every Time", comment: "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit."), symbol: "arrow.counterclockwise") {
-                        inUse.forEach { SitePermissions.setChoice(.ask, for: $0, origin: origin) }
-                    }))
-                } else {
-                    items.append(.item(.init(title: String(localized: "Always Allow on This Site", comment: "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking."), symbol: "checkmark.circle") {
-                        inUse.forEach { SitePermissions.setChoice(.allow, for: $0, origin: origin) }
-                    }))
-                }
-            }
-            MenuPanel.show(items, from: self.sidebar.address.captureButton)
+        // One button per device, each a plain toggle: the page has it, or it's muted, and a click swaps the two.
+        // What the site is kept as, and stopping a device outright, are Site Controls' job.
+        sidebar.address.cameraButton.onClick = { [weak self] _ in
+            guard let tab = self?.tabManager.selectedTab, tab.isUsingCamera else { return }
+            tab.muteCamera(!tab.isCameraMuted)
+        }
+        sidebar.address.microphoneButton.onClick = { [weak self] _ in
+            guard let tab = self?.tabManager.selectedTab, tab.isUsingMicrophone else { return }
+            tab.muteMicrophone(!tab.isMicrophoneMuted)
         }
         sidebar.onNowPlayingShow = { [weak self] tab in self?.tabManager.select(tab) }
         sidebar.onNowPlayingToggle = { [weak self] tab in self?.toggleNowPlaying(tab) }
@@ -900,7 +885,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         reloadFavorites()
         newTabNote.listChanged()
-        sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
+        sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false,
+                                   cameraMuted: tab?.isCameraMuted ?? false, microphoneMuted: tab?.isMicrophoneMuted ?? false)
         updateWindowTitle()
         refreshExtensionActions()
         updateNowPlaying()
@@ -2050,7 +2036,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .developer:
             showDeveloperBarTools()
         case .capture:
-            sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
+            sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone,
+                                       cameraMuted: tab.isCameraMuted, microphoneMuted: tab.isMicrophoneMuted)
         case .reader:
             updateReaderButton()
         case .language:

@@ -770,7 +770,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             partTokens = new.enumerated().compactMap { i, part in
                 part.page?.changed.observe { [weak self] change in
                     // `.webView`: it went to sleep or woke, which its icon shows.
-                    guard change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer else { return }
+                    guard change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .capture || change == .webView || change == .developer else { return }
                     if i == 0 { self?.refreshPartner() } else { self?.refreshExtras() }
                 }
             }
@@ -943,7 +943,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func tabChanged(_ change: Tab.Change) {
         switch change {
-        case .title, .url, .favicon, .loading, .audio, .themeColor, .webView, .activity, .developer: refresh()
+        case .title, .url, .favicon, .loading, .audio, .capture, .themeColor, .webView, .activity, .developer: refresh()
         default: break
         }
     }
@@ -1023,6 +1023,12 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// Made for the first page that's unread.
     private var unreadDot: ColorView?
     static let unreadSide: CGFloat = 6
+    /// A tab whose page is using the camera or microphone, in the colour the address bar uses for a device that's
+    /// live. Deliberately not a glyph — the speaker already owns "this row holds hardware", and the dot only has to say
+    /// "this page has a device". A page holding one shows it wherever its row is, the one you're on included.
+    private var captureDot: ColorView?
+    static let captureSide: CGFloat = 6
+    var showsCapture: Bool { tab?.holdsCapture == true && renameField == nil && !showsNumber }
     private var showsUnread: Bool { isUnread && closeButton.isHidden && !showsNumber && renameField == nil && !isSplit }
 
     private func refreshTitleColor() {
@@ -1066,6 +1072,15 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
         unreadDot?.isHidden = !showsUnread
         unreadDot?.color = Brand.Theme.for(self).accent
+        if showsCapture, captureDot == nil {
+            let dot = ColorView()
+            dot.layer?.cornerRadius = Self.captureSide / 2
+            addSubview(dot)
+            captureDot = dot
+        }
+        // Orange, as the address bar's buttons are: one colour for a device that is live, wherever it's shown.
+        captureDot?.color = .systemOrange
+        captureDot?.isHidden = !showsCapture
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
         for (i, views) in (extraViews ?? []).enumerated() {
             let page = extraPages.indices.contains(i) ? extraPages[i] : nil
@@ -1235,6 +1250,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         if let unreadDot {
             let side = Self.unreadSide
             unreadDot.frame = NSRect(x: round(closeButton.frame.midX - side / 2), y: round((bounds.height - side) / 2), width: side, height: side)
+        }
+        if let captureDot {
+            // Beside the speaker's room, whether or not the speaker is showing, so it doesn't move as sound starts.
+            let side = Self.captureSide
+            let speakerRoom = audioButton.isHidden ? 0 : audioButton.frame.width + Self.buttonGap
+            let x = bounds.width - edge - size.width - Self.buttonGap - speakerRoom
+            captureDot.frame = NSRect(x: round(x - side / 2), y: round((bounds.height - side) / 2), width: side, height: side)
         }
         if let hint = numberHint, showsNumber {
             let height = NumberHintView.height

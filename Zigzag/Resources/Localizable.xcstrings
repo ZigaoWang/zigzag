@@ -51289,7 +51289,7 @@
       }
     },
     "Camera" : {
-      "comment" : "Row in the site panel's This Site group.",
+      "comment" : "Row in the site panel's This Site group.\nTooltip of the address bar's camera button, which shows while a page uses the camera; clicking mutes it.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -103202,7 +103202,7 @@
       }
     },
     "Microphone" : {
-      "comment" : "Row in the site panel's This Site group.",
+      "comment" : "Row in the site panel's This Site group.\nTooltip of the address bar's microphone button, which shows while a page uses the microphone; clicking mutes it.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -213097,6 +213097,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上一部影片"
+
+          }
+        }
+      }
+    },
+    "Camera Muted" : {
+      "comment" : "Tooltip of the address bar's camera button while the page's camera is muted: clicking turns it back on.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera Muted"
           }
         }
       }
@@ -213180,6 +213192,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一部影片"
+
+          }
+        }
+      }
+    },
+    "Microphone Muted" : {
+      "comment" : "Tooltip of the address bar's microphone button while the page's microphone is muted: clicking turns it back on.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone Muted"
           }
         }
       }

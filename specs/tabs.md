@@ -195,6 +195,12 @@
 - Pause the video or audio a tab's sound came from → its speaker goes away after a moment, even if WebKit still says it plays.
   Test: MiniPlayerPageTests.aSoundFromAVideoEndsOnceItStops
 
+## Camera and microphone
+- A tab whose page is using the camera or microphone → an orange dot after its title, the colour the address bar's buttons are.
+  Test: RowCaptureDotTests.aTabHoldingADeviceSaysSo
+- A device muted rather than stopped → the page still holds it, so the row's dot stays and the address bar keeps its button.
+  Test: RowCaptureDotTests.aMutedDeviceStillCounts
+
 ## Frame rate
 - A page on a 120 Hz display → it draws at the display's full rate, as in Chrome; Prefer Page Rendering Updates near 60fps in Settings › Developer › Feature Flags holds every page near 60 instead.
   Test: FeatureFlagsTests.pagesDrawAtTheScreensRateUnlessChanged

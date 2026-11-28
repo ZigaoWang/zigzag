@@ -12,6 +12,13 @@
 - Autohide turned off with the bar away → it comes straight back.
   Test: TopBarTests.turningAutohideOffBringsTheBarBack
 
+## Camera and microphone
+- A page using the camera or microphone → a button for each device in the address, orange and pressed; a click silences that device without ending the call and the button shows a slash, and another click turns it back on.
+  Test: AddressCaptureTests.eachDeviceHasItsOwnButton
+  Test: AddressCaptureTests.aMutedDeviceShowsASlashAndStaysInTheBar
+- A device the page isn't using → no button for it; the field keeps room for one button per device actually in use.
+  Test: AddressCaptureTests.oneDeviceTakesOneButtonsRoom
+
 ## Autohide
 - Scroll down → the bar moves up with the page from its first point and the page takes its room; once it's out, the page scrolls as usual.
   Test: TopBarTests.autohideIsBoundToThePagesPosition

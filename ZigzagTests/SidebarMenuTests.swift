@@ -1643,11 +1643,12 @@ struct MenuPressTests {
         menu.itemTitles.indices.first { $0 > index && menu.debugIsEnabled(menu.itemTitles[$0]) == true }
     }
 
-    /// The sidebar's +, a pane's …, the address bar's buttons and the rest open their menu as the press goes down.
+    /// The sidebar's +, a pane's …, the address bar's translate button and the rest open their menu as the press goes
+    /// down. The camera and microphone buttons are plain toggles rather than menus, so they are not in this list.
     @Test func menuButtonsOpenOnThePress() async throws {
         try await inWindow { controller, _ in
             let sidebar = controller.sidebar
-            for button in [sidebar.newSpaceButton, sidebar.address.captureButton, sidebar.address.translateButton] {
+            for button in [sidebar.newSpaceButton, sidebar.address.translateButton] {
                 #expect(button.clicksOnMouseDown)
             }
             for card in controller.root.paneCards { #expect(card.header.more.clicksOnMouseDown) }

@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- The address bar shows a button for each device the page is using, the camera and the microphone, and a click mutes that device or picks it back up without ending the call; it shows a slash while muted. A tab whose page holds a device shows an orange dot after its title, so a call running in another tab is not invisible.
 - The mini player shows Previous and Next when the site offers them, as YouTube does in a playlist, so you can move on without going back to the page. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Markdown files open formatted in a tab, like a page: a .md file on your Mac, or one a site sends as Markdown or as plain text at a .md address. Tables, task lists and code show as on GitHub, links and pictures next to the file work, and Source at the top shows the plain text. It works in split view, with find, zoom, printing and Reader, and nothing in the file can run. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
 - Passkeys saved on your Mac show up under sign-in fields on sites that offer them, as in Safari: pick one and sign in with Touch ID. Zigzag asks macOS for access only when you choose Use a Saved Passkey there or Allow in Settings › Passwords, and is then listed in System Settings › Privacy & Security, where you can change it. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
