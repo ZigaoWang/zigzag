@@ -219,6 +219,10 @@
   Test: MiniPlayerPageTests.aSmallProductVideoNeverFollows
 - A card's preview inside a link → it never follows.
   Test: MiniPlayerTests.aHomepagesHoverPreviewNeverFollows
+- A page with several players of the same size from one site (a page of video solutions) → the card shows the one that's playing.
+  Test: MiniPlayerTests.aFrameAmongSameSizedPlayersIsFoundByItsAddress
+- A video the card can't show (protected, or in a frame it can't find on the page) → the site's name on a dark card instead of a black picture; its controls still play, pause and go back to the tab.
+  Test: MiniPlayerTests.aPictureTheCardCantShowIsKnown
 
 ## Mini player when you leave
 - Show a mini player when you leave Zigzag on, and switch to another app with the window covered, minimized, hidden or on a desktop no longer showing → after a moment the watched video moves into the mini player.

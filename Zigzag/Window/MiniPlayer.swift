@@ -24,6 +24,8 @@ final class MiniPlayer {
     private var video: PageVideo?
     /// Where that frame's viewport starts in the page, in CSS pixels.
     private var frameOrigin: CGPoint = .zero
+    /// Whether that frame was found in the page; nil until it's looked for.
+    private var frameFound: Bool?
     private var tokens: [SignalToken] = []
     /// The video went missing: the player waits a moment for it (a page moving on to the next video), then goes.
     private var lostWait: DispatchWorkItem?
@@ -89,6 +91,8 @@ final class MiniPlayer {
     #if DEBUG
     /// Scripted checks: the pointer counts as on the card, wherever the real one is.
     var debugPointerOnCard = false
+    /// Scripted checks: the card as when it can't show the page's picture.
+    var debugNoPicture = false { didSet { showsPicture() } }
     #endif
 
     // MARK: Moving between tabs
@@ -328,6 +332,7 @@ final class MiniPlayer {
         videoIndex = video.index
         self.video = video
         frameOrigin = .zero
+        frameFound = nil
         // Where the video was on screen, to grow the card out of; a frame's place in its page isn't known yet.
         let source: NSRect? = frame.isMain ? webView.convert(pictureRect(in: webView), to: root) : nil
 
@@ -352,6 +357,7 @@ final class MiniPlayer {
         tab.isInMiniPlayer = true
         place()
         card.update(video)
+        showsPicture()
         panel.orderFrontRegardless()
         let from = source.flatMap { rect in root.window.map { Self.global($0.convertToScreen(root.convert(rect, to: nil))) } }
         #if DEBUG
@@ -376,7 +382,12 @@ final class MiniPlayer {
         // Into view if you'd scrolled past it, then reporting four times a second while it's here.
         Task { [weak self] in
             guard let self, self.webView === webView else { return }
-            if !frame.isMain, let origin = await PageVideos.shared.origin(of: frame, in: webView) { self.frameOrigin = origin; self.place() }
+            if !frame.isMain {
+                let origin = await PageVideos.shared.origin(of: frame, in: webView)
+                self.frameFound = origin != nil
+                if let origin { self.frameOrigin = origin; self.place() }
+                self.showsPicture()
+            }
             _ = await PageVideos.shared.run("reveal", [("i", video.index)], in: frame, of: webView)
             _ = await PageVideos.shared.run("watch", [("on", true)], in: frame, of: webView)
             self.isolate()
@@ -595,6 +606,7 @@ final class MiniPlayer {
         } ?? elsewhere.map { found in
             frameID = found.frame.id
             frameOrigin = .zero
+            frameFound = nil
             return found.video
         }
         guard let found else {
@@ -614,6 +626,7 @@ final class MiniPlayer {
         let wasPlaying = video?.isPlaying
         video = found
         card?.update(found)
+        showsPicture()
         // Played or paused from the page, card or media key: update Now Playing.
         if wasPlaying != found.isPlaying { controller?.miniPlayerChanged() }
         place()
@@ -621,10 +634,24 @@ final class MiniPlayer {
         // A frame moves with its page: its place is asked again as it reports.
         if let frame = currentFrame, !frame.isMain {
             Task { [weak self] in
-                guard let origin = await PageVideos.shared.origin(of: frame, in: webView), let self, self.webView === webView else { return }
-                if origin != self.frameOrigin { self.frameOrigin = origin; self.place() }
+                let origin = await PageVideos.shared.origin(of: frame, in: webView)
+                guard let self, self.webView === webView else { return }
+                self.frameFound = origin != nil
+                if let origin, origin != self.frameOrigin { self.frameOrigin = origin; self.place() }
+                self.showsPicture()
             }
         }
+    }
+
+    /// A picture the card can't show (protected, or in a frame not found in the page) gives way to the site's name
+    /// on a calm dark card, its controls working as ever (#582).
+    private func showsPicture() {
+        guard let video else { return }
+        #if DEBUG
+        if debugNoPicture { card?.showsPicture = false; return }
+        #endif
+        let inFrame = currentFrame.map { !$0.isMain } ?? false
+        card?.showsPicture = MiniPlayerLayout.showsPicture(video, inFrame: inFrame, frameFound: frameFound ?? true)
     }
 
     /// The video's picture in the page's own points.
@@ -856,6 +883,8 @@ final class MiniPlayerView: NSView {
     private let forwardButton = MiniPlayerView.overlayButton("goforward.15", side: MiniPlayerView.centerSide, glyph: MiniPlayerView.skipGlyph,
         tip: String(localized: "Forward 15 Seconds", comment: "Tooltip of the mini player's button that skips the video ahead 15 seconds."))
     private let progress = MiniPlayerProgress()
+    /// Over the page when its picture can't show here: the site's name on a dark card.
+    private let placeholder = MiniPlayerPlaceholder()
     private weak var holder: PageHolder?
 
     var onBack: (() -> Void)?
@@ -892,6 +921,7 @@ final class MiniPlayerView: NSView {
         didSet {
             guard siteName != oldValue else { return }
             backButton.title = siteName
+            placeholder.title = siteName
             setAccessibilityLabel(String(localized: "Video from \(siteName)", comment: "VoiceOver's name for the mini player. The site is a domain, like youtube.com."))
             needsLayout = true
         }
@@ -942,6 +972,8 @@ final class MiniPlayerView: NSView {
         clip.layer?.backgroundColor = .black
         addSubview(clip)
         clip.addSubview(host)
+        placeholder.isHidden = true
+        clip.addSubview(placeholder)
 
         // The controls draw as they would at night: white glyphs and washes over the picture.
         controls.appearance = NSAppearance(named: .darkAqua)
@@ -1026,6 +1058,7 @@ final class MiniPlayerView: NSView {
             clip.layer?.cornerRadius = radius
             host.frame = clip.bounds
             host.bounds = placement.visible(in: bounds.size)
+            placeholder.frame = clip.bounds
             edge.frame = bounds
             edge.radius = radius
             controls.layer?.cornerRadius = radius
@@ -1070,6 +1103,11 @@ final class MiniPlayerView: NSView {
     }
 
     // MARK: State
+
+    /// False while its picture can't show here: the placeholder covers the page, which plays on under it.
+    var showsPicture = true {
+        didSet { placeholder.isHidden = showsPicture }
+    }
 
     /// The video's state: play or pause, its time, and whether it can be skipped through at all (not a live stream).
     func update(_ video: PageVideo) {
@@ -1352,6 +1390,7 @@ final class MiniPlayerView: NSView {
         let apply = {
             self.controls.animator().alphaValue = play
             rest.forEach { $0.animator().alphaValue = all }
+            self.placeholder.animator().alphaValue = 1 - all
         }
         if animated {
             Tokens.Motion.animate(Tokens.Motion.feedback) { apply() }
@@ -1359,6 +1398,7 @@ final class MiniPlayerView: NSView {
             Tokens.Motion.withoutAnimation {
                 self.controls.alphaValue = play
                 rest.forEach { $0.alphaValue = all }
+                self.placeholder.alphaValue = 1 - all
             }
         }
     }
@@ -1653,6 +1693,43 @@ private final class MiniPlayerScrim: NSView {
             bottom.startPoint = CGPoint(x: 0.5, y: 1)
             bottom.endPoint = CGPoint(x: 0.5, y: 0)
         }
+    }
+}
+
+/// What the card shows when the page's picture can't show in it (protected, or in a frame it can't find): the site's
+/// name under a quiet video glyph, on a dark card. Under the controls, which fade it as they come.
+private final class MiniPlayerPlaceholder: NSView {
+    private let glyph = NSImageView()
+    private let label = Label("", font: Tokens.Font.small(.semibold), color: NSColor.white.withAlphaComponent(0.72))
+    var title = "" { didSet { label.stringValue = title; needsLayout = true } }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor(white: 0.11, alpha: 1).cgColor
+        glyph.image = NSImage(systemSymbolName: "play.rectangle", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 22, weight: .regular))
+        glyph.contentTintColor = NSColor.white.withAlphaComponent(0.45)
+        glyph.imageScaling = .scaleNone
+        label.alignment = .center
+        label.lineBreakMode = .byTruncatingTail
+        addSubview(glyph)
+        addSubview(label)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+        super.layout()
+        let glyphSide: CGFloat = 28, gap = Tokens.Space.x2
+        let h = ceil(label.intrinsicContentSize.height)
+        let top = round((bounds.height - glyphSide - gap - h) / 2)
+        glyph.frame = NSRect(x: round((bounds.width - glyphSide) / 2), y: top, width: glyphSide, height: glyphSide)
+        let inset = Tokens.Space.x4
+        label.frame = NSRect(x: inset, y: top + glyphSide + gap, width: max(0, bounds.width - inset * 2), height: h)
     }
 }
 

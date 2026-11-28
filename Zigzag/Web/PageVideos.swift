@@ -50,7 +50,7 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
           const r = v.getBoundingClientRect();
           return { i, x: r.left, y: r.top, w: r.width, h: r.height, vw: v.videoWidth, vh: v.videoHeight,
                    playing: !v.paused && !v.ended && v.readyState >= 2, ended: v.ended, muted: v.muted || v.volume === 0,
-                   loop: v.loop, autoplay: v.autoplay, controls: v.controls, user: started.has(v), a: hearing(v), link: !!v.closest('a[href]'), nopip: !!v.disablePictureInPicture, fit: getComputedStyle(v).objectFit || 'contain',
+                   loop: v.loop, autoplay: v.autoplay, controls: v.controls, user: started.has(v), a: hearing(v), link: !!v.closest('a[href]'), nopip: !!v.disablePictureInPicture, drm: !!(v.mediaKeys || v.webkitKeys), fit: getComputedStyle(v).objectFit || 'contain',
                    t: v.currentTime || 0, d: isFinite(v.duration) ? v.duration : -1 };
         });
       };
@@ -181,9 +181,9 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         // The page's frames as it lays them out, so a frame's videos can be placed in it.
         frames: () => Array.from(document.querySelectorAll('iframe')).map((f) => {
           const r = f.getBoundingClientRect();
-          let host = '';
-          try { host = new URL(f.src, location.href).host; } catch (e) {}
-          return [r.left + f.clientLeft, r.top + f.clientTop, f.clientWidth, f.clientHeight, host];
+          let host = '', path = '';
+          try { const u = new URL(f.src, location.href); host = u.host; path = u.pathname; } catch (e) {}
+          return [r.left + f.clientLeft, r.top + f.clientTop, f.clientWidth, f.clientHeight, host, path];
         }),
       };
     })();
@@ -294,12 +294,13 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
     }
 
     private static func origin(of frame: Frame, among list: [[Any]]) -> CGPoint? {
-        let frames = list.compactMap { item -> (rect: CGRect, host: String)? in
-            guard item.count == 5 else { return nil }
+        let frames = list.compactMap { item -> (rect: CGRect, host: String, path: String)? in
+            guard item.count >= 5 else { return nil }
             let n = item.prefix(4).map { ($0 as? NSNumber)?.doubleValue ?? 0 }
-            return (CGRect(x: n[0], y: n[1], width: n[2], height: n[3]), item[4] as? String ?? "")
+            return (CGRect(x: n[0], y: n[1], width: n[2], height: n[3]), item[4] as? String ?? "", item.count > 5 ? item[5] as? String ?? "" : "")
         }
-        return MiniPlayerLayout.frameOrigin(viewport: frame.viewport, host: frame.info.securityOrigin.host, among: frames)
+        return MiniPlayerLayout.frameOrigin(viewport: frame.viewport, host: frame.info.securityOrigin.host, path: frame.info.request.url?.path ?? "",
+                                            among: frames)
     }
 }
 

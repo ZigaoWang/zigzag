@@ -24,6 +24,8 @@ nonisolated struct PageVideo: Equatable, Sendable {
     var blocksPictureInPicture = false
     /// When it began playing with its sound on, without a pause or a mute since.
     var heardSince: Date?
+    /// Played through encrypted media (DRM).
+    var isProtected = false
     /// Its CSS object-fit.
     var fit = "contain"
     var time: Double = 0
@@ -32,7 +34,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
 
     init(index: Int, rect: CGRect, natural: CGSize, isPlaying: Bool, hasEnded: Bool = false, isMuted: Bool = false, loops: Bool = false,
          autoplays: Bool = false, hasControls: Bool = false, isStartedByUser: Bool = false, isInLink: Bool = false, blocksPictureInPicture: Bool = false, heardSince: Date? = nil,
-         fit: String = "contain", time: Double = 0, duration: Double? = nil) {
+         isProtected: Bool = false, fit: String = "contain", time: Double = 0, duration: Double? = nil) {
         self.index = index
         self.rect = rect
         self.natural = natural
@@ -46,6 +48,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
         self.isInLink = isInLink
         self.blocksPictureInPicture = blocksPictureInPicture
         self.heardSince = heardSince
+        self.isProtected = isProtected
         self.fit = fit
         self.time = time
         self.duration = duration
@@ -61,7 +64,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
                   natural: CGSize(width: number("vw"), height: number("vh")), isPlaying: flag("playing"), hasEnded: flag("ended"),
                   isMuted: flag("muted"), loops: flag("loop"), autoplays: flag("autoplay"), hasControls: flag("controls"),
                   isStartedByUser: flag("user"), isInLink: flag("link"), blocksPictureInPicture: flag("nopip"),
-                  heardSince: heard > 0 ? Date(timeIntervalSince1970: heard / 1000) : nil, fit: o["fit"] as? String ?? "contain", time: number("t"), duration: duration > 0 ? duration : nil)
+                  heardSince: heard > 0 ? Date(timeIntervalSince1970: heard / 1000) : nil, isProtected: flag("drm"), fit: o["fit"] as? String ?? "contain", time: number("t"), duration: duration > 0 ? duration : nil)
     }
 
     /// One you're watching, as Chrome's and Arc's automatic picture in picture have it (#582): playing with its sound
@@ -240,12 +243,20 @@ nonisolated enum MiniPlayerLayout {
         return Placement(scale: scale, origin: CGPoint(x: picture.midX - seen.width / 2, y: picture.midY - seen.height / 2))
     }
 
-    /// A frame's videos are placed in its own viewport: the frame's place in the page, found by its size (and its
-    /// site, when several frames are that size). `frames` are the page's frames as the page lays them out.
-    static func frameOrigin(viewport: CGSize, host: String, among frames: [(rect: CGRect, host: String)]) -> CGPoint? {
+    /// A frame's videos are placed in its own viewport: the frame's place in the page, found by its size, and when
+    /// several frames are that size, by its address (a page of video solutions, each its own player from one site,
+    /// #582), then its site. `frames` are the page's frames as the page lays them out.
+    static func frameOrigin(viewport: CGSize, host: String, path: String = "", among frames: [(rect: CGRect, host: String, path: String)]) -> CGPoint? {
         let sized = frames.filter { abs($0.rect.width - viewport.width) <= 2 && abs($0.rect.height - viewport.height) <= 2 }
-        let match = sized.count > 1 ? sized.first { $0.host == host } ?? sized.first : sized.first
+        guard sized.count > 1 else { return sized.first?.rect.origin }
+        let match = sized.first { $0.host == host && !path.isEmpty && $0.path == path } ?? sized.first { $0.host == host } ?? sized.first
         return match?.rect.origin
+    }
+
+    /// Whether the card can show the video's picture: not one the page plays protected (its picture never draws
+    /// outside the page's own place), and for a video in a frame, only once that frame is found in the page.
+    static func showsPicture(_ video: PageVideo, inFrame: Bool, frameFound: Bool) -> Bool {
+        !video.isProtected && (!inFrame || frameFound)
     }
 
     enum Corner: String, CaseIterable, Sendable {

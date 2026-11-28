@@ -652,6 +652,8 @@ enum DebugBridge {
         // mppointer on|off: the pointer counts as on the card (for the sidebar's hover previews).
         case "mppointer": player.debugPointerOnCard = arg != "off"
         case "mppress": player.card?.debugPress(arg)
+        // mppicture on|off: the card as when it can't show the page's picture (a protected video).
+        case "mppicture": player.debugNoPicture = arg == "off"
         case "mpdrag":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count >= 2 { player.card?.debugDrag(dx: n[0], dy: n[1]) }

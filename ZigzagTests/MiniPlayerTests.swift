@@ -229,13 +229,36 @@ struct MiniPlayerTests {
     }
 
     @Test func aFramesVideosArePlacedByItsSize() {
-        let frames: [(rect: CGRect, host: String)] = [(CGRect(x: 0, y: 0, width: 300, height: 250), "ads.example"),
-                                                      (CGRect(x: 40, y: 300, width: 640, height: 360), "www.youtube.com")]
+        let frames: [(rect: CGRect, host: String, path: String)] = [(CGRect(x: 0, y: 0, width: 300, height: 250), "ads.example", "/ad"),
+                                                                    (CGRect(x: 40, y: 300, width: 640, height: 360), "www.youtube.com", "/embed/a")]
         #expect(MiniPlayerLayout.frameOrigin(viewport: CGSize(width: 640, height: 360), host: "www.youtube.com", among: frames) == CGPoint(x: 40, y: 300))
         // Two of the same size: the one from the frame's own site.
-        let twins = frames + [(CGRect(x: 40, y: 900, width: 640, height: 360), "player.vimeo.com")]
+        let twins = frames + [(CGRect(x: 40, y: 900, width: 640, height: 360), "player.vimeo.com", "/video/1")]
         #expect(MiniPlayerLayout.frameOrigin(viewport: CGSize(width: 640, height: 360), host: "player.vimeo.com", among: twins) == CGPoint(x: 40, y: 900))
         #expect(MiniPlayerLayout.frameOrigin(viewport: CGSize(width: 500, height: 500), host: "x", among: frames) == nil)
+    }
+
+    /// A page of video solutions, each its own player from one site and the same size (savemyexams.com): the card
+    /// shows the one playing, found by its address, not the first player on the page (#582).
+    @Test func aFrameAmongSameSizedPlayersIsFoundByItsAddress() {
+        let size = CGSize(width: 640, height: 360)
+        let players: [(rect: CGRect, host: String, path: String)] = (0..<3).map { i in
+            (CGRect(origin: CGPoint(x: 40, y: 100 + CGFloat(i) * 500), size: size), "player.vimeo.com", "/video/\(100 + i)")
+        }
+        #expect(MiniPlayerLayout.frameOrigin(viewport: size, host: "player.vimeo.com", path: "/video/102", among: players) == CGPoint(x: 40, y: 1100))
+        #expect(MiniPlayerLayout.frameOrigin(viewport: size, host: "player.vimeo.com", path: "/video/9", among: players) == CGPoint(x: 40, y: 100))
+    }
+
+    /// A protected video, or one in a frame the page doesn't show where it can be found, can't be shown in the card:
+    /// it shows the site's name over a calm dark card instead of a black picture (#582).
+    @Test func aPictureTheCardCantShowIsKnown() {
+        var video = PageVideo(index: 0, rect: CGRect(x: 0, y: 0, width: 640, height: 360), natural: CGSize(width: 1280, height: 720), isPlaying: true)
+        #expect(MiniPlayerLayout.showsPicture(video, inFrame: false, frameFound: false))
+        #expect(MiniPlayerLayout.showsPicture(video, inFrame: true, frameFound: true))
+        #expect(!MiniPlayerLayout.showsPicture(video, inFrame: true, frameFound: false))
+        video.isProtected = true
+        #expect(!MiniPlayerLayout.showsPicture(video, inFrame: false, frameFound: false))
+        #expect(PageVideo(["i": 0, "drm": true] as [String: Any])?.isProtected == true)
     }
 
     // MARK: Corners
