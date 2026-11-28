@@ -28,6 +28,7 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 - Przypięte karty, przypięte kafelki i ulubione, których strona nie jest wczytana, mają przyciemnioną ikonę i nazwę, aby dało się je odróżnić od otwartych, w pasku bocznym, w pływającym pasku bocznym i w pasku bocznym wysuwanym od krawędzi ekranu. ([#577](https://github.com/ZigaoWang/zigzag/issues/577))
 - Nazwa profilu obok nazwy przestrzeni jest widoczna tylko wtedy, gdy twoje przestrzenie są w więcej niż jednym profilu, więc znika po usunięciu przestrzeni z własnym profilem, a kliknięcie jej otwiera „Ustawienia” › „Profile”. Strzałka, która zwija przypięte karty, jest na wysokości nazwy przestrzeni. ([#578](https://github.com/ZigaoWang/zigzag/issues/578))
 - Adres w pasku bocznym zaczyna się przy tej samej lewej krawędzi co wiersze pod nim. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
+- Przesuwanie wstecz i dalej wygląda spokojniej i już się nie zawiesza. Strzałka to okrągły dymek na stronie, tuż przy jej krawędzi, nigdy nieucięty przy pasku bocznym ani krawędzi strony, który wypełnia się od środka w miarę przesuwania. Na początku strona podąża za palcami punkt w punkt. Jeśli podniesiesz palce przy wypełnionym dymku, a Mac tego nie zauważy, gest i tak zostanie wykonany przy następnym dotknięciu gładzika, zamiast zostawać na ekranie, a przewijanie zaraz po cofnięciu nie pokazuje już na chwilę poprzedniej strony. ([#579](https://github.com/ZigaoWang/zigzag/issues/579))
 
 ## [0.10.0] - 2026-11-25
 

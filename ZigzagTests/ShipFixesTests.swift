@@ -227,20 +227,23 @@ struct BookmarkFolderTests {
 
     // MARK: Swiping back and forward
 
-    /// The swipe arrow stays in the page's gap, never over the sidebar, the next pane or the window edge.
+    /// The swipe bubble rides a margin inside the page's moving edge, so it never sits across that edge (#579), and
+    /// never past the visible page: not over the sidebar, the next pane or the window edge.
     @Test func swipeArrowStaysInsideTheCard() {
         let page = NSRect(x: 300, y: 0, width: 800, height: 600)
         let size = SwipeArrowView.size, margin = Tokens.Space.x2
-        // Back: centered in a wide gap, a margin from the card edge in a narrow one.
-        let wide = SwipeArrowView.frame(in: page, offset: size + margin * 4, back: true)
-        #expect(wide.minX == page.minX + margin * 2)
-        let narrow = SwipeArrowView.frame(in: page, offset: 10, back: true)
-        #expect(narrow.minX == page.minX + margin)
-        // Forward: same at the right edge.
-        let forward = SwipeArrowView.frame(in: page, offset: -10, back: false)
-        #expect(forward.maxX == page.maxX - margin)
-        // Vertically centered either way.
-        #expect(narrow.midY == page.midY)
+        // Back: the page's edge has moved `offset` in; the bubble is wholly on the page, a margin past that edge.
+        for offset: CGFloat in [0, 10, 30, 66] {
+            let back = SwipeArrowView.frame(in: page, offset: offset, back: true)
+            #expect(back.minX == page.minX + offset + margin)
+            let forward = SwipeArrowView.frame(in: page, offset: -offset, back: false)
+            #expect(forward.maxX == page.maxX - offset - margin)
+            #expect(back.midY == page.midY && back.width == size)
+        }
+        // A pane narrower than the bubble's travel: it stays inside the pane.
+        let narrow = NSRect(x: 0, y: 0, width: 60, height: 300)
+        let squeezed = SwipeArrowView.frame(in: narrow, offset: 66, back: true)
+        #expect(squeezed.minX >= narrow.minX + margin && squeezed.maxX <= narrow.maxX)
     }
 
     private func decide(dx: CGFloat, dy: CGFloat = 0, back: Bool = true, forward: Bool = false,
@@ -2042,7 +2045,8 @@ struct SwipeGestureTests {
         guard on else { return }
         let (page, host) = try page()
         let swipe = page.swipeNavigator
-        try drag(page, steps: 10, dx: 10)
+        // Short of the distance and of a flick, so the lost end springs it back.
+        try drag(page, steps: 5, dx: 8, room: (false, false))
         #expect(page.layer?.affineTransform() != .identity)
         // No end; the next gesture is up and down: the page doesn't stay shifted.
         _ = swipe.handle(try scroll(phase: 128, after: 0.05))
@@ -2171,9 +2175,98 @@ struct SwipeGestureTests {
         _ = swipe.handle(try scroll(phase: 4, after: 0.2))
         #expect(swipe.isCarryingOn)
         _ = swipe.handle(try scroll(phase: 1, dx: 10))
+        swipe.debugHeard(left: false, right: false)
+        _ = swipe.handle(try scroll(phase: 2, dx: 10))
         #expect(!swipe.isCarryingOn)
         _ = swipe.handle(try scroll(phase: 4))
         #expect(swipe.isClean)
+        _ = host
+    }
+
+    /// Scrolling straight after a swipe that went leaves the page carried on until the next one arrives, rather than
+    /// putting the old page back in place for a moment.
+    @Test mutating func scrollingAfterGoingLeavesThePageCarriedOn() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 20, dx: 10)
+        _ = swipe.handle(try scroll(phase: 4, after: 0.2))
+        #expect(swipe.isCarryingOn)
+        _ = swipe.handle(try scroll(phase: 1, dy: -12))
+        _ = swipe.handle(try scroll(phase: 2, dy: -12))
+        #expect(swipe.isCarryingOn)
+        _ = swipe.handle(try scroll(phase: 4))
+        swipe.pageArrived()
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    /// The end of a swipe filled at the full distance is lost and the fingers touch down again: letting go happened,
+    /// so it goes, rather than springing back.
+    @Test mutating func aLostEndWithTheArrowFilledGoesWhenTheFingersTouchAgain() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 20, dx: 10)
+        #expect(swipe.isArmed)
+        _ = swipe.handle(try scroll(phase: 128, after: 0.3))
+        #expect(swipe.isCarryingOn)
+        #expect(!swipe.isShowing)
+        swipe.pageArrived()
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    /// Fingers lifting while it's still deciding, the end lost and the glide coming: nothing is left listening or
+    /// waiting.
+    @Test mutating func aGlideWhileDecidingEndsClean() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        _ = swipe.handle(try scroll(phase: 1, dx: 4))
+        _ = swipe.handle(try scroll(phase: 2, dx: 3))
+        #expect(!swipe.handle(try scroll(momentum: 1, dx: 6)))
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    /// The bubble never takes the pointer: with the pointer over it, a gesture's steps still go to the page.
+    @Test mutating func theArrowNeverTakesThePointer() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        try drag(page, steps: 10, dx: 10)
+        let arrow = try #require(host.swipeArrowLayer.subviews.first { $0 is SwipeArrowView })
+        let middle = NSPoint(x: arrow.frame.midX, y: arrow.frame.midY)
+        #expect(arrow.hitTest(middle) == nil)
+        #expect(host.swipeArrowLayer.hitTest(middle) !== arrow)
+        _ = page.swipeNavigator.handle(try scroll(phase: 8))
+        _ = host
+    }
+
+    /// The page moves with the fingers point for point as the swipe starts, then holds back toward its 72 points.
+    @Test func thePageFollowsTheFingersPointForPointAtFirst() {
+        #expect(abs(SwipeNavigator.shift(pulled: 4) - 4) < 0.15)
+        #expect(abs(SwipeNavigator.shift(pulled: 10) - 10) < 0.8)
+        #expect(SwipeNavigator.shift(pulled: 180) < 72 && SwipeNavigator.shift(pulled: 180) > 60)
+        #expect(SwipeNavigator.shift(pulled: -5) == 0)
+    }
+
+    /// The bubble's wash grows with the distance and is whole once armed.
+    @Test mutating func theWashFollowsTheDistanceAndFillsWhenArmed() throws {
+        guard on else { return }
+        #expect(SwipeArrowView.washScale(progress: 0.5, armed: false) == 0.5)
+        #expect(SwipeArrowView.washScale(progress: 1.4, armed: false) == 1)
+        #expect(SwipeArrowView.washScale(progress: 0.2, armed: true) == 1)
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        _ = swipe.handle(try scroll(phase: 1, dx: 9))
+        swipe.debugHeard(left: false, right: false)
+        // Slowly, so no flick fills it: 9 points a step to 90 of 180.
+        for _ in 0..<9 { _ = swipe.handle(try scroll(phase: 2, dx: 9, after: 0.05)) }
+        let arrow = try #require(host.swipeArrowLayer.subviews.first { $0 is SwipeArrowView } as? SwipeArrowView)
+        #expect(!swipe.isArmed)
+        #expect(abs(arrow.debugWashScale - 0.5) < 0.02)
+        _ = swipe.handle(try scroll(phase: 8))
         _ = host
     }
 
