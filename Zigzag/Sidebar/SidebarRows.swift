@@ -408,6 +408,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// Whether a pinned page's row, or a favorite's tile, has the open edge: only while one of its pages is loaded.
     nonisolated static func showsOpenEdge(pinned: Bool, loaded: [Bool]) -> Bool { pinned && loaded.contains(true) }
 
+    /// Whether a row is dimmed: a pinned page none of whose pages is loaded, unless it's the one you're on.
+    nonisolated static func dimsUnloaded(pinned: Bool, unloaded: Bool, selected: Bool) -> Bool { pinned && unloaded && !selected }
+
     private func showsUnloaded(_ page: Tab?) -> Bool { Self.ringsUnloaded(pinned: isBookmark, loaded: page?.isLoaded) }
 
     private func refreshUnloaded() { isUnloaded = isBookmark && !Self.showsOpenEdge(pinned: true, loaded: pages.map(\.isLoaded)) }
@@ -1026,15 +1029,19 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var showsUnread: Bool { isUnread && closeButton.isHidden && !showsNumber && renameField == nil && !isSplit }
 
     private func refreshTitleColor() {
-        // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.
         let theme = Brand.Theme.for(self)
-        let ink = theme.rowInk
+        // A pinned page that isn't loaded is dimmed, its icons and its title, as Arc's and Safari's are (#577); the one
+        // you're on stays full.
+        let dimmed = Self.dimsUnloaded(pinned: isBookmark, unloaded: isUnloaded, selected: isSelected)
+        let ink = dimmed ? theme.quietInk : theme.rowInk
         // Fixed weight so selection never shifts text. In the selected split, the focused page's title uses the row's ink and
         // the others are dimmer, matching the page area.
         func inked(part: Int) -> NSColor { isSplit && isSelected && focusedHalf != part ? theme.quietInk : ink }
         title.textColor = inked(part: 0)
         partnerTitle.textColor = inked(part: 1)
         extraViews?.enumerated().forEach { $1.title.textColor = inked(part: $0 + 2) }
+        let alpha = dimmed ? Tokens.Opacity.unloaded : 1
+        for view in [icon, partnerIcon] + (extraViews?.map(\.icon) ?? []) where view.alphaValue != alpha { view.alphaValue = alpha }
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
     }
