@@ -583,6 +583,14 @@ final class PageCardView: NSView {
         surface.addSubview(backdrop, positioned: .below, relativeTo: clip)
     }
 
+    /// The empty card's served page (`BlankPageView`): on the surface, over the backdrop and under the clip, so the
+    /// card's own shape and shadow keep it and a pane's band or header still covers it as it covers a page.
+    func setBlankPage(_ page: NSView) {
+        page.frame = surface.bounds
+        page.autoresizingMask = [.width, .height]
+        surface.addSubview(page, positioned: .below, relativeTo: clip)
+    }
+
     override var isFlipped: Bool { true }
 
     /// Around the surface, for the length of a move: the corners turning square or round again (`turnCorners`).

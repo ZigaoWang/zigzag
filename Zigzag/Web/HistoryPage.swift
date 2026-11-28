@@ -63,6 +63,17 @@ enum HistoryPage {
             } else if url.host() == SettingsPage.host {
                 data = Data(SettingsPage.html.utf8)
                 type = "text/html"
+            } else if url.host() == ViewportPage.blankHost {
+                // The page a space starts on, as a document so the card shows it the one way it shows any page. The
+                // address names the space and whether the window is private, so the page draws what was asked for
+                // rather than guessing from whichever window happens to be key.
+                data = Data(ViewportPage.html(for: url).utf8)
+                type = "text/html"
+            } else if let name = ViewportPage.pictureName(in: url),
+                      let jpeg = try? Data(contentsOf: SpaceBackground.folder.appendingPathComponent(name)) {
+                // The stored picture as it was saved: already scaled for the screen when it was chosen.
+                data = jpeg
+                type = "image/jpeg"
             } else {
                 task.didFailWithError(URLError(.fileDoesNotExist))
                 return
