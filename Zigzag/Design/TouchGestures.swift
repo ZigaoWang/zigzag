@@ -1176,25 +1176,67 @@ enum TouchSwipe {
     nonisolated static let loneFingerWait: TimeInterval = 0.12
 
     /// Whether a single finger, `moved` points from where it landed `sinceLanding` seconds ago, is a scroll and not
-    /// the start of a two-finger swipe.
-    nonisolated static func isLoneFinger(fingers: Int, moved: CGFloat, sinceLanding: TimeInterval) -> Bool {
-        fingers == 1 && (moved >= loneFingerMove || sinceLanding >= loneFingerWait)
+    /// the start of a two-finger swipe. Going `sideways`, it may be the first finger of a hand that lands already
+    /// moving, so it waits the moment a second finger takes to land (#581); up or down, it scrolls at once.
+    nonisolated static func isLoneFinger(fingers: Int, moved: CGFloat, sinceLanding: TimeInterval, sideways: Bool = false) -> Bool {
+        fingers == 1 && ((!sideways && moved >= loneFingerMove) || sinceLanding >= loneFingerWait)
+    }
+
+    /// Fingers that moved by `translation` so far are going sideways rather than up or down: within 50° of level.
+    nonisolated static func startsSideways(_ translation: NSPoint) -> Bool {
+        translation.x != 0 && abs(translation.y) <= abs(translation.x) * pageSlope
     }
 
     /// Whether fingers on a page can no longer be a back or forward swipe: neither way is open, a lone finger, more
     /// than two, or a pinch. WebKit's scrolling waits on the swipe only until then.
     nonisolated static func ruledOutOnPage(fingers: Int, spread: CGFloat, moved: CGFloat, sinceLanding: TimeInterval,
-                                           canGoEitherWay: Bool) -> Bool {
-        !canGoEitherWay || fingers > 2 || abs(spread) >= decision || isLoneFinger(fingers: fingers, moved: moved, sinceLanding: sinceLanding)
+                                           canGoEitherWay: Bool, sideways: Bool = false) -> Bool {
+        !canGoEitherWay || fingers > 2 || abs(spread) >= decision
+            || isLoneFinger(fingers: fingers, moved: moved, sinceLanding: sinceLanding, sideways: sideways)
+    }
+}
+
+/// Fingers scrolling a page on the screen keep to the axis they start on, as on an iPad (#581): started within 50° of
+/// level, the page never moves up or down under them; steeper than 65°, never sideways; in between it follows them
+/// freely. Nothing moves until they've gone `TouchSwipe.decision` points and the axis is known; the glide after they
+/// lift keeps it too.
+nonisolated struct TouchScrollLock {
+    enum Axis { case undecided, sideways, upDown, free }
+    private(set) var axis = Axis.undecided
+    private var dx: CGFloat = 0
+    private var dy: CGFloat = 0
+
+    /// tan 65°: steeper than this is up and down.
+    static let upDownSlope: CGFloat = 2.14
+
+    /// The part of a step of `dx`, `dy` the page gets; `began`, the gesture's first.
+    mutating func step(began: Bool, dx stepX: CGFloat, dy stepY: CGFloat) -> NSPoint {
+        if began { axis = .undecided; dx = 0; dy = 0 }
+        if axis == .undecided {
+            dx += stepX; dy += stepY
+            guard hypot(dx, dy) >= TouchSwipe.decision else { return .zero }
+            axis = abs(dy) <= abs(dx) * TouchSwipe.pageSlope ? .sideways : abs(dy) > abs(dx) * Self.upDownSlope ? .upDown : .free
+        }
+        switch axis {
+        case .sideways: return NSPoint(x: stepX, y: 0)
+        case .upDown: return NSPoint(x: 0, y: stepY)
+        default: return NSPoint(x: stepX, y: stepY)
+        }
     }
 }
 
 /// The fingers of a touch swipe, each from where it landed: their shared movement and how much they spread apart.
 nonisolated struct TouchFingers {
     private(set) var touches: [(id: any NSCopying & NSObjectProtocol, start: NSPoint, last: NSPoint)] = []
+    /// Where each finger was as the last one landed: how far apart they spread counts from then, so a first finger
+    /// already on its way as the second lands doesn't read as a pinch (#581).
+    private var spreadFrom: [NSPoint] = []
     var count: Int { touches.count }
 
-    mutating func land(_ id: any NSCopying & NSObjectProtocol, at point: NSPoint) { touches.append((id, point, point)) }
+    mutating func land(_ id: any NSCopying & NSObjectProtocol, at point: NSPoint) {
+        touches.append((id, point, point))
+        spreadFrom = touches.map(\.last)
+    }
 
     mutating func move(_ id: any NSCopying & NSObjectProtocol, to point: NSPoint) {
         guard let i = touches.firstIndex(where: { $0.id.isEqual(id) }) else { return }
@@ -1216,9 +1258,9 @@ nonisolated struct TouchFingers {
     }
 
     var spread: CGFloat {
-        guard touches.count > 1 else { return 0 }
-        let from = startCentroid, to = Self.centroid(touches.map(\.last))
-        let before = touches.map { hypot($0.start.x - from.x, $0.start.y - from.y) }.reduce(0, +)
+        guard touches.count > 1, spreadFrom.count == touches.count else { return 0 }
+        let from = Self.centroid(spreadFrom), to = Self.centroid(touches.map(\.last))
+        let before = spreadFrom.map { hypot($0.x - from.x, $0.y - from.y) }.reduce(0, +)
         let now = touches.map { hypot($0.last.x - to.x, $0.last.y - to.y) }.reduce(0, +)
         return (now - before) / CGFloat(touches.count)
     }

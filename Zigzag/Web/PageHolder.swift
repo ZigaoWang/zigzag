@@ -143,10 +143,11 @@ final class PageHolder: NSView {
 
     func swipeRuledOut(_ swipe: TouchSwipeRecognizer) -> Bool {
         let moved = hypot(swipe.translation.x, swipe.translation.y), since = swipe.eventAt - swipe.landedAt
+        let sideways = TouchSwipe.startsSideways(swipe.translation)
         let out = TouchSwipe.ruledOutOnPage(fingers: swipe.fingers, spread: swipe.spread, moved: moved, sinceLanding: since,
-                                            canGoEitherWay: takesBackForward(dx: 1) || takesBackForward(dx: -1))
+                                            canGoEitherWay: takesBackForward(dx: 1) || takesBackForward(dx: -1), sideways: sideways)
         if out {
-            let lone = TouchSwipe.isLoneFinger(fingers: swipe.fingers, moved: moved, sinceLanding: since)
+            let lone = TouchSwipe.isLoneFinger(fingers: swipe.fingers, moved: moved, sinceLanding: since, sideways: sideways)
             TouchLog.note("ruled out\(lone ? " (one finger)" : "") fingers=\(swipe.fingers) spread=\(Int(swipe.spread)) "
                           + "moved=\(Self.describe(swipe.translation)) after=\(Int(since * 1000))ms")
         }
@@ -155,6 +156,8 @@ final class PageHolder: NSView {
 
     /// Sideways and taken so far, with the page yet to say whether it keeps the spot: asked again on the next move.
     func swipeWaits(_ swipe: TouchSwipeRecognizer) -> Bool {
+        // One finger on its way sideways: its partner may still land (`TouchSwipe.isLoneFinger`).
+        if swipe.fingers == 1, TouchSwipe.startsSideways(swipe.translation) { return true }
         guard TouchSwipe.goesBackOrForward(fingers: swipe.fingers, translation: swipe.translation, spread: swipe.spread),
               let navigator = (page as? BrowserWebView)?.swipeNavigator else { return false }
         let waits = navigator.touchPageLeaves(swipe.translation.x > 0 ? -1 : 1) == nil

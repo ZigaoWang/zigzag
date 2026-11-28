@@ -1088,7 +1088,7 @@ struct TouchMovesTests {
     /// Two fingers on a page as a hand lands them: the first rests with a little jitter, the second lands up to
     /// 100 ms later, then both go at `degrees` off level. Each event runs the rules in the recognizer's order.
     private func pageFingers(secondAfter stagger: TimeInterval, degrees: CGFloat, leftward: Bool = false, fingers: Int = 2,
-                             loneMove: CGFloat = 0) -> (ruledOut: Bool, swipes: Bool) {
+                             loneMove: NSPoint = .zero) -> (ruledOut: Bool, swipes: Bool) {
         var hand = TouchFingers()
         let ids = [NSNumber(value: 1), NSNumber(value: 2)]
         let starts = [NSPoint(x: 300, y: 300), NSPoint(x: 302, y: 345)]
@@ -1096,7 +1096,7 @@ struct TouchMovesTests {
         let angle = degrees * .pi / 180, sign: CGFloat = leftward ? -1 : 1
         func out(_ t: TimeInterval) -> Bool {
             TouchSwipe.ruledOutOnPage(fingers: hand.count, spread: hand.spread, moved: hypot(hand.translation.x, hand.translation.y),
-                                      sinceLanding: t, canGoEitherWay: true)
+                                      sinceLanding: t, canGoEitherWay: true, sideways: TouchSwipe.startsSideways(hand.translation))
         }
         hand.land(ids[0], at: starts[0])
         if out(0) { return (true, false) }
@@ -1117,11 +1117,14 @@ struct TouchMovesTests {
                 }
             } else {
                 // Resting while it waits for its partner: under a point of jitter, or the drift `loneMove` asks for.
-                let jitter = loneMove > 0 ? loneMove : 0.6 * sin(CGFloat(t) * 70)
-                hand.move(ids[0], to: NSPoint(x: starts[0].x + jitter, y: starts[0].y + jitter / 3))
+                let jitter = 0.6 * sin(CGFloat(t) * 70)
+                let drift = loneMove == .zero ? NSPoint(x: jitter, y: jitter / 3) : loneMove
+                hand.move(ids[0], to: NSPoint(x: starts[0].x + drift.x, y: starts[0].y + drift.y))
             }
             if out(t) { return (true, false) }
-            if hypot(hand.translation.x, hand.translation.y) >= TouchSwipe.decision {
+            // One finger on its way sideways waits for its partner, as PageHolder.swipeWaits says.
+            let waits = hand.count == 1 && TouchSwipe.startsSideways(hand.translation)
+            if !waits, hypot(hand.translation.x, hand.translation.y) >= TouchSwipe.decision {
                 return (false, TouchSwipe.goesBackOrForward(fingers: hand.count, translation: hand.translation, spread: hand.spread))
             }
         }
@@ -1150,8 +1153,8 @@ struct TouchMovesTests {
         }
     }
 
-    /// Two fingers up and down scroll, however late the second lands; one finger moving 3 points alone is let go at
-    /// once, so the page scrolls without waiting.
+    /// Two fingers up and down scroll, however late the second lands; one finger moving 3 points up or down alone is
+    /// let go at once, so the page scrolls without waiting.
     @Test func steepFingersAndALoneMovingFingerScroll() {
         for stagger in [0.0, 0.02, 0.06, 0.09] {
             for degrees: CGFloat in [70, 85, -70, -85, 90] {
@@ -1161,11 +1164,102 @@ struct TouchMovesTests {
         }
         #expect(pageFingers(secondAfter: 1, degrees: 0, fingers: 1).ruledOut)
         #expect(pageFingers(secondAfter: 1, degrees: 90, fingers: 1).ruledOut)
-        #expect(pageFingers(secondAfter: 0.06, degrees: 0, loneMove: 3).ruledOut)
+        #expect(pageFingers(secondAfter: 0.06, degrees: 0, loneMove: NSPoint(x: 1, y: 3)).ruledOut)
+        // Sideways, it waits for its partner instead (#581).
+        #expect(!pageFingers(secondAfter: 0.06, degrees: 0, loneMove: NSPoint(x: 3, y: 1)).ruledOut)
         #expect(TouchSwipe.isAcrossPage(NSPoint(x: 10, y: 11.5)))
         #expect(!TouchSwipe.isAcrossPage(NSPoint(x: 10, y: 21.5)))
         #expect(!TouchSwipe.isAcrossPage(NSPoint(x: 5, y: 0)))
         #expect(TouchSwipe.degreesOffLevel(NSPoint(x: -10, y: 10)) == 45)
+    }
+
+    /// A hand that lands already moving: the first finger is on its way sideways before the second lands, up to 100 ms
+    /// later. It still goes back or forward, rather than being let go as a lone finger that scrolls the page (#581).
+    @Test func aSwipeWhoseFirstFingerLandsMovingGoesBackOrForward() {
+        for stagger in [0.01, 0.03, 0.06, 0.09] {
+            for degrees: CGFloat in [0, 15, -20, 35] {
+                var hand = TouchFingers()
+                let ids = [NSNumber(value: 1), NSNumber(value: 2)]
+                let starts = [NSPoint(x: 300, y: 300), NSPoint(x: 302, y: 345)]
+                let angle = degrees * .pi / 180, speed: CGFloat = 500
+                var t = 0.0, swipes: Bool?
+                hand.land(ids[0], at: starts[0])
+                while t < 0.6, swipes == nil {
+                    t += 1.0 / 120
+                    let d = speed * CGFloat(t)
+                    let at = { (i: Int) in NSPoint(x: starts[i].x + d * cos(angle), y: starts[i].y + d * sin(angle)) }
+                    if hand.count == 1, t >= stagger { hand.land(ids[1], at: at(1)) }
+                    for i in 0..<hand.count { hand.move(ids[i], to: at(i)) }
+                    let moved = hypot(hand.translation.x, hand.translation.y)
+                    if TouchSwipe.ruledOutOnPage(fingers: hand.count, spread: hand.spread, moved: moved, sinceLanding: t,
+                                                 canGoEitherWay: true, sideways: TouchSwipe.startsSideways(hand.translation)) {
+                        swipes = false
+                    } else if hand.count == 2, moved >= TouchSwipe.decision {
+                        swipes = TouchSwipe.goesBackOrForward(fingers: 2, translation: hand.translation, spread: hand.spread)
+                    }
+                }
+                #expect(swipes == true, "second finger \(Int(stagger * 1000)) ms late, \(Int(degrees))°")
+            }
+        }
+        // One finger alone sideways is still the page's, once a partner would have landed.
+        #expect(TouchSwipe.ruledOutOnPage(fingers: 1, spread: 0, moved: 30, sinceLanding: 0.12, canGoEitherWay: true, sideways: true))
+        // Up and down, at once.
+        #expect(TouchSwipe.ruledOutOnPage(fingers: 1, spread: 0, moved: 3, sinceLanding: 0.01, canGoEitherWay: true, sideways: false))
+        #expect(TouchSwipe.startsSideways(NSPoint(x: 3, y: 1)) && !TouchSwipe.startsSideways(NSPoint(x: 1, y: 3)))
+    }
+
+    /// tabs.md: fingers on a page keep to the axis they start on, as on an iPad. Started mostly sideways, the page
+    /// never moves up or down under them, their glide included; started up or down, never sideways; a slant scrolls
+    /// freely. Until they've gone far enough to tell, nothing moves (#581).
+    @Test func fingersOnAPageKeepToTheAxisTheyStartOn() {
+        var lock = TouchScrollLock()
+        #expect(lock.step(began: true, dx: 4, dy: 2) == .zero)
+        #expect(lock.step(began: false, dx: 8, dy: 3) == NSPoint(x: 8, y: 0))
+        #expect(lock.step(began: false, dx: 2, dy: 9) == NSPoint(x: 2, y: 0))
+        #expect(lock.step(began: false, dx: 3, dy: -4) == NSPoint(x: 3, y: 0))
+        #expect(lock.axis == .sideways)
+        // A new gesture decides afresh: up and down keeps to up and down.
+        #expect(lock.step(began: true, dx: 1, dy: 12) == NSPoint(x: 0, y: 12))
+        #expect(lock.step(began: false, dx: 5, dy: 3) == NSPoint(x: 0, y: 3))
+        #expect(lock.axis == .upDown)
+        // Between 50° and 65° off level: as the fingers go.
+        #expect(lock.step(began: true, dx: 6, dy: 10) == NSPoint(x: 6, y: 10))
+        #expect(lock.step(began: false, dx: 5, dy: -3) == NSPoint(x: 5, y: -3))
+        #expect(lock.axis == .free)
+    }
+
+    /// The lock on a real page: a touch scroll that starts sideways reaches the page with nothing up or down in it; a
+    /// trackpad's scroll is left as it is (#581).
+    @Test func aTouchScrollThatStartsSidewaysNeverScrollsThePageUpOrDown() throws {
+        let saved = (TouchPress.landedAt, TouchPress.fingerDown)
+        defer { TouchPress.landedAt = saved.0; TouchPress.fingerDown = saved.1 }
+        let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let now = ProcessInfo.processInfo.systemUptime
+        func scroll(_ phase: Int64, dx: Int32, dy: Int32, momentum: Int64 = 0, at offset: TimeInterval) throws -> NSEvent {
+            let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: dx, wheel3: 0))
+            cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+            cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+            cg.setIntegerValueField(.scrollWheelEventMomentumPhase, value: momentum)
+            cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
+            cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(dx))
+            cg.timestamp = CGEventTimestamp((now + offset) * 1_000_000_000)
+            return try #require(NSEvent(cgEvent: cg))
+        }
+        TouchPress.landedAt = now
+        TouchPress.fingerDown = true
+        let first = page.touchLocked(try scroll(1, dx: 12, dy: 4, at: 0.01))
+        #expect(first.scrollingDeltaY == 0 && first.scrollingDeltaX == 12)
+        let drift = page.touchLocked(try scroll(2, dx: 3, dy: 7, at: 0.02))
+        #expect(drift.scrollingDeltaY == 0 && drift.scrollingDeltaX == 3)
+        TouchPress.fingerDown = false
+        let glide = page.touchLocked(try scroll(0, dx: 4, dy: -6, momentum: 2, at: 0.05))
+        #expect(glide.scrollingDeltaY == 0 && glide.scrollingDeltaX == 4)
+        // The trackpad, long after the finger: untouched.
+        TouchPress.landedAt = now - 10
+        let trackpad = try scroll(1, dx: 12, dy: 4, at: 0.1)
+        #expect(page.touchLocked(trackpad) === trackpad)
+        let next = try scroll(2, dx: 3, dy: 7, at: 0.11)
+        #expect(page.touchLocked(next) === next)
     }
 
     /// The fingers' shared travel counts each finger from where it landed, so a late second finger adds no jump.
