@@ -14,6 +14,7 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 - Mini oynatıcı artık Chrome ve Arc'taki gibi yalnızca gerçekten izlediğiniz bir videoda açılır: sesi açık oynayan, gerçek bir oynatıcı boyutunda ve görünürde olan, sizin başlattığınız ya da bir süredir oynayan bir video. x.com gibi akışlarda sessiz kendiliğinden oynayan videolar, Taobao gibi mağazalardaki küçük ürün videoları ve bağlantı önizlemeleri, sekme değiştirdiğinizde ya da Zigzag'dan ayrıldığınızda artık onu açmaz. ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
 - Dokunmatik ekranda mini oynatıcıya dokunmak denetimlerini gösterir, bir kez daha dokunmak gizler. ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
 - Mini oynatıcı, çözüm videoları sayfası gibi aynı boyutta birkaç oynatıcı olan bir sayfada siyah bir kart yerine doğru videoyu gösterir; gösteremediği bir videoda sitenin adı ve çalışmaya devam eden denetimler görünür. Denetimleri daha hafif bir karartmanın üzerinde daha yumuşak belirir. ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
+- Ekranın kenarından açılan kenar çubuğunun yanındaki sayfa, imleç panelin herhangi bir yerindeyken, İndirilenler’e, +’ya veya bir Space’in adına giderken de açık kalır. Space değiştirdiğinizde yerini korur ve yeni Space’in sekmelerinden birinde imleci bekletene kadar o Space’in boş sayfasını gösterir. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#556](https://github.com/ZigaoWang/zigzag/issues/556), [#572](https://github.com/ZigaoWang/zigzag/pull/572))
 
 ## [0.10.0] - 2026-11-25
 

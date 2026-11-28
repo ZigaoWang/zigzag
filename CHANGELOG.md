@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The mini player shows up only for a video you're watching, as in Chrome and Arc: one playing with its sound on, the size of a real player and in view, that you started yourself or that has played for a while. Muted autoplay in feeds like x.com, small product videos on shops like Taobao and link previews no longer pop it up when you switch tabs or leave Zigzag. ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
 - On a touch display, a tap on the mini player shows its controls, and another tap hides them. ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
 - The mini player shows the right video on a page with several players of the same size, such as a page of video solutions, instead of a black card, and a video it can't show gets the site's name with controls that still work. Its controls fade in more gently, over a lighter dim. ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
+- The page beside the screen edge's sidebar stays out while the pointer is anywhere on the panel, also on its way to Downloads, the + or a space's name. Switching spaces keeps its place, showing the new space's empty page until you rest on one of its tabs. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#556](https://github.com/ZigaoWang/zigzag/issues/556), [#572](https://github.com/ZigaoWang/zigzag/pull/572))
 
 ## [0.10.0] - 2026-11-25
 

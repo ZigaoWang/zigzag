@@ -22,6 +22,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 小播放器现在只在你真正在看的视频上出现，和 Chrome、Arc 一样：有声音地播放、有真正播放器那么大、在画面里，而且是你自己点开的或已经播放了一会儿的。x.com 这类信息流里静音自动播放的视频、淘宝这类购物网站上的小商品视频和链接预览，在你切换标签页或离开 Zigzag 时不会再弹出小播放器。 ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
 - 在触控屏上，轻点小播放器会显示它的控制按钮，再点一下会隐藏。 ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
 - 在讲解视频页这类有好几个同样大小播放器的页面上，小播放器会显示正确的视频，而不是一张黑卡片；它显示不了的视频会显示网站名称，控制按钮照常可用。控制按钮的淡入更柔和，底下的暗色也更浅。 ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
+- 从屏幕边缘调出的边栏旁边的网页，只要指针还在面板上就会一直显示，移向“下载”、+ 或空间名称的路上也不会收起。切换空间时它的位置也会保留，显示新空间的空白页，直到你把指针停在新空间的某个标签页上。感谢 [Lakeland97](https://github.com/Lakeland97)。([#556](https://github.com/ZigaoWang/zigzag/issues/556), [#572](https://github.com/ZigaoWang/zigzag/pull/572))
 
 ## [0.10.0] - 2026-11-25
 

@@ -19,6 +19,7 @@
 - 小播放器現在只會在你真正在看的影片上出現，和 Chrome、Arc 一樣：有聲音地播放、有真正播放器那麼大、在畫面裡，而且是你自己點開的或已經播放一段時間的。x.com 這類動態中靜音自動播放的影片、淘寶這類購物網站上的小商品影片和連結預覽，在你切換分頁或離開 Zigzag 時不會再跳出小播放器。 ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
 - 在觸控螢幕上，輕點小播放器會顯示它的控制項目，再點一下會隱藏。 ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
 - 在講解影片頁這類有好幾個同樣大小播放器的網頁上，小播放器會顯示正確的影片，而不是一張黑色卡片；它無法顯示的影片會顯示網站名稱，控制項目照常可用。控制項目的淡入更柔和，底下的暗色也更淺。 ([#582](https://github.com/ZigaoWang/zigzag/issues/582))
+- 從螢幕邊緣叫出的側邊欄旁邊的網頁，只要指標還在面板上就會一直顯示，移向「下載」、+ 或空間名稱的途中也不會收起。切換空間時它的位置也會保留，顯示新空間的空白頁，直到你把指標停在新空間的某個分頁上。感謝 [Lakeland97](https://github.com/Lakeland97)。([#556](https://github.com/ZigaoWang/zigzag/issues/556), [#572](https://github.com/ZigaoWang/zigzag/pull/572))
 
 ## [0.10.0] - 2026-11-25
 
