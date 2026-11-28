@@ -321,11 +321,17 @@ final class PageCardView: NSView {
     }
 
     /// Page loading, in the space's accent: a thin line along the card's top edge that grows with the load and fades
-    /// when done. Between WebKit's steps it keeps creeping on, so a slow page never looks stuck.
+    /// when done. It only moves when the page does: a stalled load holds it still, so a dead site and a slow one
+    /// don't look alike (#548).
     private let progressLine = CALayer()
     private var progress: CGFloat = 0
     private var isShowingProgress = false
-    private var creep: Timer?
+
+    #if DEBUG
+    /// Tests show the line a load's state and read where it is, without a WebKit page to follow.
+    func debugShowLoading(_ loading: Bool, progress value: Double) { setLoading(loading, progress: value) }
+    var debugProgress: CGFloat { progress }
+    #endif
 
     /// The page whose load the line shows: the one in this card, whichever tab is selected. In split view each card
     /// follows its own pane's page.
@@ -349,7 +355,6 @@ final class PageCardView: NSView {
     /// The line gone at once, wherever it was.
     private func resetLoading() {
         progressLine.removeAllAnimations()
-        stopCreeping()
         isShowingProgress = false
         progress = 0
         Tokens.Motion.withoutAnimation {
@@ -375,9 +380,9 @@ final class PageCardView: NSView {
             isShowingProgress = true
             progress = 0
             Tokens.Motion.withoutAnimation { progressLine.opacity = 1; layoutProgress() }
-            startCreeping()
         }
-        guard target >= progress || !loading else { return }
+        // A page that isn't moving doesn't move the line: no step to take, and nothing to fade.
+        if loading, target == progress { return }
         progress = target
         CATransaction.begin()
         CATransaction.setAnimationDuration(loading ? Tokens.Motion.large : Tokens.Motion.standard)
@@ -386,7 +391,6 @@ final class PageCardView: NSView {
         CATransaction.commit()
         guard !loading else { return }
         isShowingProgress = false
-        stopCreeping()
         CATransaction.begin()
         CATransaction.setAnimationDuration(Tokens.Motion.large)
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
@@ -404,31 +408,6 @@ final class PageCardView: NSView {
 
     private func paintProgress() {
         Tokens.Motion.withoutAnimation { progressLine.backgroundColor = cgColor(Brand.Theme.current.accent) }
-    }
-
-    /// While the page loads, the line inches toward 90% between WebKit's steps, slower the further it gets. Not with
-    /// Reduce Motion.
-    private func startCreeping() {
-        stopCreeping()
-        guard !Tokens.Motion.reduceMotion else { return }
-        creep = Timer.scheduledTimer(withTimeInterval: Tokens.Motion.progressCreep, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.isShowingProgress else { return }
-                let next = self.progress + (0.9 - self.progress) * 0.05
-                guard next > self.progress else { return }
-                self.progress = next
-                CATransaction.begin()
-                CATransaction.setAnimationDuration(Tokens.Motion.progressCreep)
-                CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
-                self.layoutProgress()
-                CATransaction.commit()
-            }
-        }
-    }
-
-    private func stopCreeping() {
-        creep?.invalidate()
-        creep = nil
     }
 
     func setOverlay(_ view: NSView?) {

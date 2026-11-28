@@ -830,8 +830,6 @@ enum Tokens {
         static let previewDelay: TimeInterval = 0.6
         /// How long the pointer can stray off the floating sidebar before it slides away.
         static let edgeHideDelay: TimeInterval = 0.05
-        /// The page's loading line inching on between WebKit's steps, linearly, once this often.
-        static let progressCreep: TimeInterval = 0.5
         /// Motion that isn't an answer to anything you did: the wordmark drawing itself, the guided tour's beat, a
         /// space's atmosphere drifting. Never on the way of something you asked for.
         enum Ambient {
