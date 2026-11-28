@@ -529,8 +529,8 @@ import Testing
         return parts
     }
 
-    /// A pinned page that isn't loaded reads dimmer than one that is, icon and title, until it's loaded (#577).
-    @Test func anUnloadedPinsRowIsDimmedAndALoadedOneIsnt() throws {
+    /// A pinned page that isn't loaded wears the sleeping ring, as a tab does, at full strength; loaded, it's plain (#577).
+    @Test func anUnloadedPinsRowWearsTheRingAndALoadedOneIsnt() throws {
         try inWindow(["0", "1", "2"]) { controller, tabs, space in
             let manager = controller.tabManager
             manager.select(tabs[0])
@@ -543,14 +543,14 @@ import Testing
             let loaded = try #require(controller.sidebar.list.row(forBookmark: loadedID) as? TabRowView)
             let unloaded = try #require(controller.sidebar.list.row(forBookmark: unloadedID) as? TabRowView)
             #expect(!loaded.isUnloaded && unloaded.isUnloaded)
-            #expect(loaded.icon.alphaValue == 1)
-            #expect(unloaded.icon.alphaValue == Tokens.Opacity.unloaded)
-            #expect(drawn(unloaded.title.textColor, in: unloaded) == drawn(Brand.Theme.for(unloaded).quietInk, in: unloaded))
-            #expect(drawn(loaded.title.textColor, in: loaded) == drawn(Brand.Theme.for(loaded).rowInk, in: loaded))
+            #expect(!loaded.icon.isUnloaded && unloaded.icon.isUnloaded)
+            for row in [loaded, unloaded] {
+                #expect(row.icon.alphaValue == 1)
+                #expect(drawn(row.title.textColor, in: row) == drawn(Brand.Theme.for(row).rowInk, in: row))
+            }
             tabs[2].ensureWebView()
             controller.sidebar.list.refreshRows()
-            #expect(unloaded.icon.alphaValue == 1)
-            #expect(drawn(unloaded.title.textColor, in: unloaded) == drawn(Brand.Theme.for(unloaded).rowInk, in: unloaded))
+            #expect(!unloaded.icon.isUnloaded)
         }
     }
 

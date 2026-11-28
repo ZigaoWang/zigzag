@@ -474,11 +474,6 @@ final class FavoriteTile: InteractiveView {
         selected ? .selected : TabRowView.showsOpenEdge(pinned: true, loaded: loaded) ? .open : .closed
     }
 
-    /// How strong a tile's icons are drawn: dimmed while none of its pages is loaded, as a pinned row is (#577).
-    static func iconAlpha(_ look: Look, hovered: Bool) -> CGFloat {
-        look == .closed ? Tokens.Opacity.unloaded : 1
-    }
-
     /// Whether the open page has left its saved URL (`TabManager.isAway`, as pinned rows): neither the saved URL nor where
     /// it redirects.
     static func isAway(current: URL?, saved: URL, landing: URL?) -> Bool {
@@ -797,7 +792,11 @@ final class FavoriteTile: InteractiveView {
 
     private func refreshLoading() {
         let live = livePages
-        for (page, view) in zip(live, pageIcons) { view.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true) }
+        for (page, view) in zip(live, pageIcons) {
+            view.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true)
+            // A page that isn't running wears the sleeping ring, as a tab's and a pinned tab's do (#577).
+            view.isUnloaded = TabRowView.ringsUnloaded(pinned: true, loaded: page?.isLoaded)
+        }
         isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: live.compactMap { $0?.isLoaded })
         refreshClose()
         refreshAway()
@@ -932,8 +931,6 @@ final class FavoriteTile: InteractiveView {
             return
         }
         refreshClose()
-        let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
-        for view in pageIcons where view.alphaValue != alpha { view.alphaValue = alpha }
         // Space-tinted tile, lighter on hover; brighter with a fine edge while loaded. The current one uses the selected card.
         let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)
             : isPressed ? Tokens.Chrome.fieldPressed

@@ -397,19 +397,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }()
     /// A pinned page none of whose pages is running (never opened, put to sleep, or not loaded yet since Zigzag
     /// reopened): no open edge and no unload button, the way a pinned page that was never opened looks (#205).
-    private(set) var isUnloaded = false { didSet { if oldValue != isUnloaded { refreshTitleColor() }; showsOpenEdge = isBookmark && !isUnloaded } }
+    private(set) var isUnloaded = false { didSet { showsOpenEdge = isBookmark && !isUnloaded } }
 
-    /// Whether a page's icon wears the ring of a page that isn't running (#205). `loaded`: nil for no page. In the
-    /// Tabs list every row is a tab, so the ring is what tells one that isn't running, asleep or not loaded yet
-    /// since Zigzag reopened. Among pinned pages and favorites the open edge does (`showsOpenEdge(pinned:loaded:)`):
-    /// one that isn't running looks like one never opened, never ringed while those beside it aren't.
-    nonisolated static func ringsUnloaded(pinned: Bool, loaded: Bool?) -> Bool { !pinned && loaded == false }
+    /// Whether a page's icon wears the ring of a page that isn't running (#205, #577), the one cue for it in the Tabs
+    /// list, pinned pages and favorites alike. `loaded`: nil for no page, which on a pinned page means never opened.
+    nonisolated static func ringsUnloaded(pinned: Bool, loaded: Bool?) -> Bool { loaded == false || (pinned && loaded == nil) }
 
     /// Whether a pinned page's row, or a favorite's tile, has the open edge: only while one of its pages is loaded.
     nonisolated static func showsOpenEdge(pinned: Bool, loaded: [Bool]) -> Bool { pinned && loaded.contains(true) }
-
-    /// Whether a row is dimmed: a pinned page none of whose pages is loaded, unless it's the one you're on.
-    nonisolated static func dimsUnloaded(pinned: Bool, unloaded: Bool, selected: Bool) -> Bool { pinned && unloaded && !selected }
 
     private func showsUnloaded(_ page: Tab?) -> Bool { Self.ringsUnloaded(pinned: isBookmark, loaded: page?.isLoaded) }
 
@@ -1029,19 +1024,15 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var showsUnread: Bool { isUnread && closeButton.isHidden && !showsNumber && renameField == nil && !isSplit }
 
     private func refreshTitleColor() {
+        // A pinned tab that isn't loaded reads at full strength; its icon's ring says so (#577).
         let theme = Brand.Theme.for(self)
-        // A pinned page that isn't loaded is dimmed, its icons and its title, as Arc's and Safari's are (#577); the one
-        // you're on stays full.
-        let dimmed = Self.dimsUnloaded(pinned: isBookmark, unloaded: isUnloaded, selected: isSelected)
-        let ink = dimmed ? theme.quietInk : theme.rowInk
+        let ink = theme.rowInk
         // Fixed weight so selection never shifts text. In the selected split, the focused page's title uses the row's ink and
         // the others are dimmer, matching the page area.
         func inked(part: Int) -> NSColor { isSplit && isSelected && focusedHalf != part ? theme.quietInk : ink }
         title.textColor = inked(part: 0)
         partnerTitle.textColor = inked(part: 1)
         extraViews?.enumerated().forEach { $1.title.textColor = inked(part: $0 + 2) }
-        let alpha = dimmed ? Tokens.Opacity.unloaded : 1
-        for view in [icon, partnerIcon] + (extraViews?.map(\.icon) ?? []) where view.alphaValue != alpha { view.alphaValue = alpha }
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
     }

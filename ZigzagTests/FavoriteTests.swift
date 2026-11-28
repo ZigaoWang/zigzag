@@ -243,13 +243,18 @@ struct BookmarkTitleTests {
         #expect(FavoriteTile.look(selected: false, loaded: [false, false]) == .closed)
     }
 
-    @Test func aTileIconIsDimmedOnlyWhileItsPageIsntLoaded() {
-        // Not loaded: dimmed, under the pointer too, as a pinned row is (#577). Loaded or the one you're on: full.
-        #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == Tokens.Opacity.unloaded)
-        #expect(FavoriteTile.iconAlpha(.closed, hovered: true) == Tokens.Opacity.unloaded)
-        #expect(FavoriteTile.iconAlpha(.open, hovered: false) == 1)
-        #expect(FavoriteTile.iconAlpha(.selected, hovered: false) == 1)
-        #expect(Tokens.Opacity.unloaded < 1)
+    @Test func aTileIconWearsTheRingOnlyWhileItsPageIsntLoaded() {
+        // Not loaded: the sleeping ring, as a tab's; loaded: plain. Full strength either way (#577).
+        let left = Bookmark(url: saved, title: "Mail"), right = Bookmark(url: URL(string: "https://notes.example.com/")!, title: "Notes")
+        let tile = FavoriteTile(bookmark: left, partners: [right])
+        tile.track(nil, partners: [nil])
+        #expect(tile.pageIcons.prefix(2).map(\.isUnloaded) == [true, true])
+        let notes = Tab(url: right.url, title: "Notes", spaceID: UUID())
+        notes.ensureWebView()
+        tile.track(nil, partners: [notes])
+        #expect(tile.pageIcons.prefix(2).map(\.isUnloaded) == [true, false])
+        #expect(tile.pageIcons.allSatisfy { $0.alphaValue == 1 })
+        notes.close()
     }
 
     @Test func onItsSavedPageItIsNotAway() {

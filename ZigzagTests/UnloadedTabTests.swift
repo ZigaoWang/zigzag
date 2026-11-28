@@ -112,8 +112,9 @@ import WebKit
     }
 
     @Test func pinnedPagesNotRunningLookLikeOnesNeverOpened() {
-        // No ring among pinned pages, loaded or not: the open edge tells them apart.
-        #expect(!TabRowView.ringsUnloaded(pinned: true, loaded: false))
+        // The ring among pinned pages too, as in the Tabs list: asleep, or never opened (no page) alike (#577).
+        #expect(TabRowView.ringsUnloaded(pinned: true, loaded: false))
+        #expect(TabRowView.ringsUnloaded(pinned: true, loaded: nil))
         #expect(!TabRowView.ringsUnloaded(pinned: true, loaded: true))
         // Never opened, asleep, or restored and not opened yet: no edge, all alike.
         #expect(!TabRowView.showsOpenEdge(pinned: true, loaded: []))
