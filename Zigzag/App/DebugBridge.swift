@@ -2118,6 +2118,7 @@ enum DebugBridge {
             // long each took goes to the debug log (#170). minisidebutton and webapp sidebutton do the same there.
             if let window = controller.window { sendSideButton(arg, to: window) }
         case "downloads": controller.showDownloads(nil)
+        case "dlfinished": controller.debugRevealFinished()
         case "menupanel":
             // menupanel View/Tabs: that menu of the menu bar, or a submenu of it, drawn as Zigzag draws menus near the
             // window's top, for a picture of what it holds without opening the menu bar.

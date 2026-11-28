@@ -46,14 +46,18 @@
   Test: DownloadPolicyTests.aFramesFileAnswersToTheFramesOwnSites
 
 ## The downloads panel
-- The sidebar's download button → the five newest downloads, and Open Downloads Folder at the bottom.
-  No test yet.
+- The sidebar's download button → the downloads from the last hour and any under way or paused, newest at the top, at most five, or the newest alone when none is that recent; Show All Downloads at the bottom for the earlier ones, or Open Downloads Folder when there are none.
+  Test: DownloadsPanelListTests.openedYourselfItListsTheRecentOnesNewestFirst
+- Show All Downloads → every download, newest at the top, as many as fit above the button (five at least, twelve at most), and Open Downloads Folder at the bottom.
+  Test: DownloadsPanelListTests.showAllListsAsManyAsFitNewestFirst
 - While something downloads, the button's circle → a progress ring that reads on every space color, light or dark: a 2pt ring over a full track as heavy, on the icon's own circle and centered on its arrow, in the space's accent where it stands out from the sidebar and its ink where it wouldn't; it eases forward, then fills, fades and shows a check when done.
   Test: DownloadsRingTests.theRingAndItsTrackLieOnTheIconsCircle
   Test: DownloadsRingTests.theProgressReadsOnEverySpaceColor
   Test: DownloadsRingTests.theTrackShowsAndTheProgressStandsApartFromIt
 - A download starting → the panel opens on just that one, with Show All Downloads for the rest; it closes six seconds after the file is done unless you're using it.
   No test yet.
+- A download finishing in the window you're using → the panel opens again on just that file, marked Just downloaded, with any still coming in and Show All Downloads for the rest; it closes six seconds later unless you're using it. Over the command bar or another panel it doesn't open.
+  Test: DownloadsPanelListTests.aFinishedDownloadIsShownAloneWithTheRestBehindShowAll
 - The panel's width → wide enough for every label, at the narrowest sidebar, in English and Chinese.
   Test: DownloadsPanelLayoutTests.everyLabelFitsAtTheNarrowestSidebar
 - A row → the file's icon, name and progress or size; Pause and Cancel while coming in, Show in Finder when done, Try Again when a failed one can be, Download Again when the file was moved or deleted.

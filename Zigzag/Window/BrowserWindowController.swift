@@ -323,6 +323,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self, window == nil || window === self.window else { return }
             self.flyDownload(item)
         })
+        tokens.append(DownloadManager.shared.finished.observe { [weak self] item in self?.downloadFinished(item) })
         if #available(macOS 15.4, *) {
             tokens.append(ExtensionCenter.changed.observe { [weak self] in self?.scheduleExtensionActions() })
             tokens.append(ExtensionCenter.popupsChanged.observe { [weak self] in self?.scheduleExtensionActions() })
@@ -2743,6 +2744,28 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let active = mine.filter { $0.state == .downloading }
         let progress = active.isEmpty ? 1 : active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
         bothSidebars { $0.updateDownloads(active: active.count, hasAny: !mine.isEmpty, progress: progress) }
+    }
+
+    /// A download done in this window: the panel comes out of the Downloads button on just that file, newest first,
+    /// with Show All Downloads for the rest, and tidies itself away a while later (#586). One still flying in is
+    /// shown when it lands; nothing opens over the command bar or another panel, or in a window you aren't using.
+    private func downloadFinished(_ item: DownloadItem) {
+        guard item.isPrivate == tabManager.isPrivate, item.window.map({ $0 === window }) ?? true,
+              window?.isKeyWindow == true, !flyingDownloads.contains(item.id) else { return }
+        guard !hasFloatingPanel || DownloadsPanel.isOpen(in: window) else { return }
+        revealFinished(item)
+    }
+
+    #if DEBUG
+    /// For a test copy kept behind other apps, whose window is never key: the newest download shown as done.
+    func debugRevealFinished() { DownloadManager.shared.items(isPrivate: tabManager.isPrivate).first.map(revealFinished) }
+    #endif
+
+    private func revealFinished(_ item: DownloadItem) {
+        let sidebarShown = root.chromeSidebarShown || root.isSidebarFloatingVisible
+        if !sidebarShown { showFloatingDownloads() }
+        sidebar.layoutSubtreeIfNeeded()
+        DownloadsPanel.reveal(from: sidebarShown ? sidebar.downloadsAnchor : floatingDownloadsButton, in: self, closingAfter: item, arrival: .pop)
     }
 
     /// The file's own icon lifts off where you clicked and arcs into the Downloads button, which answers with a

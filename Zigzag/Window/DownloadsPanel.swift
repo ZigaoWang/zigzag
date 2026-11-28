@@ -244,13 +244,17 @@ enum DownloadsPanel {
     static func isOpen(in window: NSWindow?) -> Bool { isOpen && current?.window === window }
     static func closeCurrent() { current?.close() }
 
-    /// Opened by a download landing in the button: it goes away by itself a while after that download is done,
-    /// unless you're using it; a click elsewhere closes it sooner, as always.
-    static func reveal(from anchor: NSView, in controller: BrowserWindowController, closingAfter item: DownloadItem) {
+    /// Opened by a download landing in the button, or by one finishing: it goes away by itself a while after that
+    /// download is done, unless you're using it; a click elsewhere closes it sooner, as always.
+    static func reveal(from anchor: NSView, in controller: BrowserWindowController, closingAfter item: DownloadItem,
+                       arrival: FloatingPanelView.Arrival = .burst) {
         // Already open: it shows this one too, at the top, marked as new.
         if let current {
-            // Showing just one download: the newest takes its place.
-            if current.focused != nil { current.focused = item }
+            // Showing just one download: the newest takes its place, and the panel goes once it's done.
+            if current.focused != nil {
+                current.focused = item
+                current.closeWhenDone(item)
+            }
             current.reload()
             return
         }
@@ -258,7 +262,7 @@ enum DownloadsPanel {
         let panel = DownloadsPanelView(controller: controller)
         panel.focused = item
         current = panel
-        panel.show(from: anchor, arrival: .burst)
+        panel.show(from: anchor, arrival: arrival)
         panel.closeWhenDone(item)
     }
 
@@ -296,8 +300,31 @@ final class DownloadsPanelView: FloatingPanelView {
     private var rows: [DownloadRowView] = []
     /// Opened by a download landing: just that one (and any others still coming), not the whole list.
     fileprivate var focused: DownloadItem?
-    /// How many it lists when you open it yourself; the rest are in the folder.
-    private static let recentCount = 5
+    /// Show All Downloads was clicked: the whole list, newest first, as much of it as fits.
+    private var showingAll = false
+    /// The most it lists when you open it yourself, and the fewest Show All Downloads lists.
+    static let recentCount = 5
+    /// The most Show All Downloads lists, room allowing; the rest are in the folder.
+    static let allCount = 12
+    /// How long a download counts as recent: opened yourself, the panel lists these and the ones under way.
+    static let recentAge: TimeInterval = 60 * 60
+
+    /// What the panel lists, newest first, and whether Show All Downloads offers more (#586). Opened on a download:
+    /// that one and any still coming in. Opened yourself: the recent ones and any under way or paused, at most
+    /// `recentCount`, or the newest alone when none is recent. Show All Downloads: the newest `room`.
+    static func shown(_ all: [DownloadItem], focused: DownloadItem?, showingAll: Bool, room: Int = recentCount,
+                      now: Date = Date()) -> (items: [DownloadItem], more: Bool) {
+        let items: [DownloadItem]
+        if showingAll {
+            return (Array(all.prefix(max(room, recentCount))), false)
+        } else if let focused {
+            items = all.filter { $0 === focused || $0.state == .downloading || $0.state == .paused }
+        } else {
+            let recent = all.filter { [.downloading, .paused].contains($0.state) || now.timeIntervalSince($0.started) < recentAge }
+            items = recent.isEmpty ? Array(all.prefix(1)) : Array(recent.prefix(recentCount))
+        }
+        return (items, all.count > items.count)
+    }
     private let title: Label = {
         let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
         label.attributedStringValue = Tokens.Font.voiceText(String(localized: "Downloads", comment: "Title of the downloads panel."))
@@ -372,8 +399,9 @@ final class DownloadsPanelView: FloatingPanelView {
         clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
             guard let self else { return }
-            if self.focused != nil, self.offersAll {
+            if self.offersAll {
                 self.focused = nil
+                self.showingAll = true
                 self.touched = true
                 self.reload()
                 return
@@ -507,14 +535,8 @@ final class DownloadsPanelView: FloatingPanelView {
 
     fileprivate func reload() {
         let all = DownloadManager.shared.items(isPrivate: isPrivate)
-        let items: [DownloadItem]
-        if let focused {
-            items = all.filter { $0 === focused || $0.state == .downloading || $0.state == .paused }
-        } else {
-            items = Array(all.prefix(Self.recentCount))
-        }
-        // Focused with more to see: the button shows the rest here; otherwise it opens the folder.
-        let more = focused != nil && all.count > items.count
+        let (items, more) = Self.shown(all, focused: focused, showingAll: showingAll, room: roomForRows)
+        // More to see: the button shows the rest here; otherwise it opens the folder.
         offersAll = more
         folderButton.title.stringValue = more ? folderTitles.showAll : folderTitles.open
         folderButton.symbol = more ? "list.bullet" : "folder"
@@ -553,6 +575,13 @@ final class DownloadsPanelView: FloatingPanelView {
         emptyIcon.isHidden = true
         reposition()
         needsLayout = true
+    }
+
+    /// How many rows fit above the button that opened it, up to `allCount`.
+    private var roomForRows: Int {
+        guard let anchor, let space = host ?? controller?.root.overlay else { return Self.recentCount }
+        let above = anchor.convert(anchor.bounds, to: space).minY - Tokens.Space.x2 - Tokens.Metric.cardInset - header - footer
+        return min(Self.allCount, max(0, Int((above + rowGap) / (rowHeight + rowGap))))
     }
 
     private func reposition() {

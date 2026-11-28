@@ -21,6 +21,8 @@ final class DownloadItem {
     fileprivate(set) var totalBytes: Int64 = 0
     fileprivate(set) var completedBytes: Int64 = 0
     var started = Date()
+    /// The window it came from, where it's shown once it's done.
+    fileprivate(set) weak var window: NSWindow?
     fileprivate weak var download: WKDownload?
     fileprivate var progressObservation: NSKeyValueObservation?
     fileprivate var resumeData: Data?
@@ -182,6 +184,8 @@ final class DownloadManager: NSObject {
 
     /// A download got its file and is under way: the window it came from shows it leaving for Downloads.
     let started = Signal<(DownloadItem, NSWindow?)>()
+    /// A download that was under way is done: the window it came from shows it there (#586).
+    let finished = Signal<DownloadItem>()
     private var windows: [ObjectIdentifier: NSWindow] = [:]
     /// The origin at download start; the tab may have navigated by the time the destination is decided, and it
     /// decides whether cookies may go along.
@@ -218,6 +222,7 @@ final class DownloadManager: NSObject {
     #if DEBUG
     func debugPendingFileHandoffs(from webView: WKWebView) -> [URL] { (pendingFileHandoffs[ObjectIdentifier(webView)] ?? []).map(\.request.url) }
     func debugSetFileHandoff(_ handoff: PendingFileHandoff?, on item: DownloadItem) { item.fileHandoff = handoff }
+    func debugSetState(_ state: DownloadItem.State, of item: DownloadItem) { item.state = state }
     #endif
 
     /// The File handoff waiting for this download, matched by its address, before or after redirects. Never another
@@ -760,6 +765,7 @@ extension DownloadManager: WKDownloadDelegate {
             item.destination = destination
             item.opensWhenFinished = opensWhenFinished
             item.fileHandoff = fileHandoff
+            item.window = window
             changed.send(item)
             started.send((item, window))
         }
@@ -849,6 +855,8 @@ extension DownloadManager: WKDownloadDelegate {
             // Bounce the Downloads stack in the Dock, like every Mac browser.
             if !item.isForAIApps { DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path) }
         }
+        // Before `changed`: where the panel opens on it, DockProgress's "Downloaded" toast stays away.
+        if !item.isForAIApps { finished.send(item) }
         changed.send(item)
         if item.opensWhenFinished { openWhenFinished(item) }
         if let handoff = item.fileHandoff {
