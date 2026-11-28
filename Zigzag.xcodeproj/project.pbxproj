@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		36A001FE3C1A5F87003851B9 /* SidebarPlaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0533B293B0F228EA9B849403 /* SidebarPlaceTests.swift */; };
+		8E1B2EE881958B2028049839 /* TabDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851DD448EB7DDA2D6DC22D8D /* TabDropTests.swift */; };
+		9901DD64B9664B548937AB07 /* PinnedPlace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E24081D2F998073A8E8C97C /* PinnedPlace.swift */; };
+		B3EB794CF43760A20C3CED73 /* PinnedDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B74F02EFF5D8CE83982112ED /* PinnedDropTests.swift */; };
 		E44933E8A74D5389CD1576AE /* TestScratch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E64961A922BEEA0BBBB7EA4 /* TestScratch.swift */; };
 		8EDD98C71A9B2D031C21E2CC /* HelperLifetimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */; };
 		C5E205C75B78676838E7A67B /* HelperProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DCAC029985B8485280EC93A /* HelperProbe.swift */; };
@@ -182,6 +186,7 @@
 		3F44E584CDB22914EEFD966E /* FirefoxImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */; };
 		4026E10B64D404C941974769 /* SidebarMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6567506B7F99FD1755289D6C /* SidebarMenuTests.swift */; };
 		91499BFF3936E2887958C6B1 /* LiveFoldersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6E4BB1C664E00D06BD28458 /* LiveFoldersTests.swift */; };
+		F524C7210B16F91E18F9121A /* SidebarDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4136877AC1A5AC3871DC96D3 /* SidebarDrop.swift */; };
 		FA35EB7E6A7CF0F30C781906 /* CHANGELOG.es.md in Resources */ = {isa = PBXBuildFile; fileRef = DC22D965DDA890AE63B06AA6 /* CHANGELOG.es.md */; };
 		FCBC7694CFDF99C8839253A1 /* LiveFeedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE16647854F4B119663E916E /* LiveFeedTests.swift */; };
 		4049A34E6137133411D1BC58 /* DeveloperBarToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64016A5E5662CB06CF07C33 /* DeveloperBarToolsTests.swift */; };
@@ -727,10 +732,15 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0533B293B0F228EA9B849403 /* SidebarPlaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarPlaceTests.swift; sourceTree = "<group>"; };
 		2E64961A922BEEA0BBBB7EA4 /* TestScratch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestScratch.swift; sourceTree = "<group>"; };
 		05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperLifetimeTests.swift; sourceTree = "<group>"; };
+		4136877AC1A5AC3871DC96D3 /* SidebarDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarDrop.swift; sourceTree = "<group>"; };
+		851DD448EB7DDA2D6DC22D8D /* TabDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabDropTests.swift; sourceTree = "<group>"; };
 		9DCAC029985B8485280EC93A /* HelperProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperProbe.swift; sourceTree = "<group>"; };
 		4918D8BAD599CEF14063B226 /* HelperLifetime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperLifetime.swift; sourceTree = "<group>"; };
+		9E24081D2F998073A8E8C97C /* PinnedPlace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedPlace.swift; sourceTree = "<group>"; };
+		B74F02EFF5D8CE83982112ED /* PinnedDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedDropTests.swift; sourceTree = "<group>"; };
 		D3099C3E94756F3E4F4C4782 /* SyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncTests.swift; sourceTree = "<group>"; };
 		3DD1F8636E632A6F45792C2E /* SyncSettingsRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsRows.swift; sourceTree = "<group>"; };
 		7D866549DC3C6AFB95B08014 /* SyncSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSession.swift; sourceTree = "<group>"; };
@@ -1552,6 +1562,8 @@
 				CC0E8F62B17A23075DFB3BF5 /* FavoritesView.swift */,
 				6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */,
 				316205FDAE606ECFE3682BA1 /* NumberHints.swift */,
+				9E24081D2F998073A8E8C97C /* PinnedPlace.swift */,
+				4136877AC1A5AC3871DC96D3 /* SidebarDrop.swift */,
 				15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */,
 				9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */,
 				1234581EFDA339A86BE3929B /* LiveFolderSheet.swift */,
@@ -1998,6 +2010,9 @@
 		DF27ED16EF9BB28D19F995E5 /* ZigzagTests */ = {
 			isa = PBXGroup;
 			children = (
+				B74F02EFF5D8CE83982112ED /* PinnedDropTests.swift */,
+				0533B293B0F228EA9B849403 /* SidebarPlaceTests.swift */,
+				851DD448EB7DDA2D6DC22D8D /* TabDropTests.swift */,
 				2E64961A922BEEA0BBBB7EA4 /* TestScratch.swift */,
 				05128F02BACB07E62E7E961C /* HelperLifetimeTests.swift */,
 				60823191217F3C0F87144EA5 /* AccessibilityTests.swift */,
@@ -2638,6 +2653,8 @@
 			files = (
 				C5E205C75B78676838E7A67B /* HelperProbe.swift in Sources */,
 				7A6644E5F8E6F88E4D4B80E1 /* AboutWindow.swift in Sources */,
+				9901DD64B9664B548937AB07 /* PinnedPlace.swift in Sources */,
+				F524C7210B16F91E18F9121A /* SidebarDrop.swift in Sources */,
 				C4A7D1E20F3B4C5D6E7F8A90 /* ZigzagCard.swift in Sources */,
 				B0B613E852FA44892B755F04 /* AcknowledgementsWindow.swift in Sources */,
 				548A302B2614C99406A1F549 /* AdFilters.swift in Sources */,
@@ -2982,6 +2999,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B3EB794CF43760A20C3CED73 /* PinnedDropTests.swift in Sources */,
+				36A001FE3C1A5F87003851B9 /* SidebarPlaceTests.swift in Sources */,
+				8E1B2EE881958B2028049839 /* TabDropTests.swift in Sources */,
 				E44933E8A74D5389CD1576AE /* TestScratch.swift in Sources */,
 				8EDD98C71A9B2D031C21E2CC /* HelperLifetimeTests.swift in Sources */,
 				8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */,
