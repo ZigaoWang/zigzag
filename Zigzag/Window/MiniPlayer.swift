@@ -1019,6 +1019,7 @@ final class MiniPlayerView: NSView {
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         refreshColors()
+        if TouchGestures.isAvailable { addTouchWatch() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1271,9 +1272,10 @@ final class MiniPlayerView: NSView {
     }
 
     /// The control under a point in the card's own terms, while the controls show.
+    /// Paused, the play button shows on its own and takes a press too.
     private func controlHit(at local: NSPoint) -> NSView? {
-        guard showsControls, let hit = controls.hitTest(local), hit is InteractiveView || hit is MiniPlayerProgress, !hit.isHidden else { return nil }
-        return hit
+        guard let hit = controls.hitTest(local), hit is InteractiveView || hit is MiniPlayerProgress, !hit.isHidden else { return nil }
+        return showsControls || (!isPlaying && hit === playButton) ? hit : nil
     }
 
     private var tracking: NSTrackingArea?
@@ -1288,12 +1290,15 @@ final class MiniPlayerView: NSView {
 
     override func mouseEntered(with event: NSEvent) { onPointer?(); keepControls() }
     override func mouseMoved(with event: NSEvent) {
+        // The pointer itself moving, not the finger's own: hover takes over.
+        if touchRevealed, ProcessInfo.processInfo.systemUptime - fingerAt > 1 { TouchReveal.pointerMoved(over: self) }
         keepControls()
         showResizeCursor(at: convert(event.locationInWindow, from: nil))
     }
     override func mouseExited(with event: NSEvent) {
         if !isDragging { NSCursor.arrow.set() }
-        guard !isDragging, !progress.isScrubbing else { return }
+        // Shown by a tap: the finger lifting isn't the pointer leaving.
+        guard !isDragging, !progress.isScrubbing, !touchRevealed else { return }
         hideTimer?.invalidate()
         setControls(false, animated: true)
     }
@@ -1357,10 +1362,63 @@ final class MiniPlayerView: NSView {
         }
     }
 
+    // MARK: Touch
+
+    /// Shown by a tap, as hovering shows them (`TouchReveal`), until another tap on the card, a finger elsewhere, the
+    /// pointer, or `idleHide` with nothing tapped.
+    private(set) var touchRevealed = false
+    /// When the controls last came up, and when the finger now down landed.
+    private var shownAt: TimeInterval = 0
+    private var fingerAt: TimeInterval = 0
+
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onDown = { [weak self] _ in self?.touchDown() }
+        watch.onTap = { [weak self] point in
+            guard let self else { return }
+            self.touchTapped(at: self.convert(point, from: nil))
+        }
+        addGestureRecognizer(watch)
+    }
+
+    func touchDown(at time: TimeInterval = ProcessInfo.processInfo.systemUptime) { fingerAt = time }
+
+    /// A tap at `point` (the card's own), once AppKit's click from it has gone through: on a control that showed, the
+    /// click pressed it and the controls stay; anywhere else they come up, or go if they were up before the finger
+    /// landed (the click itself brings them up a moment before).
+    func touchTapped(at point: NSPoint) {
+        guard !isGoing else { return }
+        let wasShowing = showsControls && shownAt < fingerAt - 0.3
+        let onControl = controlHit(at: point).map { $0 is InteractiveView || $0 is MiniPlayerProgress } ?? false
+        if wasShowing, !onControl {
+            if TouchReveal.isRevealed(self) { TouchReveal.finish() }
+            touchRevealed = false
+            hideTimer?.invalidate()
+            setControls(false, animated: true)
+            return
+        }
+        touchRevealed = true
+        setControls(true, animated: true)
+        TouchReveal.reveal(self) { [weak self] in
+            guard let self, self.touchRevealed else { return }
+            self.touchRevealed = false
+            self.hideTimer?.invalidate()
+            if !self.progress.isScrubbing { self.setControls(false, animated: true) }
+        }
+        hideTimer?.invalidate()
+        hideTimer = Timer.scheduledTimer(withTimeInterval: Self.idleHide, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.touchRevealed, !self.progress.isScrubbing, !self.isDragging else { return }
+                if TouchReveal.isRevealed(self) { TouchReveal.finish() } else { self.touchRevealed = false; self.setControls(false, animated: true) }
+            }
+        }
+    }
+
     /// The controls come and go in a quick fade: they sit over a moving picture, so a cut would flash.
     func setControls(_ on: Bool, animated: Bool) {
         guard on != showsControls else { return }
         showsControls = on
+        if on { shownAt = ProcessInfo.processInfo.systemUptime }
         showControls(animated: animated)
         if !on { [backButton, minimizeButton, closeButton, previousButton, rewindButton, playButton, forwardButton, nextButton].forEach { $0.isHovered = false } }
     }

@@ -269,6 +269,8 @@
   Test: TouchGesturesTests.aTapShowsAnOpenFavoritesClose
 - Tap the Tabs label above today's tabs → Clear shows, as hovering the list shows it, until a finger lands outside the sidebar or the pointer comes over the list.
   Test: TouchGesturesTests.aTapShowsClearAboveTheTabs
+- Tap the mini player → its controls show, as hovering shows them; tap it again away from its buttons, land a finger elsewhere, or leave it 2.5 seconds → they go. Tap a button that shows → it does what a click does, and the controls stay.
+  Test: TouchGesturesTests.aTapTogglesTheMiniPlayersControls
 - Two taps on a tab, a space's dot or a resize edge → what a double-click there does (rename, edit the space, the usual width or even tiles).
   Test: TouchMovesTests.twoTapsOnAControlAreADoubleClick
 - Taps on different tabs one after another → each selects its tab; two taps count as a double-click only on the same tab.

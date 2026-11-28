@@ -274,6 +274,38 @@ struct TouchGesturesTests {
         TouchReveal.finish()
     }
 
+    /// A tap on the mini player toggles its controls, as hovering shows them (#582); a tap on a control that shows
+    /// presses it and they stay; the finger lifting off isn't the pointer leaving.
+    @Test func aTapTogglesTheMiniPlayersControls() {
+        let card = MiniPlayerView(frame: NSRect(x: 0, y: 0, width: 320, height: 180))
+        card.layoutSubtreeIfNeeded()
+        let empty = NSPoint(x: 40, y: 120)
+        #expect(!card.showsControls)
+        let now = ProcessInfo.processInfo.systemUptime
+        card.touchDown(at: now)
+        card.touchTapped(at: empty)
+        #expect(card.showsControls && card.touchRevealed)
+        card.mouseExited(with: NSEvent.enterExitEvent(with: .mouseExited, location: NSPoint(x: 500, y: 500), modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, trackingNumber: 0, userData: nil)!)
+        #expect(card.showsControls)
+        // A tap on the close or play button that showed: pressed, and the controls stay.
+        card.touchDown(at: now + 1)
+        card.touchTapped(at: NSPoint(x: 160, y: 90))
+        #expect(card.showsControls)
+        // Another tap off the controls: they go.
+        card.touchDown(at: now + 2)
+        card.touchTapped(at: empty)
+        #expect(!card.showsControls && !card.touchRevealed)
+        // The tap's own click brought them up a moment before: the tap keeps them.
+        card.setControls(true, animated: false)
+        card.touchDown(at: ProcessInfo.processInfo.systemUptime)
+        card.touchTapped(at: empty)
+        #expect(card.showsControls)
+        // A finger landing elsewhere puts them away.
+        TouchReveal.touchLanded(mouse(.leftMouseDown, at: NSPoint(x: 400, y: 400)))
+        #expect(!card.showsControls && !card.touchRevealed)
+        TouchReveal.finish()
+    }
+
     @Test func theRevealRules() {
         #expect(TouchReveal.keeps(touchInArea: true, sameWindow: true))
         #expect(!TouchReveal.keeps(touchInArea: false, sameWindow: true))
