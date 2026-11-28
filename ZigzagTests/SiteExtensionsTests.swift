@@ -37,6 +37,14 @@ struct SiteExtensionsTests {
 
     // MARK: Layout
 
+    /// Pinned to the address first, then those that work on this site, then the rest, by name in each (#384).
+    @Test func pinnedAndWorkingOnesComeFirst() {
+        let all = items(5, access: { [0, 3].contains($0) ? .blocked : .runs })
+        let ordered = SiteExtensionsSection.ordered(all.reversed(), pinned: ["ext3", "ext4"])
+        #expect(ordered.map(\.id) == ["ext3", "ext4", "ext1", "ext2", "ext0"])
+        #expect(SiteExtensionsSection.ordered(all, pinned: []).map(\.id) == ["ext1", "ext2", "ext4", "ext0", "ext3"])
+    }
+
     @Test func noneIsOneQuietRow() {
         section([]) { s in
             #expect(s.height(for: column) == PanelLinkRow.height)

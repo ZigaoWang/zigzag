@@ -130,6 +130,15 @@ final class SiteExtensionsSection: NSView {
         let menu: () -> NSMenu?
     }
 
+    /// The order they're shown in: pinned to the address first, then those that work on this site, then the rest, by
+    /// name in each (#384).
+    static func ordered(_ items: [Item], pinned: Set<String>) -> [Item] {
+        func rank(_ item: Item) -> Int { pinned.contains(item.id) ? 0 : item.access == .runs ? 1 : 2 }
+        return items.sorted { a, b in
+            rank(a) != rank(b) ? rank(a) < rank(b) : a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+    }
+
     /// Whether the section is open, as chosen; nil until it is.
     static var chosenOpen: Bool? {
         get { UserDefaults.standard.object(forKey: "SiteControlsExtensionsOpen") as? Bool }
@@ -443,7 +452,7 @@ final class SiteExtensionsSection: NSView {
 /// a pinned one has its pin mark at the trailing end. One that doesn't work on the site is faded, and says
 /// why under the pointer.
 final class SiteExtensionRow: InteractiveView {
-    static let height = PanelLinkRow.height
+    static var height: CGFloat { PanelLinkRow.height }
     private let iconView = NSImageView()
     private let title: Label
     var isDimmed = false { didSet { stateDidChange(animated: false) } }

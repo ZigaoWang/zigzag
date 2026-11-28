@@ -13,12 +13,12 @@ import WebKit
     func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab)
 }
 
-/// Everything about the page you're on, behind one button by the address (#174). Its first page is short: the site,
-/// with whether its connection is secure in a small line under its name (#221), a row of quick actions, your
-/// extensions to click right there (#215), a line into Permissions (once the site asked), and the few switches that
-/// apply to this page. Each of those
-/// lines opens a page of its own in the same panel, with a way back. Rarer things (installing the site as an app, clearing its cookies or cache) wait in the
-/// ⋯ menu. Changes apply at once.
+/// Everything about the page you're on, behind one button by the address (#174). Its first page reads top down: the
+/// site, with whether its connection is secure on a row under its name (#221), a row of quick actions, then This Site:
+/// the switches changed every day (zoom, ad blocking, dark page, what the site asked for, compatibility mode for a site
+/// that breaks). Lines after them open pages of their own in the same panel, with a way back: Permissions, the zapped
+/// elements, and More for This Site for the choices made once (#384). Your extensions come last (#215). Rarer things
+/// (installing the site as an app, clearing its cookies or cache) wait in the ⋯ menu. Changes apply at once.
 final class SitePanel: FloatingPanelView {
     override var replacesExtensionPopup: Bool { true }
     private static weak var current: SitePanel?
@@ -76,7 +76,15 @@ final class SitePanel: FloatingPanelView {
     private let siteLabel = Label.section(String(localized: "This Site", comment: "Section label over the site's settings in the site panel."))
     private var rows: [PanelRow] = []
     private let group = PanelGroup()
-    /// Whether the connection is secure, small under the site's name, and the way into its certificate (#221).
+    /// Every switch and menu of This Site and More for This Site, top to bottom.
+    private var allRows: [PanelRow] { rows + moreRows }
+    /// The choices made once for a site (#384), on their own page: keeping its tabs awake, its user agent, where its
+    /// full screen goes, apps on this Mac and the space it opens in.
+    private var moreRows: [PanelRow] = []
+    private let moreGroup = PanelGroup()
+    private var moreRow: PanelLinkRow?
+    private let moreHeader = PanelPageHeader(SitePanel.moreTitle)
+    /// Whether the connection is secure, on a row under the site's name, and the way into its certificate (#221).
     private var connectionLine: ConnectionLine?
     /// Why the connection isn't secure, under the site's name, when that isn't plain to see (a certificate let through).
     private let connectionNote: Label = {
@@ -124,12 +132,15 @@ final class SitePanel: FloatingPanelView {
     private var zoomStepper: ZoomStepper?
 
     /// The panel's pages: the site at a glance, and one each for what's behind its rows.
-    enum Page: String { case main, connection, permissions, zapped }
+    /// "more" is the ⋯ menu to `sitepage`, so More for This Site goes by "morepage".
+    enum Page: String { case main, connection, permissions, zapped, more = "morepage" }
     private(set) var page = Page.main
     var showsSubpage: Bool { page != .main }
     private let mainBox = FlippedView()
     private let permissionsBox = FlippedView()
     private let zapsBox = FlippedView()
+    private let moreBox = FlippedView()
+    private var boxes: [FlippedView] { [mainBox, permissionsBox, zapsBox, moreBox] }
 
     /// The panel's content, in a sheet that scrolls when the window is too short for it.
     private let scroll = NSScrollView()
@@ -140,6 +151,11 @@ final class SitePanel: FloatingPanelView {
     fileprivate var maxHeight: CGFloat = .greatestFiniteMagnitude
 
     static let width: CGFloat = 300
+    /// Opened by a finger: its rows 44 points tall, as a menu a finger opens has them. One panel is open at a time,
+    /// so its rows read it from here as they're laid out.
+    private(set) static var touchSized = false
+    /// The row into the page of choices made once for a site, and that page's title (#384).
+    static let moreTitle = String(localized: "More for This Site", comment: "Row in the site panel, and the title of its page: the site's choices you set once, like its user agent, the space it opens in and keeping its tabs awake.")
     /// How a plain http page is marked, here and in the address bar: one symbol and one wording.
     static let notSecure = String(localized: "Not secure", comment: "How a page loaded over plain http, or with a certificate you chose to trust anyway, is marked, in the site panel and the address bar's tooltip.")
     static let notSecureSymbol = "lock.open.fill"
@@ -171,7 +187,10 @@ final class SitePanel: FloatingPanelView {
 
     #if DEBUG
     /// A panel for `tab` outside any window, for tests.
-    static func forTesting(tab: Tab) -> SitePanel? { SitePanel(controller: nil, tab: tab) }
+    static func forTesting(tab: Tab, touch: Bool = false) -> SitePanel? {
+        touchSized = touch
+        return SitePanel(controller: nil, tab: tab)
+    }
     #endif
 
     private init?(controller: BrowserWindowController?, pageHost: SitePanelPageHost? = nil, tab asked: Tab?) {
@@ -198,10 +217,11 @@ final class SitePanel: FloatingPanelView {
         scroll.documentView = content
         addSubview(scroll)
         // A page's header is the panel's own, over the sheet that scrolls: its way back and its title stay put (#220).
-        [permissionsHeader, zapsHeader, certificateHeader, headerEdge].forEach { addSubview($0) }
-        [mainBox, permissionsBox, zapsBox].forEach { content.addSubview($0) }
+        [permissionsHeader, zapsHeader, certificateHeader, moreHeader, headerEdge].forEach { addSubview($0) }
+        boxes.forEach { content.addSubview($0) }
         contentReady = true
         permissionsHeader.onBack = { [weak self] in self?.show(.main) }
+        moreHeader.onBack = { [weak self] in self?.show(.main) }
         zapsHeader.onBack = { [weak self] in self?.show(.main) }
         certificateHeader.onBack = { [weak self] in self?.show(.main) }
         scroll.contentView.postsBoundsChangedNotifications = true
@@ -250,7 +270,7 @@ final class SitePanel: FloatingPanelView {
         let profileID = tab.profile.id
         clearingToken = KeptCookies.clearingChanged.observe { [weak self] profile in
             guard let self, profile == profileID, !self.isBlank,
-                  SitePanelRows.rows(self.rowContext).contains(.keepCookies) != self.rows.contains(where: { $0 === self.keepCookiesRow }) else { return }
+                  SitePanelRows.rows(self.rowContext).contains(.keepCookies) != (self.rows + self.moreRows).contains(where: { $0 === self.keepCookiesRow }) else { return }
             self.rebuildRows()
         }
         // Its menu opens as the press goes down, as a pop-up button's does.
@@ -284,6 +304,7 @@ final class SitePanel: FloatingPanelView {
             current.close()
             if here { return }
         }
+        touchSized = opensForTouch(from: anchor)
         guard let panel = SitePanel(controller: controller, tab: tab) else { return }
         controller.closeFloatingPanels()
         panel.anchor = anchor
@@ -339,6 +360,7 @@ final class SitePanel: FloatingPanelView {
             current.close()
             if here { return }
         }
+        touchSized = opensForTouch(from: button)
         guard let panel = SitePanel(controller: nil, pageHost: host, tab: host.tab) else { return }
         panel.anchor = button
         // Over the page, under the button's end, as from the address above a browser window's page; kept in the window.
@@ -361,6 +383,13 @@ final class SitePanel: FloatingPanelView {
             guard let panel else { return event }
             return panel.handle(event)
         }
+    }
+
+    /// Whether the press opening it was a finger's, as a menu tells (`MenuPanel.opensForTouch`).
+    private static func opensForTouch(from anchor: NSView) -> Bool {
+        let event = (anchor as? InteractiveView)?.currentPress ?? NSApp.currentEvent
+        return MenuPanel.opensForTouch(holding: false, eventType: event?.type, eventTime: event?.timestamp ?? 0,
+                                       landedAt: TouchPress.landedAt, fingerDown: TouchPress.fingerDown)
     }
 
     /// A click or key while it's open, in its own window only: Esc goes back from one of its pages, or closes it; a
@@ -580,7 +609,7 @@ final class SitePanel: FloatingPanelView {
         applyPage()
         resize()
         scroll.contentView.scroll(to: .zero)
-        let shown: [NSView?] = [mainBox, permissionsBox, zapsBox, certificatePage, pinnedHeader]
+        let shown: [NSView?] = boxes + [certificatePage, pinnedHeader]
         for view in shown.compactMap({ $0 }) where !view.isHidden && view.superview != nil {
             Tokens.Motion.present(view, from: .inPlace, entering: true)
         }
@@ -593,6 +622,8 @@ final class SitePanel: FloatingPanelView {
         permissionsHeader.isHidden = page != .permissions
         zapsBox.isHidden = page != .zapped
         zapsHeader.isHidden = page != .zapped
+        moreBox.isHidden = page != .more
+        moreHeader.isHidden = page != .more
         certificateHeader.isHidden = page != .connection
         refreshHeaderEdge()
     }
@@ -604,6 +635,7 @@ final class SitePanel: FloatingPanelView {
         case .main: nil
         case .permissions: permissionsHeader
         case .zapped: zapsHeader
+        case .more: moreHeader
         case .connection: certificateHeader
         }
     }
@@ -645,6 +677,8 @@ final class SitePanel: FloatingPanelView {
         let line = ConnectionLine(connection.value, warns: connection.warns, opens: opens) { [weak self] in self?.showCertificate() }
         guard line.debugText != old.debugText || (connection.reason ?? "") != (connectionNote.isHidden ? "" : connectionNote.stringValue) else { return }
         line.frame = old.frame
+        line.glyphCenterX = old.glyphCenterX
+        line.textX = old.textX
         replaceSubview(old, with: line)
         connectionLine = line
         if let reason = connection.reason {
@@ -708,7 +742,7 @@ final class SitePanel: FloatingPanelView {
     }
 
     #if DEBUG
-    /// sitepage <main|connection|permissions>: goes to that page, as its row or back button does.
+    /// sitepage <main|connection|permissions|morepage>: goes to that page, as its row or back button does.
     func debugPage(_ arg: String) {
         // sitepage zap | restore: Zap Element in ⋯, or Restore All.
         if arg == "zap" { startZapping(); return }
@@ -731,21 +765,33 @@ final class SitePanel: FloatingPanelView {
     var debugState: [String: Any] {
         ["site": site, "page": page.rawValue, "certificate": certificatePage?.debugState ?? [:],
          "connection": connectionLine?.debugText ?? "",
-         "links": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
-         "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle), "zaps": zapsGroup.rows.map(\.debugTitle),
+         "links": [permissionsRow, zappedRow, styleRow, moreRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
+         "rows": rows.map(\.debugTitle), "more": moreRows.map(\.debugTitle),
+         "permissions": permissionsGroup.rows.map(\.debugTitle), "zaps": zapsGroup.rows.map(\.debugTitle),
+         "touch": Self.touchSized, "order": debugOrder,
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
          "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY],
          // Width the widest row needs on one line.
-         "fit": (rows + permissionsGroup.rows).map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
-         "linksFit": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
+         "fit": (rows + moreRows + permissionsGroup.rows).map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
+         "linksFit": [permissionsRow, zappedRow, styleRow, moreRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "place": ["x": frame.minX, "width": frame.width, "window": superview?.bounds.width ?? 0,
                    "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? CGFloat(-1)]]
     }
 
+    /// The first page's parts that show, top to bottom, by where they were laid out.
+    var debugOrder: [String] {
+        let parts: [(String, NSView?)] = [("site", siteName), ("connection", connectionLine), ("actions", actionTiles.first),
+                                          ("developer", developerTiles.first), ("This Site", rows.isEmpty ? nil : group),
+                                          ("Permissions", permissionsRow), ("zapped", zappedRow), ("style", styleRow),
+                                          ("More for This Site", moreRow), ("Extensions", extensionsSection)]
+        return parts.compactMap { name, view in view.flatMap { $0.isHidden || $0.superview == nil ? nil : (name, $0.frame.minY) } }
+            .sorted { $0.1 < $1.1 }.map(\.0)
+    }
+
     /// sitecompat on|off: the Compatibility mode switch.
     func debugCompatibility(_ arg: String) {
-        rows.first { $0.debugTitle.hasPrefix(Self.compatibilityTitle + ":") }?.debugChoose(arg == "on" ? 1 : 0)
+        allRows.first { $0.debugTitle.hasPrefix(Self.compatibilityTitle + ":") }?.debugChoose(arg == "on" ? 1 : 0)
     }
 
     /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.
@@ -778,10 +824,11 @@ final class SitePanel: FloatingPanelView {
         permissionsGroup.rows[row].debugChoose(choice)
     }
 
-    /// <index> <row title>: picks that choice in the named This Site row's menu ("1 Open in").
+    /// <index> <row title>: picks that choice in the named row's menu or switch, on This Site or More for This Site
+    /// ("1 Open in").
     func debugChooseRow(_ arg: String) {
         let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
-        guard f.count == 2, let index = Int(f[0]), let row = rows.first(where: { $0.debugTitle.hasPrefix(f[1] + ":") }) else { return }
+        guard f.count == 2, let index = Int(f[0]), let row = allRows.first(where: { $0.debugTitle.hasPrefix(f[1] + ":") }) else { return }
         row.debugChoose(index)
     }
 
@@ -789,7 +836,7 @@ final class SitePanel: FloatingPanelView {
     func debugRowMenu(_ arg: String) {
         let action = arg.hasPrefix("action ")
         let title = action ? String(arg.dropFirst(7)) : arg
-        guard let dropdown = rows.first(where: { $0.debugTitle.hasPrefix(title + ":") })?.debugDropdown else { return }
+        guard let dropdown = allRows.first(where: { $0.debugTitle.hasPrefix(title + ":") })?.debugDropdown else { return }
         if action { MenuPanel.current?.close(animated: false); dropdown.actions.first?.run() } else { dropdown.openMenu() }
     }
     #endif
@@ -857,8 +904,10 @@ final class SitePanel: FloatingPanelView {
                                               },
                                               menu: { [weak self] in self?.extensionMenu(for: context) })
         }
-        // By name, so a tile is always where it was, whatever order they were loaded in.
-        items.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        // Pinned ones first, then those that work on this site, then the rest (#384); by name in each, so a tile is
+        // always where it was, whatever order they were loaded in.
+        let pins = installs.pins
+        items = SiteExtensionsSection.ordered(items, pinned: Set(pins.ids))
         #if DEBUG
         if Self.debugExtensionCount > 0, !items.isEmpty {
             let real = items
@@ -993,6 +1042,7 @@ final class SitePanel: FloatingPanelView {
         // JavaScript has a row on every web page, so Permissions is never empty.
         let hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
         context.hasPermissions = hasPermissions || context.isWeb
+        context.asked = !askedPermissions.isEmpty
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
         context.clearsCookiesOnQuit = KeptCookies.clearsOnQuit(in: tab.profile.id)
         // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
@@ -1027,14 +1077,59 @@ final class SitePanel: FloatingPanelView {
     private weak var javaScriptRow: PanelRow?
 
     private func buildRows() {
-        rows = []
         zoomStepper = nil
         keepCookiesRow = nil
-        let compatible = self.compatible
         // Each is offered only where it does something (`SitePanelRows`). The choices kept for a site (ad blocking,
         // dark pages, keeping tabs awake) aren't offered in a private window: its site would be kept in Settings ›
         // Privacy › Sites. Its tabs still follow the ones made elsewhere.
-        for kind in SitePanelRows.rows(rowContext) {
+        let context = rowContext
+        rows = makeRows(SitePanelRows.everyday(context))
+        moreRows = makeRows(SitePanelRows.more(context))
+        if group.superview == nil { addSubview(group) }
+        group.rows = rows
+        group.isHidden = rows.isEmpty
+        siteLabel.isHidden = rows.isEmpty
+        if siteLabel.superview == nil { addSubview(siteLabel) }
+        if moreGroup.superview == nil { moreBox.addSubview(moreGroup) }
+        moreGroup.rows = moreRows
+        if moreRow == nil {
+            let row = PanelLinkRow(Self.moreTitle, goes: true) { [weak self] in self?.show(.more) }
+            addSubview(row)
+            moreRow = row
+        }
+        // Nothing left on it (a rule removed): back to the first page.
+        if moreRows.isEmpty, page == .more { show(.main) }
+        buildPermissions()
+        buildBoostRows()
+    }
+
+    /// The permissions the site asked for or has its own answer for, which get a row on the first page too.
+    private var askedPermissions: [SitePermission] {
+        guard let origin else { return [] }
+        return SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate).filter { isOwn($0) }
+    }
+
+    /// A permission's row, Ask, Allow or Block, wherever it shows: a choice in one is shown in the other at once.
+    private func permissionRow(_ permission: SitePermission, origin: String) -> PanelRow {
+        let tab = tab
+        let choices = permission.choices
+        let now = choice(permission, origin: origin)
+        // WebRTC applies at load: choosing reloads (`WebRTCProtection.choose`); private windows keep it per tab.
+        return .choice(permission.title, options: choices.map(\.title), selected: choices.firstIndex(of: now) ?? 0) { [weak self] index in
+            if permission == .webRTC {
+                WebRTCProtection.choose(choices[index] == .allow, origin: origin, in: tab)
+            } else {
+                SitePermissions.setChoice(choices[index], for: permission, origin: origin)
+            }
+            self?.rebuildRows()
+        }
+    }
+
+    /// The rows for these kinds, top to bottom: none for one that doesn't apply after all, a row per permission asked.
+    private func makeRows(_ kinds: [SitePanelRows.Row]) -> [PanelRow] {
+        var rows: [PanelRow] = []
+        let compatible = self.compatible
+        for kind in kinds {
             switch kind {
             case .zoom:
                 // The page's zoom as it is: in a private window that's its own, which isn't saved for the site.
@@ -1152,15 +1247,12 @@ final class SitePanel: FloatingPanelView {
                     PageTranslator.setTranslatesAlways(on, language)
                     if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
                 })
+            case .asked:
+                guard let origin else { break }
+                rows += askedPermissions.map { permissionRow($0, origin: origin) }
             }
         }
-        if group.superview == nil { addSubview(group) }
-        group.rows = rows
-        group.isHidden = rows.isEmpty
-        siteLabel.isHidden = rows.isEmpty
-        if siteLabel.superview == nil { addSubview(siteLabel) }
-        buildPermissions()
-        buildBoostRows()
+        return rows
     }
 
     /// The browser the site is told it's in (#392): Default, a preset, or one typed in Custom…; choosing reloads.
@@ -1187,20 +1279,8 @@ final class SitePanel: FloatingPanelView {
         permissionKinds = []
         javaScriptRow = nil
         if let origin {
-            let tab = tab
             for permission in SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate) {
-                let choices = permission.choices
-                let now = choice(permission, origin: origin)
-                // WebRTC applies at load: choosing reloads (`WebRTCProtection.choose`); private windows keep it per
-                // tab.
-                permissionRows.append(.choice(permission.title, options: choices.map(\.title), selected: choices.firstIndex(of: now) ?? 0) { [weak self] index in
-                    if permission == .webRTC {
-                        WebRTCProtection.choose(choices[index] == .allow, origin: origin, in: tab)
-                    } else {
-                        SitePermissions.setChoice(choices[index], for: permission, origin: origin)
-                    }
-                    self?.refreshPermissionsRow()
-                })
+                permissionRows.append(permissionRow(permission, origin: origin))
                 permissionKinds.append(permission)
             }
         }
@@ -1431,7 +1511,7 @@ final class SitePanel: FloatingPanelView {
         }
         scroll.frame = NSRect(x: 0, y: band, width: bounds.width, height: max(0, bounds.height - band))
         content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(body, scroll.frame.height))
-        for box in [mainBox, permissionsBox, zapsBox] { box.frame = content.bounds }
+        for box in boxes { box.frame = content.bounds }
         refreshHeaderEdge()
     }
 
@@ -1466,7 +1546,7 @@ final class SitePanel: FloatingPanelView {
         }
         func finish() -> CGFloat { headerBand + y - gapAfter - slack + pad }
         // A page's box covers the panel, so what's in it is placed in the panel's own terms.
-        for box in [mainBox, permissionsBox, zapsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
+        for box in boxes where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
         func group(_ group: PanelGroup) {
             let height = group.height(for: inner)
             place(group, NSRect(x: pad, y: y, width: inner, height: height))
@@ -1500,6 +1580,10 @@ final class SitePanel: FloatingPanelView {
                 end(0, slack: restoreAllRow.bottomSlack)
             }
             return finish()
+        case .more:
+            group(moreGroup)
+            if !moreGroup.rows.isEmpty { end(0, slack: moreGroup.bottomSlack) }
+            return finish()
         case .main, .connection:
             break
         }
@@ -1517,11 +1601,13 @@ final class SitePanel: FloatingPanelView {
             ended(y + caps.bottom, next: headingGap)
         }
 
-        // The extensions, below the actions (#215): folded to a header with their strip, or open as tiles.
-        func extensions() {
+        // The extensions (#215): folded to a header with their strip, or open as tiles.
+        func extensions(slot: CGFloat? = nil) {
             guard let section = extensionsSection else { return }
             let h = section.height(for: inner)
-            let y = top(section.topSlack)
+            // With none yet, Get Extensions is one more line of the list above it, at its pitch.
+            let y = section.items.isEmpty ? slot.map { $0 + ((PanelRow.height - PanelLinkRow.height) / 2).rounded() } ?? top(section.topSlack)
+                : top(section.topSlack)
             place(section, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: h))
             ended(y + h - section.bottomSlack)
         }
@@ -1531,17 +1617,13 @@ final class SitePanel: FloatingPanelView {
             return finishMain()
         }
 
-        // Header: the site's icon and name, and ⋯.
+        // Header: the site's icon and name, and ⋯, on one line.
         let iconSide = Tokens.Space.x6
         let moreSide = Tokens.Metric.iconButton
-        // The name, and under it the connection's line when there is one: the icon and ⋯ in the middle of both.
-        let lineHeight = connectionLine == nil ? 0 : ConnectionLine.height
-        let block = siteName.lineHeight + lineHeight
-        let headerHeight = max(block, moreSide)
-        let nameOffset = (headerHeight - block) / 2
+        let headerHeight = max(siteName.lineHeight, moreSide, iconSide)
+        let nameOffset = siteName.centeredY(in: headerHeight)
         let iconOffset = (headerHeight - iconSide) / 2
         let nameCaps = siteName.capsSpan
-        let textBottom = connectionLine.map { nameOffset + siteName.lineHeight + $0.inkBottom } ?? nameOffset + nameCaps.bottom
         let headerY = top(min(iconOffset, nameOffset + nameCaps.top))
         let nameY = headerY + nameOffset
         // ⋯'s dots end on the text column's edge, as the switches below do.
@@ -1555,11 +1637,20 @@ final class SitePanel: FloatingPanelView {
         siteNameHover.toolTip = siteName.stringValue == shownName ? nil : shownName
         place(siteName, NSRect(x: textX - Label.inset, y: nameY, width: textWidth + Label.inset * 2, height: siteName.lineHeight))
         place(siteNameHover, NSRect(x: textX, y: nameY, width: min(textWidth, siteName.inkWidth), height: siteName.lineHeight))
+        ended(headerY + max(iconOffset + iconSide, nameOffset + nameCaps.bottom), next: Tokens.Space.x3)
         if let connectionLine {
-            // On the name's text column, as wide as its words: the rest of the header stays the name's.
-            place(connectionLine, NSRect(x: textX, y: nameY + siteName.lineHeight, width: min(textWidth, connectionLine.fittingWidth), height: lineHeight))
+            // A row of its own under the name: its lock under the site's icon, its words under the name.
+            let h = ConnectionLine.height
+            if !dryRun {
+                connectionLine.glyphCenterX = PanelLinkRow.outset + iconSide / 2
+                connectionLine.textX = PanelLinkRow.outset + textX - pad
+            }
+            let probe = Label("E", font: Tokens.Font.body(), color: .clear)
+            let caps = probe.centeredY(in: h) + probe.capsSpan.top
+            let y = top(caps)
+            place(connectionLine, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: h))
+            ended(y + h - (h - probe.centeredY(in: h) - probe.capsSpan.bottom))
         }
-        ended(headerY + max(iconOffset + iconSide, textBottom))
         // Why it isn't secure, when that isn't plain to see, under the whole header.
         if !connectionNote.isHidden {
             let w = inner + Label.inset * 2
@@ -1592,7 +1683,17 @@ final class SitePanel: FloatingPanelView {
             tiles(developerTiles)
         }
 
-        extensions()
+        // This site's everyday switches, right under the actions (#384).
+        // Where the next row's slot starts, so the lines into the other pages keep This Site's rhythm.
+        var slot: CGFloat?
+        if !rows.isEmpty {
+            heading(siteLabel)
+            let y = top(self.group.topSlack)
+            let height = self.group.height(for: inner)
+            place(self.group, NSRect(x: pad, y: y, width: inner, height: height))
+            ended(y + height - self.group.bottomSlack)
+            slot = y + height
+        }
 
         // One line into each of the other pages, each saying what's there; only those that apply.
         var c = SitePanelRows.Context()
@@ -1600,29 +1701,24 @@ final class SitePanel: FloatingPanelView {
         c.hasPermissions = permissionsRow?.isHidden == false || (["http", "https"].contains(url.scheme?.lowercased() ?? "") && permissionsRow != nil)
         c.zapped = zappedRow == nil ? 0 : boost.zaps.count
         c.styled = styleRow != nil && boost.hasStyle
+        c.more = !moreRows.isEmpty
         let links = SitePanelRows.links(c)
-        let linkRows: [(SitePanelRows.Link, PanelLinkRow?)] = [(.permissions, permissionsRow), (.zapped, zappedRow), (.style, styleRow)]
-        var lastLink: PanelLinkRow?
+        let linkRows: [(SitePanelRows.Link, PanelLinkRow?)] = [(.permissions, permissionsRow), (.zapped, zappedRow), (.style, styleRow), (.more, moreRow)]
+        let h = PanelLinkRow.height
         for (kind, row) in linkRows {
             guard let row else { continue }
             row.isHidden = !links.contains(kind)
             guard !row.isHidden else { continue }
-            // One after another, a list: a row's gap between them.
-            if let lastLink { gap = lastLink.bottomSlack + PanelLinkRow.gap + row.topSlack }
-            let y = top(row.topSlack)
-            place(row, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: PanelLinkRow.height))
-            ended(y + PanelLinkRow.height - row.bottomSlack)
-            lastLink = row
+            // Each in a slot as tall as a row of This Site, so the list goes on at one pitch.
+            let y: CGFloat
+            if let start = slot { y = start + ((PanelRow.height - h) / 2).rounded() } else { y = top(row.topSlack) }
+            place(row, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: h))
+            ended(y + h - row.bottomSlack)
+            slot = y - ((PanelRow.height - h) / 2).rounded() + PanelRow.height
         }
 
-        // This site's switches.
-        if !rows.isEmpty {
-            heading(siteLabel)
-            let y = top(self.group.topSlack)
-            let height = self.group.height(for: inner)
-            place(self.group, NSRect(x: pad, y: y, width: inner, height: height))
-            ended(y + height - self.group.bottomSlack)
-        }
+        // Your extensions last (#215, #384): folded to a header with their strip, or open.
+        extensions(slot: slot)
         return finishMain()
     }
 
@@ -2072,7 +2168,8 @@ final class PanelRow: NSView {
 /// A row that is the control: its name, and a chevron when it goes somewhere (Settings › Extensions). The hover wash
 /// reaches `PanelLinkRow.outset` past the text on each side, so its words stand on the panel's text column.
 final class PanelLinkRow: InteractiveView {
-    static let height = Tokens.Page.rowHeight
+    /// Taller when a finger opened the panel (`SitePanel.touchSized`).
+    static var height: CGFloat { SitePanel.touchSized ? TouchTargets.size : Tokens.Page.rowHeight }
     static let outset = Tokens.Space.x2
     /// Between two rows in a list, the sidebar's gap: a hovered row's fill never touches its neighbor's.
     static let gap = Tokens.Sidebar.rowGap
@@ -2407,25 +2504,32 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
     }
 }
 
-/// Under the site's name at the top of the panel: whether the connection is secure, in a few small words after the
-/// address's lock (#221), for the one thing most people need from it at a glance. Quiet when it's secure; in the
-/// warning color, with the address's open lock, when it isn't (plain http, a certificate trusted anyway, parts of the
-/// page over plain http). On an https page it's the way into the certificate: a chevron after its words, which step
-/// up under the pointer as a section header's do.
+/// Under the site's name at the top of the panel: whether the connection is secure, as a plain row (#221, #384), for
+/// the one thing most people need from it at a glance. The lock sits under the site's icon and the words under its
+/// name. Quiet when it's secure; in the warning color, with the address's open lock, when it isn't (plain http, a
+/// certificate trusted anyway, parts of the page over plain http). On an https page the row is the way into the
+/// certificate, with a chevron at its end and the panel's row wash; plain http only says so.
 final class ConnectionLine: InteractiveView {
-    /// Its words with a little room above and below, for the pointer.
-    static let height = Label("", font: Tokens.Font.small(), color: .clear).lineHeight + Tokens.Space.x1
+    /// A row of the panel's lists: `PanelLinkRow.height`, taller when a finger opened the panel.
+    static var height: CGFloat { PanelLinkRow.height }
     private let glyph = NSImageView()
     private let label: Label
     private let chevron = NSImageView()
     private let warns: Bool
     private let opens: Bool
+    /// The middle of the lock and the start of the words, in the row's terms: under the site's icon and name.
+    var glyphCenterX: CGFloat = PanelLinkRow.outset + Tokens.Space.x3 { didSet { needsLayout = true } }
+    var textX: CGFloat = PanelLinkRow.outset + Tokens.Space.x6 + Tokens.Space.x3 { didSet { needsLayout = true } }
 
     init(_ text: String, warns: Bool, opens: Bool, run: @escaping () -> Void) {
-        label = Label(text, font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+        label = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+        label.lineBreakMode = .byTruncatingTail
         self.warns = warns
         self.opens = opens
         super.init(frame: .zero)
+        pressScales = true
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
         glyph.image = Tokens.Symbol.image(warns ? SitePanel.notSecureSymbol : "lock", size: Tokens.Symbol.inline)
         glyph.imageScaling = .scaleNone
         chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.Symbol.inline)
@@ -2447,31 +2551,35 @@ final class ConnectionLine: InteractiveView {
     var debugText: String { label.stringValue + (warns ? " (warns)" : "") + (opens ? " >" : "") }
 
     private var side: CGFloat { Tokens.Symbol.inline }
-    /// Where its last ink ends, from its top: the words' baseline or the lock's foot.
-    var inkBottom: CGFloat {
-        let lock = Tokens.Symbol.inkSize(warns ? SitePanel.notSecureSymbol : "lock", size: side).height
-        return max(label.centeredY(in: Self.height) + label.capsSpan.bottom, (Self.height + lock) / 2)
+    /// The room above the caps of its words and below their baseline: the panel spaces by the ink.
+    var topSlack: CGFloat { label.centeredY(in: bounds.height > 0 ? bounds.height : Self.height) + label.capsSpan.top }
+    var bottomSlack: CGFloat {
+        let h = bounds.height > 0 ? bounds.height : Self.height
+        return h - label.centeredY(in: h) - label.capsSpan.bottom
     }
     /// The lock, the words and the chevron, and no more.
     var fittingWidth: CGFloat { ceil(side + Tokens.Space.x1 + label.inkWidth + (opens ? 2 + side : 0)) }
 
     override func layout() {
         super.layout()
-        glyph.frame = NSRect(x: 0, y: (bounds.height - side) / 2, width: side, height: side)
-        let x = side + Tokens.Space.x1
-        let room = max(0, bounds.width - x - (opens ? 2 + side : 0))
-        let w = min(label.inkWidth, room)
-        label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: w + Label.inset * 2, height: label.lineHeight)
-        chevron.frame = NSRect(x: x + w + 2, y: (bounds.height - side) / 2, width: side, height: side)
+        // The lock's ink in the middle of the site icon's column, on the words' cap-center line.
+        let ink = Tokens.Symbol.inkOffset(warns ? SitePanel.notSecureSymbol : "lock", size: side)
+        let capsMid = label.centeredY(in: bounds.height) + (label.capsSpan.top + label.capsSpan.bottom) / 2
+        glyph.frame = NSRect(x: (glyphCenterX - side / 2 - ink.width).rounded(), y: (capsMid - side / 2 + ink.height).rounded(), width: side, height: side)
+        // The chevron's ink ends on the text column's edge, as a link row's does.
+        let chevronInk = Tokens.Symbol.inkOffset("chevron.right", size: side).width + Tokens.Symbol.inkSize("chevron.right", size: side).width / 2
+        chevron.frame = NSRect(x: (bounds.width - PanelLinkRow.outset - chevronInk - side / 2).rounded(), y: (bounds.height - side) / 2, width: side, height: side)
+        let right = opens ? chevron.frame.minX - Tokens.Space.x1 : bounds.width - PanelLinkRow.outset
+        label.frame = NSRect(x: textX - Label.inset, y: label.centeredY(in: bounds.height), width: max(0, right - textX) + Label.inset * 2, height: label.lineHeight)
     }
 
     override func stateDidChange(animated: Bool) {
-        // No wash: the words step up under the pointer. Not secure always stands out.
-        let hot = isHovered && isEnabled
-        let ink = warns ? Tokens.Color.caution : hot ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
+        // The row wash where it opens the certificate; plain http only says what it says. Not secure always stands out.
+        if isEnabled { applyRowStyle(animated: animated) } else { layer?.backgroundColor = nil }
+        let ink = warns ? Tokens.Color.caution : Tokens.Color.textSecondary
         label.textColor = ink
         glyph.contentTintColor = ink
-        chevron.contentTintColor = hot ? (warns ? Tokens.Color.caution : Tokens.Color.textSecondary) : Tokens.Color.textTertiary
+        chevron.contentTintColor = Tokens.Color.textTertiary
     }
 }
 
@@ -2544,13 +2652,16 @@ enum SitePanelSizing {
     }
 }
 
-/// Which of the panel's rows apply to the page: none is shown that does nothing there.
+/// Which of the panel's rows apply to the page, and where: none is shown that does nothing there. The switches
+/// changed every day are This Site, on the first page; the choices made once for a site wait on More for This Site
+/// (#384).
 enum SitePanelRows {
-    /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case compatibility, zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
+    /// The site's switches and menus. `asked` stands for a row each for what the site asked for (the camera, location,
+    /// notifications), which the panel builds from the site's permissions.
+    enum Row: Equatable { case compatibility, zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn, asked }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
-    /// line under the site name (#221).
-    enum Link: Equatable { case permissions, zapped, style }
+    /// row under the site name (#221).
+    enum Link: Equatable { case permissions, zapped, style, more }
 
     struct Context {
         /// An http or https page, not an extension's own page.
@@ -2572,6 +2683,8 @@ enum SitePanelRows {
         var coveredPage = false
         /// The site asked for something, or has an answer kept.
         var hasPermissions = false
+        /// The site asked for a permission or has its own answer for one: those rows are on the first page too.
+        var asked = false
         /// More than one space to route the site to (#286).
         var manySpaces = false
         /// Number of zapped elements.
@@ -2582,23 +2695,39 @@ enum SitePanelRows {
         var localApps = false
         /// A user agent can be chosen: not on addons.mozilla.org, which is always asked for as Firefox.
         var userAgent = true
+        /// More for This Site has rows.
+        var more = false
     }
 
-    static func rows(_ c: Context) -> [Row] {
+    /// Every row that applies, This Site's first, then More for This Site's.
+    static func rows(_ c: Context) -> [Row] { everyday(c) + more(c) }
+
+    /// This Site, on the first page: how the page looks and what it blocks, what the site asked for, and last, the one
+    /// switch for a site that breaks.
+    static func everyday(_ c: Context) -> [Row] {
         var rows: [Row] = []
-        // First, above the rows it turns off (#497). Kept for the site: private windows follow it, as they do allowing ads.
-        if c.isWeb, !c.isPrivate { rows.append(.compatibility) }
         if c.isWeb, !c.coveredPage { rows.append(.zoom) }
         if c.isWeb, c.adBlocking, !c.isPrivate { rows.append(.adBlocking) }
         if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
         if c.siteChoices {
             rows.append(.darkPage)
-            rows.append(.keepAwake)
             if c.clearsCookiesOnQuit { rows.append(.keepCookies) }
+        }
+        if c.foreignLanguage { rows.append(.alwaysTranslate) }
+        if c.asked { rows.append(.asked) }
+        // Kept for the site: private windows follow it, as they do allowing ads (#497).
+        if c.isWeb, !c.isPrivate { rows.append(.compatibility) }
+        return rows
+    }
+
+    /// More for This Site: set once for a site, then left alone.
+    static func more(_ c: Context) -> [Row] {
+        var rows: [Row] = []
+        if c.siteChoices {
+            rows.append(.keepAwake)
             if c.isWeb, c.userAgent { rows.append(.userAgent) }
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
-        if c.foreignLanguage { rows.append(.alwaysTranslate) }
         // Only while Settings allows websites to reach apps on this Mac: before that there is nothing the switch could
         // do, and the place to turn it on is named there.
         if c.localApps { rows.append(.localApps) }
@@ -2612,6 +2741,7 @@ enum SitePanelRows {
         if c.hasPermissions { links.append(.permissions) }
         if c.zapped > 0 { links.append(.zapped) }
         if c.styled { links.append(.style) }
+        if c.more { links.append(.more) }
         return links
     }
 }

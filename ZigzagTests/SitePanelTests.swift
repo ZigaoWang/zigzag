@@ -81,3 +81,120 @@ struct SitePanelClosingTests {
         #expect(heard == 1)
     }
 }
+
+/// Site Controls reads top down (#384): the site and its connection, the actions, This Site's everyday switches with
+/// what the site asked for, the lines into the other pages, and the extensions last; what's set once is on More for
+/// This Site, where each control still works.
+@MainActor
+@Suite(.serialized)
+struct SitePanelLayoutTests {
+    private let url = URL(string: "https://layout-384.example.com/page")!
+
+    /// Each kept choice the panel can change, in a scratch store for the test.
+    private func withStores(_ body: () throws -> Void) throws {
+        let suite = "zigzag-site-panel-layout-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = (SitePermissions.defaults, KeepAwake.defaults, SiteUserAgents.defaults)
+        SitePermissions.defaults = defaults
+        KeepAwake.defaults = defaults
+        SiteUserAgents.defaults = defaults
+        SitePermissions.forgetAsked()
+        defer {
+            (SitePermissions.defaults, KeepAwake.defaults, SiteUserAgents.defaults) = before
+            SitePermissions.forgetAsked()
+            defaults.removeScratchSuite(suite)
+        }
+        try body()
+    }
+
+    private func panel(touch: Bool = false) throws -> SitePanel {
+        let tab = Tab(url: url, title: "Example", spaceID: UUID())
+        let panel = try #require(SitePanel.forTesting(tab: tab, touch: touch))
+        panel.frame = NSRect(x: 0, y: 0, width: SitePanel.width, height: 900)
+        panel.layoutSubtreeIfNeeded()
+        return panel
+    }
+
+    @Test func theFirstPageReadsTopDown() throws {
+        try withStores {
+            let panel = try panel()
+            defer { panel.close() }
+            let order = panel.debugState["order"] as? [String] ?? []
+            #expect(order == ["site", "connection", "This Site", "Permissions", "More for This Site"])
+            let rows = panel.debugState["rows"] as? [String] ?? []
+            // Compatibility mode last, for a site that breaks.
+            #expect(rows.last == "\(SitePanel.compatibilityTitle): off")
+            #expect(rows.contains("Ad blocking: on"))
+            #expect(rows.contains { $0.hasPrefix("Dark page: ") })
+        }
+    }
+
+    @Test func theRareChoicesAreOnTheirOwnPage() throws {
+        try withStores {
+            let panel = try panel()
+            defer { panel.close() }
+            let rows = panel.debugState["rows"] as? [String] ?? []
+            let more = panel.debugState["more"] as? [String] ?? []
+            #expect(more.contains("Keep tabs awake: off"))
+            #expect(more.contains { $0.hasPrefix("\(SiteUserAgents.title): ") })
+            #expect(!rows.contains { $0.hasPrefix("Keep tabs awake") || $0.hasPrefix(SiteUserAgents.title) })
+            // Its line opens it, with a way back.
+            #expect((panel.debugState["links"] as? [String] ?? []).contains(SitePanel.moreTitle))
+            panel.debugPage("morepage")
+            #expect(panel.page == .more)
+            panel.show(.main)
+            #expect(panel.page == .main)
+        }
+    }
+
+    @Test func eachControlOnMoreStillWorks() throws {
+        try withStores {
+            let panel = try panel()
+            defer { panel.close() }
+            panel.debugPage("morepage")
+            panel.debugChooseRow("1 Keep tabs awake")
+            #expect(KeepAwake.isOn(for: url))
+            panel.debugChooseRow("0 Keep tabs awake")
+            #expect(!KeepAwake.isOn(for: url))
+            panel.debugChooseRow("1 \(SiteUserAgents.title)")
+            #expect(SiteUserAgents.choice(for: url) == SiteUserAgents.Choice.presets.first)
+            panel.debugChooseRow("0 \(SiteUserAgents.title)")
+            #expect(SiteUserAgents.choice(for: url) == nil)
+        }
+    }
+
+    /// What the site asked for is on the first page too, and a choice there is the one the Permissions page shows.
+    @Test func anAskedPermissionIsOnTheFirstPageToo() throws {
+        try withStores {
+            let origin = try #require(SiteOrigin.of(url))
+            let before = try panel()
+            #expect(!(before.debugState["rows"] as? [String] ?? []).contains { $0.hasPrefix(SitePermission.camera.title) })
+            before.close()
+            SitePermissions.noteAsked(.camera, origin: origin, isPrivate: false)
+            let panel = try panel()
+            defer { panel.close() }
+            let camera = SitePermission.camera.title
+            #expect((panel.debugState["rows"] as? [String] ?? []).contains { $0.hasPrefix(camera + ":") })
+            let allow = try #require(SitePermission.camera.choices.firstIndex(of: .allow))
+            panel.debugChooseRow("\(allow) \(camera)")
+            #expect(SitePermissions.choice(.camera, origin: origin) == .allow)
+            let shown = panel.debugState["permissions"] as? [String] ?? []
+            let mainRow = (panel.debugState["rows"] as? [String] ?? []).first { $0.hasPrefix(camera + ":") }
+            #expect(mainRow != nil && shown.contains(mainRow!))
+        }
+    }
+
+    /// Opened by a finger, its rows into pages are 44 points tall, as This Site's are.
+    @Test func aFingerGetsTallRows() throws {
+        try withStores {
+            let touched = try panel(touch: true)
+            #expect(PanelLinkRow.height == TouchTargets.size)
+            #expect(ConnectionLine.height == TouchTargets.size)
+            #expect(PanelRow.height >= TouchTargets.size)
+            touched.close()
+            let clicked = try panel()
+            defer { clicked.close() }
+            #expect(PanelLinkRow.height == Tokens.Page.rowHeight)
+        }
+    }
+}
