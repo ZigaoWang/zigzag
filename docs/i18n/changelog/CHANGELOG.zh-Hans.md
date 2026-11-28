@@ -26,6 +26,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 下载完成时，下载面板会从“下载”按钮弹出，只显示刚下载的文件，其余的在“显示所有下载”中，几秒后自动收起。自己打开时，最新的排在最上面：列出最近一小时的下载和仍在进行的下载，更早的在“显示所有下载”中。 ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - 没有打开标签页的窗口现在显示 Zigzag 自己的一个页面，和历史记录、设置一样：空间的颜色或图片，加上 ZIGZAG 字标，浅色和深色下都是一打开就在。感谢 [Lakeland97](https://github.com/Lakeland97)。 ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
+### 更改
+- 历史记录、归档和设置看起来是同一个 App 了：历史记录和归档会和设置一样随窗口变浅或变深，而不只是跟随 Mac，标题栏也和设置的对齐。在设置中，可折叠的框（快捷键里的每个菜单、网站的权限）的悬停效果不会超出圆角，菜单里快捷键的按键与框边缘的距离和名称左侧的距离一致。 ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
+
 ### 修复
 - 加载线只在网页真正有进展时才会前进。不再回应的网站会让它停在原处，不会慢慢爬向终点；没有新内容到达时，加载线会轻轻地明暗起伏。感谢 [Lakeland97](https://github.com/Lakeland97)。 ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - 关闭标签页或标签页进入休眠时，如果 macOS 的“屏幕使用时间”在释放网页时出了问题，Zigzag 不会再偶尔退出。

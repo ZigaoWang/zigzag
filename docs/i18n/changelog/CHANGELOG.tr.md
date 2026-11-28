@@ -17,6 +17,9 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 - Bir indirme bittiğinde indirilenler paneli İndirilenler düğmesinden açılıp yalnızca o dosyayı gösterir, geri kalanı Tüm İndirilenleri Göster’dedir ve panel birkaç saniye sonra kapanır. Kendiniz açtığınızda en yenisi en üstte olur: son bir saatin indirmeleri ve hâlâ süren indirmeler listelenir, daha eskiler Tüm İndirilenleri Göster’dedir. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - Açık sekmesi olmayan bir pencere artık Geçmiş ve Ayarlar gibi Zigzag’ın kendi sayfasını gösteriyor: Space’in rengi veya resmi üzerinde ZIGZAG yazısı, açık ve koyu görünümde ilk andan itibaren. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
+### Değişiklikler
+- Geçmiş, Arşiv ve Ayarlar tek bir uygulama gibi görünüyor: Geçmiş ve Arşiv, Ayarlar gibi yalnızca Mac'e göre değil pencereye göre açık veya koyu oluyor ve üst bilgileri Ayarlar'ınkiyle hizalı. Ayarlar'da katlanabilen bir kutunun (Kısayollar'daki her menü, bir sitenin izinleri) vurgusu yuvarlak köşelerinin içinde kalıyor ve bir menüdeki kısayolların tuşları, adların başladığı kadar kutunun kenarından uzakta bitiyor. ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
+
 ### Düzeltmeler
 - Yükleme çizgisi artık yalnızca sayfa ilerlediğinde ilerliyor. Yanıt vermeyi bırakan bir sitede sona doğru sürünmek yerine yerinde duruyor ve hiçbir şey gelmediği sürece hafifçe sönüp parlıyor. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Bir sekmeyi kapattığınızda veya bir sekme uykuya geçtiğinde, macOS’in Ekran Süresi sayfayı bırakırken bir sorunla karşılaşırsa Zigzag artık ara sıra kapanmaz.

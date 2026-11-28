@@ -23,6 +23,9 @@
 - 下載完成時，下載面板會從「下載項目」按鈕彈出，只顯示剛下載的檔案，其餘的在「顯示所有下載」中，幾秒後自動收起。自己打開時，最新的排在最上面：列出最近一小時的下載和仍在進行的下載，更早的在「顯示所有下載」中。 ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - 沒有打開分頁的視窗現在會顯示 Zigzag 自己的一個頁面，和瀏覽記錄、設定一樣：空間的顏色或圖片，加上 ZIGZAG 字標，淺色和深色下都是一打開就在。感謝 [Lakeland97](https://github.com/Lakeland97)。 ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
+### 變更
+- 瀏覽記錄、封存和設定看起來是同一個 App 了：瀏覽記錄和封存會和設定一樣隨視窗變淺或變深，而不只是跟隨 Mac，標題列也和設定的對齊。在設定中，可收合的框（鍵盤快速鍵裡的每個選單、網站的權限）的游標停留效果不會超出圓角，選單裡快速鍵的按鍵與框邊緣的距離和名稱左側的距離一致。 ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
+
 ### 修正
 - 載入線只在網頁真的有進展時才會前進。不再回應的網站會讓它停在原處，不會慢慢爬向終點；沒有新內容送達時，載入線會輕輕地明暗起伏。感謝 [Lakeland97](https://github.com/Lakeland97)。 ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - 關閉分頁或分頁進入休眠時，如果 macOS 的「螢幕使用時間」在釋放網頁時出了問題，Zigzag 不會再偶爾結束。

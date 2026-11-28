@@ -213,7 +213,9 @@ One look for each state, everywhere:
   it takes to part from the ground under it by 1.2:1 (pressed 1.36:1), measured on the space's or the page's color
   and on black or white when that isn't known; rows on the frame `Chrome.hover`; elsewhere `Color.hoverFill`
   (rows), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
-  primary. Instant both ways, in and out: a fade on something you sweep past all day reads as lag.
+  primary. Instant both ways, in and out: a fade on something you sweep past all day reads as lag. Inside a box
+  that folds (`FoldStyle.hoverShape`: a box's header, a shortcut), the fill is inset `Space.x1` on every side with
+  corners of the box's radius less that, so it never reaches the box's corners or edge.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
   once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
   rest. Things that read as objects (pill buttons, favorites) sink (`pressSinks`, `showSink`): down
@@ -605,7 +607,9 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
   Passwords in a light tint of their window's space, `Brand.Theme.for(view).wash`), `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,
-  quiet rows.
+  quiet rows. Light or dark with the window, never with the Mac alone: History and the Archive, HTML, leave their web
+  view's look to the window (`HistoryPage.followsWindow`), as Settings' own views take it, and their header is the
+  native one's height, its title's capitals on the search field's middle.
 - **Floating panel** (`FloatingPanelView`): opaque, near white by day and a deep gray at night, each leaning just
   perceptibly toward the window's space (`Brand.Theme.panel`), so the panel belongs to it and text always reads.
   Panel radius, a crisp hairline edge, one soft small shadow, 12pt padding, `CardRow`-style rows inset 4pt. It grows

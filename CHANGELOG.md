@@ -18,6 +18,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - When a download finishes, the downloads panel comes out of the Downloads button on just that file, with Show All Downloads for the rest, and goes away a few seconds later. Opened yourself, it lists the newest first: the last hour's downloads and any still coming in, with earlier ones behind Show All Downloads. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - A window with no tab open now shows a page of Zigzag's own, like History and Settings: the space's color or picture with the ZIGZAG wordmark, there from the first moment in light and dark. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
+### Changed
+- History, the Archive and Settings look like one app: History and the Archive are light or dark with the window, as Settings is, rather than with the Mac alone, and their header lines up with Settings'. In Settings, a box that folds (a menu in Shortcuts, a site's permissions) keeps its hover inside its rounded corners, and a menu's shortcuts end their keys as far in from the box's edge as their names start. ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
+
 ### Fixed
 - The loading line moves only when the page does. A site that has stopped answering holds still instead of creeping toward the end, and while nothing arrives the line softly fades in and out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
