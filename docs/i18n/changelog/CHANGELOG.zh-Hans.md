@@ -39,6 +39,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 边栏里的地址与下面各行从同一个左边缘开始。([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 - 左右滑动前进后退看起来更安静，也不会再卡住了。箭头换成了一个圆形气泡，停在页面边缘内侧，不会再在侧边栏或页面边缘被切掉，滑动时从中间慢慢填满。刚开始滑时页面跟手指一点不差。气泡填满时松开手指、Mac 却漏掉了这个动作，下次碰触控板时照样会前进或后退，不会一直停在屏幕上；后退之后马上滚动，也不会再闪一下旧页面。 ([#579](https://github.com/ZigaoWang/zigzag/issues/579))
 - 在触控屏上，滑动会锁定起手的方向，和 iPad 一样：左右滑不会再让页面上下滚动，就算一根手指已经在动、另一根才落下，两指照样能前进后退。起手是上下滑的，照常滚动。 ([#581](https://github.com/ZigaoWang/zigzag/issues/581))
+- 下载中途卡住时，下载面板和“下载”按钮的进度环会显示它实际到达的进度，而不是停下前四分之一秒的数值。感谢 [Lakeland97](https://github.com/Lakeland97)。([#571](https://github.com/ZigaoWang/zigzag/issues/571), [#580](https://github.com/ZigaoWang/zigzag/pull/580))
 
 ## [0.10.0] - 2026-11-25
 

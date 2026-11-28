@@ -30,6 +30,7 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 - Kenar çubuğundaki adres, altındaki satırlarla aynı sol kenardan başlar. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 - Geri ve ileri kaydırma daha sakin görünüyor ve artık takılı kalmıyor. Ok, sayfanın kenarının hemen içinde duran yuvarlak bir baloncuk; kenar çubuğunda ya da sayfanın kenarında hiç kesilmiyor ve kaydırdıkça ortadan dolmaya başlıyor. Kaydırma başlarken sayfa parmaklarınızı noktası noktasına izliyor. Baloncuk doluyken parmaklarınızı kaldırdığınızda Mac bunu kaçırsa bile, ekranda kalmak yerine izleme dörtgenine yeniden dokunduğunuzda geçiş yapılıyor; geri gittikten hemen sonra kaydırmak da artık eski sayfayı bir an göstermiyor. ([#579](https://github.com/ZigaoWang/zigzag/issues/579))
 - Dokunmatik ekranda bir kaydırma, iPad'deki gibi başladığı yönü koruyor: yana kaydırmak artık sayfayı yukarı aşağı kaydırmıyor ve diğeri dokunurken biri zaten hareket ediyor olsa bile iki parmak geri ya da ileri gidiyor. Yukarı ya da aşağı başlayan bir kaydırma sayfayı kaydırmaya devam ediyor. ([#581](https://github.com/ZigaoWang/zigzag/issues/581))
+- Takılan bir indirme, indirilenler panelinde ve İndirilenler düğmesinin halkasında, durmadan çeyrek saniye önceki değeri değil, gerçekten ulaştığı ilerlemeyi gösterir. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#571](https://github.com/ZigaoWang/zigzag/issues/571), [#580](https://github.com/ZigaoWang/zigzag/pull/580))
 
 ## [0.10.0] - 2026-11-25
 

@@ -22,7 +22,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - The loading line moves only when the page does. A site that has stopped answering holds still instead of creeping toward the end, and while nothing arrives the line softly fades in and out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
-- A download that stalls shows the progress it actually reached, in the panel's row and the sidebar's ring, instead of the figure from a quarter of a second before it stopped. ([#571](https://github.com/ZigaoWang/zigzag/issues/571))
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
 - An installed app on a disk that isn’t connected stays in Settings › General › Installed Apps, marked On a disk that isn’t connected, and works again as soon as the disk is back. Before, it left the list, with its toolbar choice, until you opened the app. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
 - Pressing ⌘Z after typing in a page no longer quits Zigzag now and then.
@@ -32,6 +31,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The address in the sidebar starts on the same left edge as the rows below it. ([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 - Swiping back and forward looks calmer and no longer gets stuck. The arrow is a round bubble that sits on the page just inside its edge, never cut off at the sidebar or the page's edge, and fills in from the middle as you swipe. The page moves with your fingers point for point as the swipe starts. If you lift your fingers with the bubble filled and the Mac misses it, the swipe still goes when you touch the trackpad again, instead of staying on screen, and scrolling right after going back no longer flashes the old page. ([#579](https://github.com/ZigaoWang/zigzag/issues/579))
 - On a touch display, a swipe keeps to the direction it starts in, as on an iPad: a sideways swipe no longer scrolls the page up and down, and two fingers go back or forward even when one is already moving as the other lands. A swipe that starts up or down still scrolls. ([#581](https://github.com/ZigaoWang/zigzag/issues/581))
+- A download that stalls shows the progress it actually reached, in the downloads panel and on the Downloads button's ring, instead of the figure from a quarter of a second before it stopped. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#571](https://github.com/ZigaoWang/zigzag/issues/571), [#580](https://github.com/ZigaoWang/zigzag/pull/580))
 
 ## [0.10.0] - 2026-11-25
 

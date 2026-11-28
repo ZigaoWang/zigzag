@@ -36,6 +36,7 @@
 - 側邊欄裡的網址與下面各列從同一個左邊緣開始。([#587](https://github.com/ZigaoWang/zigzag/issues/587))
 - 左右滑動前往和返回看起來更安靜，也不會再卡住了。箭頭換成一個圓形氣泡，停在頁面邊緣內側，不會再在側邊欄或頁面邊緣被切掉，滑動時從中間慢慢填滿。剛開始滑時頁面緊跟手指。氣泡填滿時放開手指、Mac 卻漏掉了這個動作，下次碰觸控式軌跡板時照樣會前往或返回，不會一直停在螢幕上；返回之後馬上捲動，也不會再閃一下舊頁面。 ([#579](https://github.com/ZigaoWang/zigzag/issues/579))
 - 在觸控螢幕上，滑動會鎖定起手的方向，和 iPad 一樣：左右滑不會再讓頁面上下捲動，就算一根手指已經在動、另一根才落下，兩指照樣能前往或返回。起手是上下滑的，照常捲動。 ([#581](https://github.com/ZigaoWang/zigzag/issues/581))
+- 下載中途卡住時，下載面板和「下載項目」按鈕的進度環會顯示它實際到達的進度，而不是停下前四分之一秒的數值。感謝 [Lakeland97](https://github.com/Lakeland97)。([#571](https://github.com/ZigaoWang/zigzag/issues/571), [#580](https://github.com/ZigaoWang/zigzag/pull/580))
 
 ## [0.10.0] - 2026-11-25
 
