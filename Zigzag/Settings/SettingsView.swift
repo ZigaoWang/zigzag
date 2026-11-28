@@ -1465,6 +1465,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var sitePanelToken: SignalToken?
     private let tabsGroup = FormGroup()
     private let searchGroup = FormGroup()
+    /// The sites Tab searches from the address bar: yours, then Zigzag's own (#583).
+    private let siteSearchGroup = FormGroup()
+    private let addSiteSearchButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Site Search in Settings › Search: opens the sheet that adds a site to search with Tab."))
+    private var siteSearchToken: SignalToken?
     private let blockingGroup = FormGroup()
     private let spacesGroup = FormGroup()
     /// Whether new spaces get their own profile (#291).
@@ -2264,10 +2268,73 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         searchGroup.add(customSearchRow)
         refreshCustomSearch()
         suggestionsToggle.onChange = { on in SuggestionFetcher.isOn = on }
-        // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
         searchGroup.add(FormRow(title: String(localized: "Search suggestions", comment: "A setting in Settings › Search."),
                                 detail: String(localized: "What you type in the address bar is sent to your search engine for suggestions.", comment: "Explanation under “Search suggestions” in Settings › Search."),
                                 control: suggestionsToggle))
+        addSiteSearchButton.onClick = { [weak self] _ in if let self { SiteSearchSheet.edit(nil, in: self) } }
+        // Changed here, in another window's Settings or by sync: the list follows.
+        siteSearchToken = SiteSearches.changed.observe { [weak self] in
+            guard let self else { return }
+            self.reloadSiteSearches()
+            if self.pane == .search || self.isSearching { self.layoutDocument() }
+        }
+        reloadSiteSearches()
+    }
+
+    /// Site Search: the sites you added, each with its keyword, switch, Edit and Delete, then Zigzag's own with a
+    /// switch each, in one box headed by how many.
+    private func reloadSiteSearches() {
+        siteSearchGroup.removeAllRows()
+        func keyCap(_ keyword: String) -> KeyCap {
+            let cap = KeyCap(keyword)
+            cap.toolTip = String(localized: "Type \(keyword), then press Tab", comment: "Tooltip of a site's keyword in Settings › Search › Site Search. The placeholder is the keyword, like yt.")
+            return cap
+        }
+        func controls(_ views: [NSView]) -> NSStackView {
+            let stack = NSStackView(views: views)
+            stack.orientation = .horizontal
+            stack.spacing = Tokens.Space.x1
+            stack.distribution = .fill
+            stack.alignment = .centerY
+            stack.setCustomSpacing(Tokens.Space.x3, after: views[0])
+            return stack
+        }
+        for site in SiteSearches.custom {
+            let toggle = Toggle(isOn: site.isEnabled)
+            toggle.onChange = { on in SiteSearches.setEnabled(on, custom: site.id) }
+            toggle.setAccessibilityLabel(String(localized: "Turn \(site.name) on or off", comment: "A site's switch in Settings › Search › Site Search, for VoiceOver. The placeholder is the site's name."))
+            let edit = IconButton(symbol: "slider.horizontal.3", size: .compact,
+                                  toolTip: String(localized: "Edit Site", comment: "Tooltip of the button that changes a site you added to Site Search in Settings › Search."))
+            edit.onClick = { [weak self] _ in if let self { SiteSearchSheet.edit(site, in: self) } }
+            let remove = IconButton(symbol: "trash", size: .compact,
+                                    toolTip: String(localized: "Delete Site", comment: "Tooltip of the button that deletes a site you added to Site Search in Settings › Search."))
+            remove.onClick = { [weak self] _ in
+                self?.confirm(title: String(localized: "Delete “\(site.name)” from Site Search?", comment: "Title of the sheet that deletes a site from Site Search in Settings › Search. The placeholder is its name."),
+                              message: String(localized: "Its keyword no longer searches it from the address bar.", comment: "Message of the sheet that deletes a site from Site Search in Settings › Search."),
+                              action: String(localized: "Delete", comment: "Button of the sheet that deletes a site from Site Search in Settings › Search.")) {
+                    SiteSearches.remove(site.id)
+                }
+            }
+            let row = FormRow(title: site.name, detail: site.template, control: controls([keyCap(site.keyword), toggle, edit, remove]))
+            row.detailTruncatesMiddle = true
+            row.keywords = site.keyword
+            row.revealsOnHover(remove)
+            siteSearchGroup.add(row)
+        }
+        let builtIn = SiteSearch.builtIn
+        list("site search", in: siteSearchGroup,
+             summary: String(localized: "\(builtIn.count) sites from Zigzag", comment: "Heads the folded list of Zigzag's own sites in Settings › Search › Site Search: how many."),
+             words: builtIn.map { "\($0.name) \($0.keys.joined(separator: " "))" }) {
+            builtIn.map { site in
+                let toggle = Toggle(isOn: SiteSearches.isOn(site.id))
+                toggle.onChange = { on in SiteSearches.setOn(on, builtIn: site.id) }
+                toggle.setAccessibilityLabel(String(localized: "Turn \(site.name) on or off", comment: "A site's switch in Settings › Search › Site Search, for VoiceOver. The placeholder is the site's name."))
+                let row = FormRow(title: site.name, detail: site.template, control: controls([keyCap(site.keyword), toggle]))
+                row.detailTruncatesMiddle = true
+                row.keywords = site.keys.joined(separator: " ")
+                return row
+            }
+        }
     }
 
     /// Zigzag Mini.
@@ -3895,6 +3962,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     var debugShortcutBoxes: [FoldBox] { shortcutsGroup.rows.compactMap { $0 as? FoldBox } }
     var debugRuleBoxes: [FoldBox] { downloadRuleRows.map(\.row) }
     var debugDeveloperSitesBox: FoldBox? { developmentSitesGroup.rows.first as? FoldBox }
+    /// Site Search's rows, the box of Zigzag's own and the rows in it included.
+    var debugSiteSearchRows: [String] { debugRows(siteSearchGroup).map(\.debugTitle) }
     /// The panes whose rows are made.
     var debugBuiltPanes: Set<SettingsPane> { builtPanes }
     /// How many rows a pane's groups hold, a box counted once, feature flags' boxes included.
@@ -4105,6 +4174,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // The groups' headings, each said once for the page and its search.
     private static var webAppsHeading: String { String(localized: "Installed Apps", comment: "A heading in Settings › General: the sites installed as apps with File › Install as App.") }
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
+    private static var siteSearchHeading: String { String(localized: "Site Search", comment: "A heading in Settings › Search, over the sites you can search from the address bar by typing their keyword and pressing Tab.") }
     private static var downloadRulesHeading: String { String(localized: "Hand Off Downloads and Links", comment: "A heading in Settings › Downloads, over the rules that send a download or a link to another app.") }
     private static var downloadTypesHeading: String { String(localized: "File Types", comment: "A heading in Settings › Downloads, over the file types and where their downloads go.") }
     private static var downloadTestHeading: String { String(localized: "Test a Rule", comment: "A heading in Settings › Downloads, over the address field that shows which rule would take it.") }
@@ -4162,7 +4232,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .downloads: [(nil, downloadPlaceGroup), (Self.downloadTypesHeading, downloadTypesGroup), (Self.downloadRulesHeading, downloadRulesGroup), (Self.downloadTestHeading, downloadTestGroup)]
         case .appearance: [(nil, appearanceGroup)]
         case .tabs: [(nil, tabsGroup)]
-        case .search: [(nil, searchGroup)]
+        case .search: [(nil, searchGroup), (Self.siteSearchHeading, siteSearchGroup)]
         case .mini: [(nil, miniGroup)]
         case .spaces: [(nil, newSpacesGroup), (Self.spacesHeading, spacesGroup)] + (Library.shared.yourSpaces.count > 1 ? [(Self.routesHeading, routesGroup)] : [])
         case .profiles: [(Self.profilesHeading, profilesGroup), (Self.unlistedHeading, unlistedGroup)]
@@ -4329,7 +4399,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(Self.downloadTypesHeading, downloadTypesGroup, accessory: addFileTypeButton)
             section(Self.downloadRulesHeading, downloadRulesGroup, accessory: addDownloadRuleButton)
             section(Self.downloadTestHeading, downloadTestGroup)
-        case .general, .appearance, .tabs, .search, .mini, .automation:
+        case .search:
+            section(nil, searchGroup)
+            section(Self.siteSearchHeading, siteSearchGroup, accessory: addSiteSearchButton)
+            note(String(localized: "Type a site’s keyword in the address bar, then press Tab to search it.", comment: "Under the list in Settings › Search › Site Search."))
+        case .general, .appearance, .tabs, .mini, .automation:
             for (title, group) in groups(of: pane) { section(title, group) }
         case .spaces:
             section(nil, newSpacesGroup)

@@ -328,6 +328,7 @@
 		C4A7D1E20F3B4C5D6E7F8A90 /* ZigzagCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A7D1E20F3B4C5D6E7F8A91 /* ZigzagCard.swift */; };
 		7AB39474A82DB35790BF5AE1 /* PhoneLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A4EB98BE921B92AA85CBF4 /* PhoneLink.swift */; };
 		7C136AE63DBC68A78BFA1EB9 /* SiteRouteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75BA5C343852E0E29D797FC /* SiteRouteSheet.swift */; };
+		AEAA95F2F19C880973047CD5 /* SiteSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF4B42EAD9312B9954382689 /* SiteSearchSheet.swift */; };
 		7C2FE38D621DB85C0E007C50 /* CleanLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC2746C9940BC684BB9A616 /* CleanLinkTests.swift */; };
 		7C3B87B3AD96EAD6D775BB02 /* NoticeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7998746D98A412DEEA84CFB /* NoticeCard.swift */; };
 		7C42A54C2877285DE25719E2 /* WhatsNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = E748383173F4821F4C0D92B3 /* WhatsNew.swift */; };
@@ -1159,6 +1160,7 @@
 		A69950C3F8014CFB7FAB861A /* DarkSeen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkSeen.swift; sourceTree = "<group>"; };
 		A6E2DC56DCEDF8A855DC8CE9 /* DevelopmentSiteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentSiteSheet.swift; sourceTree = "<group>"; };
 		A75BA5C343852E0E29D797FC /* SiteRouteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteRouteSheet.swift; sourceTree = "<group>"; };
+		BF4B42EAD9312B9954382689 /* SiteSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteSearchSheet.swift; sourceTree = "<group>"; };
 		A8679BD8FFD9BC3825E36199 /* MiniLinkWakeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniLinkWakeTests.swift; sourceTree = "<group>"; };
 		A9205F70718ADF73D6C096BD /* Freezes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Freezes.swift; sourceTree = "<group>"; };
 		A99718608C8C7D69D10500FD /* SiteBoostsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteBoostsTests.swift; sourceTree = "<group>"; };
@@ -1756,6 +1758,7 @@
 				58C3A67ABEDFF4E2FE3FC9AC /* SiteDataList.swift */,
 				5729983AF049602057502EBA /* SiteRouteRow.swift */,
 				A75BA5C343852E0E29D797FC /* SiteRouteSheet.swift */,
+				BF4B42EAD9312B9954382689 /* SiteSearchSheet.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -2899,6 +2902,7 @@
 				6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */,
 				689E7D1B46055A22C2F3FE3A /* SiteRouteRow.swift in Sources */,
 				7C136AE63DBC68A78BFA1EB9 /* SiteRouteSheet.swift in Sources */,
+				AEAA95F2F19C880973047CD5 /* SiteSearchSheet.swift in Sources */,
 				6100638AABCE2DAF5710824A /* SiteRoutes.swift in Sources */,
 				DFB7FFE90CE40670E90BB664 /* SiteSearch.swift in Sources */,
 				85CF7A7FCD64C059A4930055 /* SiteStyleSheet.swift in Sources */,
