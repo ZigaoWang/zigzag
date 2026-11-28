@@ -93,6 +93,7 @@
 		F2A3E9AC0FF5000000000003 /* FramePacingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF5000000000004 /* FramePacingTests.swift */; };
 		F2A3E9AC0FF6000000000003 /* PageLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000004 /* PageLocationTests.swift */; };
 		F2A3E9AC0FF6000000000023 /* EdgeHoverRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000024 /* EdgeHoverRoutingTests.swift */; };
+		F2A3E9AC0FF6000000000050 /* EdgeNewTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000051 /* EdgeNewTabTests.swift */; };
 		1116ADE95186795EFF5297C6 /* Headless.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA5039BA8CA89B76CCF6C5B /* Headless.swift */; };
 		1845DD30334A776382156546 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D0B754CF4F921CAA567C219B /* InfoPlist.xcstrings */; };
 		1A3C4EEF9AB9B8D6903AE06A /* ExtensionStorms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1401764DF9792E0E8F11146A /* ExtensionStorms.swift */; };
@@ -853,6 +854,7 @@
 		F2A3E9AC0FF5000000000004 /* FramePacingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FramePacingTests.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF6000000000004 /* PageLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageLocationTests.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF6000000000024 /* EdgeHoverRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeHoverRoutingTests.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000051 /* EdgeNewTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeNewTabTests.swift; sourceTree = "<group>"; };
 		27F3073C0E2D268EC8C3B767 /* DockProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockProgress.swift; sourceTree = "<group>"; };
 		289F60BB400BACFDF97EA0E6 /* NativeAudioOut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioOut.swift; sourceTree = "<group>"; };
 		2904F433A0EC465A91389CF8 /* MCPBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPBrowser.swift; sourceTree = "<group>"; };
@@ -2090,6 +2092,7 @@
 				F2A3E9AC0FF6000000000004 /* PageLocationTests.swift */,
 				E7E4F10A5C0FFEE000000002 /* EverydayFlowsTests.swift */,
 				F2A3E9AC0FF6000000000024 /* EdgeHoverRoutingTests.swift */,
+				F2A3E9AC0FF6000000000051 /* EdgeNewTabTests.swift */,
 				C6FFF4026B73131D9A02C72E /* PageBrowserGlobalTests.swift */,
 				84BBAA546F017A1BFC662BFE /* PageDownloadsTests.swift */,
 				522CE4F5EFBC537C69A1750C /* LocalPageServer.swift */,
@@ -3071,6 +3074,7 @@
 				F2A3E9AC0FF6000000000003 /* PageLocationTests.swift in Sources */,
 				E7E4F10A5C0FFEE000000001 /* EverydayFlowsTests.swift in Sources */,
 				F2A3E9AC0FF6000000000023 /* EdgeHoverRoutingTests.swift in Sources */,
+				F2A3E9AC0FF6000000000050 /* EdgeNewTabTests.swift in Sources */,
 				95C884EC5F3B95AC38A8E0F3 /* PageBrowserGlobalTests.swift in Sources */,
 				DB2ECF228056F24DAE892BD5 /* PageDownloadsTests.swift in Sources */,
 				D206810867189A7F878FDF2A /* LocalPageServer.swift in Sources */,

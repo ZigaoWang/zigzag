@@ -62,6 +62,13 @@ enum EdgeSidebarLayout {
         sidebar + inset + (page ? pageWidth(in: visible) + inset * 2 : 0)
     }
 
+    /// The panel while its new-tab bar is out (#560): the card, and beside it the page's gutters and room for the whole
+    /// bar, against the same edge and never wider than the screen. The card stays where it was.
+    static func newTabBarFrame(in visible: NSRect, sidebar: CGFloat, inset: CGFloat, onRight: Bool) -> NSRect {
+        let room = Tokens.Metric.commandBarWidth + Tokens.Space.x8 * 2
+        return frame(in: visible, width: min(visible.width, sidebar + inset * 3 + room), onRight: onRight)
+    }
+
     /// The page beside the sidebar card, as tall as the card.
     static func pageFrame(in bounds: NSRect, sidebar: CGFloat, inset: CGFloat, onRight: Bool) -> NSRect {
         let width = max(0, bounds.width - sidebar - inset * 3)
@@ -142,6 +149,14 @@ final class EdgeSidebar {
     private var panel: EdgeSidebarPanel?
     private var host: EdgeSidebarHost?
     private(set) var isShowing = false
+    /// The new-tab bar over the screen while the panel is out (#560), the window's bar, hosted here.
+    private(set) var newTabBar: CommandBarController?
+    /// The panel's whole window, card and the room beside it the bar opens in.
+    private let barOverlay = PassthroughView()
+    /// What had the keyboard before the bar: it gets it back when the bar closes.
+    private weak var previousResponder: NSResponder?
+    /// Whether the panel's bar is out; the panel keeps its room beside the card while it is, and until it has left.
+    private var barRoom = false
     private var shownOnRight = false
     /// The visible frame the panel is on, and the panel's frame without a menu's room.
     private var shownVisible: NSRect = .zero
@@ -326,12 +341,12 @@ final class EdgeSidebar {
         // A pressed button, a menu from the panel or a sheet keeps it out.
         var held = NSEvent.pressedMouseButtons != 0 || MenuPanel.current != nil
             || RunLoop.current.currentMode == .eventTracking || NSApp.modalWindow != nil
-            || host?.overlay.subviews.isEmpty == false
+            || host?.overlay.subviews.isEmpty == false || barRoom
         #if DEBUG
         if Self.debugHoldsOpen { held = true }
         #endif
-        // The menu's room goes with the menu; the page's room stays while a page is out.
-        let frame = preview == nil ? cardPanelFrame : previewPanelFrame
+        // The menu's room goes with the menu; the bar's room stays while the bar is out; the page's while a page is.
+        let frame = barRoom ? newTabBarFrame : preview == nil ? cardPanelFrame : previewPanelFrame
         if MenuPanel.current == nil, panel.frame != frame { panel.setFrame(frame, display: true) }
         if MenuPanel.current == nil, menuCoversPage {
             menuCoversPage = false
@@ -435,7 +450,7 @@ final class EdgeSidebar {
     /// The row's page in a docked Mini beside the sidebar, folding in over the page before it. A page that isn't
     /// running shows its card instead, and stays asleep.
     private func showPreview(_ tab: Tab, in controller: BrowserWindowController) {
-        guard isShowing, !menuCoversPage, let panel, let host, !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url),
+        guard isShowing, !menuCoversPage, !barRoom, let panel, let host, !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url),
               Self.isInShownSpace(tab, of: controller), preview?.tab !== tab else { return }
         let live = EdgeLensPolicy.showsLivePage(isLoaded: tab.isLoaded, isAsleep: tab.isAsleep)
         let previous = preview
@@ -596,7 +611,7 @@ final class EdgeSidebar {
         guard isShowing, let host, let panel else { return }
         host.pageShowing = false
         if let target { host.cardWidth = target.edgeSidebarWidth }
-        panel.setFrame(cardPanelFrame, display: true)
+        panel.setFrame(barRoom ? newTabBarFrame : cardPanelFrame, display: true)
     }
 
     /// A tab of the space the panel's list shows; a favorite belongs to every space.
@@ -667,6 +682,10 @@ final class EdgeSidebar {
         closePreview(animated: false, panelStays: false)
         guard isShowing, let panel else { return }
         isShowing = false
+        // The bar is the panel's while it's out: it goes with it, never left open behind (#560).
+        newTabBar?.dismiss(restoringFocus: false)
+        barRoom = false
+        previousResponder = nil
         generation += 1
         if MenuPanel.current?.window === panel { MenuPanel.current?.close(animated: false) }
         // A sheet, editor or the downloads list open in the panel goes with it, never left for its next time out.
@@ -691,7 +710,8 @@ final class EdgeSidebar {
     /// A menu is opening in the panel: it widens on the inner side, the card staying put, so the menu isn't cut off.
     func makeRoomForMenu() {
         guard isShowing, let panel else { return }
-        let width = max(cardPanelFrame.width + EdgeSidebarLayout.menuRoom, previewPanelFrame.width)
+        let width = max(cardPanelFrame.width + EdgeSidebarLayout.menuRoom, previewPanelFrame.width,
+                        barRoom ? newTabBarFrame.width : 0)
         panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: width, onRight: shownOnRight), display: true)
         menuCoversPage = true
         preview?.layoutInDock()
@@ -705,8 +725,27 @@ final class EdgeSidebar {
                             receding: target.edgeSidebar.map { [$0.list] } ?? [])
     }
 
-    /// ⌘T with the panel clicked into: a new tab in the window, which comes forward.
-    func newTab() { target?.newTabFromEdge() }
+    /// ⌘T in the panel: the same place the + menu's New Tab goes (#560).
+    func newTab() { target?.listNewTab() }
+
+    /// New Tab's bar over the screen, in the panel (#560): the window's own bar, hosted here, so the window behind
+    /// stays behind. It opens in the space the panel shows and gives the panel the keyboard back when it closes.
+    func showNewTabBar() {
+        guard isShowing, target != nil else { return }
+        let bar = newTabBar ?? CommandBarController(host: self)
+        newTabBar = bar
+        // The panel's window has no page behind the bar, so its glass shows the desktop.
+        bar.showsDesktop = true
+        barRoom = true
+        bar.show(mode: .newTab)
+    }
+
+    /// The panel's frame while the bar is out: room beside the card for the whole bar, as a page would take.
+    private var newTabBarFrame: NSRect {
+        guard let host else { return cardPanelFrame }
+        return EdgeSidebarLayout.newTabBarFrame(in: shownVisible, sidebar: host.cardWidth, inset: host.inset,
+                                                onRight: shownOnRight)
+    }
 
     /// Menu bar actions done where they are, the panel's list showing what they did. Every other one is done in the
     /// window, which comes forward, as for a menu item picked in the panel.
@@ -799,6 +838,10 @@ final class EdgeSidebar {
         panel.eventInterceptor = { [weak self] event in self?.intercept(event) ?? false }
         let host = EdgeSidebarHost()
         panel.contentView = host
+        // The bar's layer over the whole panel: the card and the room beside it it opens in (#560).
+        barOverlay.frame = host.bounds
+        barOverlay.autoresizingMask = [.width, .height]
+        host.addSubview(barOverlay)
         self.host = host
         self.panel = panel
         return panel
@@ -859,9 +902,14 @@ final class EdgeSidebarHost: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// The room beside the card: where a page comes out, and where the new-tab bar opens (#560).
+    var roomFrame: NSRect {
+        EdgeSidebarLayout.pageFrame(in: bounds, sidebar: cardWidth, inset: inset, onRight: onRight)
+    }
+
     /// The page's place beside the card.
     var pageFrame: NSRect {
-        pageShowing ? EdgeSidebarLayout.pageFrame(in: bounds, sidebar: cardWidth, inset: inset, onRight: onRight) : .zero
+        pageShowing ? roomFrame : .zero
     }
 
     /// Against the screen's edge, whatever room beside it a menu has.
@@ -996,5 +1044,57 @@ final class EdgeAsleepPageView: NSView {
         title.frame = NSRect(x: (bounds.midX - width / 2).rounded(), y: y, width: width, height: titleHeight)
         y = title.frame.maxY + Tokens.Space.x2
         note.frame = NSRect(x: (bounds.midX - width / 2).rounded(), y: y, width: width, height: noteHeight)
+    }
+}
+
+// MARK: - The new-tab bar over the screen (#560)
+
+/// The panel hosts the same command bar a window does, in its own window over other apps: New Tab typed here opens in
+/// the window's tabs, in the space the panel shows, and the keyboard is the panel's again when the bar closes.
+extension EdgeSidebar: CommandBarHost {
+    var window: NSWindow? { panel }
+    var commandBarOverlay: NSView { barOverlay }
+    var commandBarPageFrame: NSRect { host?.roomFrame ?? .zero }
+    func commandBarAnchor(asked: NSView?) -> NSView? { nil }
+    var commandBarTabs: TabManager? { target?.tabManager }
+    var commandBarProfile: Profile { target?.tabManager.profile ?? Profiles.shared.default }
+    var commandBarTab: Tab? { target?.tabManager.selectedTab }
+    var commandBarSpace: SpaceInfo? { target?.tabManager.currentSpace }
+    var commandBarIsPrivate: Bool { target?.tabManager.isPrivate ?? false }
+    var commandBarBrowser: BrowserWindowController? { target }
+
+    /// One floating thing at a time, as in the window, and room beside the card for the whole bar.
+    func commandBarWillShow() {
+        guard isShowing, let host, let panel else { return }
+        if DownloadsPanel.isOpen(in: panel) { DownloadsPanel.closeCurrent() }
+        host.overlay.subviews.forEach { ($0 as? FormSheet)?.close(); ($0 as? SpaceEditorPanel)?.close() }
+        // Typing is no time for a page beside the panel.
+        closePreview(animated: false)
+        // The bar takes the keyboard as a click in the panel does, without bringing the app in front forward.
+        panel.makeKey()
+        // Whatever had it gets the keyboard back when the bar closes: a field being edited, or a view in the panel.
+        let editing = (panel.firstResponder as? NSTextView)?.delegate as? NSView
+        previousResponder = editing ?? panel.firstResponder
+        // The bar opens where a page would, so the panel takes that room while it's out.
+        panel.setFrame(newTabBarFrame, display: true)
+        host.layoutSubtreeIfNeeded()
+    }
+
+    /// The bar is gone: the panel has the keyboard again, not the browser window behind.
+    func commandBarRestoreFocus() {
+        guard isShowing, let panel else { return }
+        panel.makeKey()
+        if let previous = previousResponder as? NSView, previous.window === panel, previous.superview != nil {
+            panel.makeFirstResponder(previous)
+        } else {
+            panel.makeFirstResponder(nil)
+        }
+        previousResponder = nil
+    }
+
+    func commandBarDidHide() {
+        // The bar is gone from the screen: the panel narrows to its card again, and keeps the keyboard (#560).
+        barRoom = false
+        if isShowing { panel?.makeKey() }
     }
 }

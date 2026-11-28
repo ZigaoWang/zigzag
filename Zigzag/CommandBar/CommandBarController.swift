@@ -143,6 +143,9 @@ protocol CommandBarHost: AnyObject {
     var commandBarAppearance: NSAppearance? { get }
     /// The browser window's tabs, for open tabs among the results and for completing what you type; nil if there's none.
     var commandBarTabs: TabManager? { get }
+    /// The browser window whose tabs, spaces and pages the bar opens in, when the host isn't one itself (the edge
+    /// panel's bar, #560): a chosen page goes into that window's tabs, in the space the panel shows.
+    var commandBarBrowser: BrowserWindowController? { get }
     /// Browser windows: the bar can be dragged and keeps its place.
     var commandBarIsMovable: Bool { get }
     /// The profile whose history, favorites and open pages the bar suggests: the one of the space it's used in.
@@ -167,6 +170,7 @@ extension CommandBarHost {
     var commandBarFitsAnchor: Bool { false }
     var commandBarAppearance: NSAppearance? { nil }
     var commandBarIsMovable: Bool { false }
+    var commandBarBrowser: BrowserWindowController? { self as? BrowserWindowController }
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool { false }
     func commandBarDidHide() {}
 }
@@ -177,7 +181,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     private weak var host: CommandBarHost?
     /// The browser window it's in, for what only a browser window does (its commands, its other panels).
-    private var controller: BrowserWindowController? { host as? BrowserWindowController }
+    private var controller: BrowserWindowController? { host?.commandBarBrowser }
     /// Catches clicks outside the bar; it doesn't dim the page.
     private let scrim = ScrimView(dims: false)
     private let panel = FloatingPanelView()
@@ -319,11 +323,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         self.mode = mode
         fetcher.isPrivate = host.commandBarIsPrivate
         mouseAtOpen = NSEvent.mouseLocation
-        let card = host.commandBarPageFrame
         let opening = !isVisible
         if !isVisible {
             host.commandBarWillShow()
             isVisible = true
+            // The host may have made room for the bar: the edge panel widens beside its card (#560).
+            let card = host.commandBarPageFrame
             // The history of the profile the bar is used in. It may have changed since the bar was last open: nothing
             // found then is reused.
             history.use(host.commandBarProfile.history)

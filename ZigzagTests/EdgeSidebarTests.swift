@@ -566,7 +566,7 @@ struct EdgeSidebarTests {
     }
 
     /// The menu bar's keys work in the panel: ⌘W closes the tab whose row is lit and the panel stays; ⌘L edits the
-    /// address in the window, which comes forward to do it, as ⌘T does.
+    /// address in the window, which comes forward to do it.
     @Test func theMenuBarsKeysActOnThePanelsBrowser() throws {
         let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
         defer { done() }

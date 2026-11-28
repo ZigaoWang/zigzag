@@ -3771,8 +3771,13 @@ extension BrowserWindowController: SidebarDelegate {
             }
         }
     }
+    /// New Tab from the + menu, and ⌘T in the panel: with the panel out its own bar opens over the screen, so the
+    /// window behind never comes forward (#560). Otherwise it's the window's bar, as ever.
     func listNewTab() {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.showNewTabBar()
+            return
+        }
         commandBar.show(mode: .newTab)
     }
 
@@ -4618,12 +4623,6 @@ extension BrowserWindowController {
     /// A menu item from the edge's panel acts on this window's sidebar: rename, a new folder, the space editor.
     func revealSidebarForEdge() {
         if !root.chromeSidebarShown && !root.isSidebarFloatingVisible { root.reveal(true) }
-    }
-
-    /// ⌘T in the edge's panel.
-    func newTabFromEdge() {
-        bringForwardForEdge()
-        newTab(nil)
     }
 }
 

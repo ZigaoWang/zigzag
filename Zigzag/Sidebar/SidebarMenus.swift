@@ -723,8 +723,8 @@ enum SidebarMenus {
                 case .separator: break
                 }
             }
-            // In the edge panel everything but New Tab is done where the list is; New Tab's bar is the window's.
-            item.staysInEdgePanel = entry != .newTab
+            // The panel's own: every item from its + menu is done where the list is, New Tab's bar included (#560).
+            item.staysInEdgePanel = true
             return .item(item)
         }
     }
