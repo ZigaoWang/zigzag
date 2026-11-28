@@ -13,6 +13,7 @@
 - 網站提供上一個和下一個時，小播放器會顯示「上一部影片」和「下一部影片」，就像 YouTube 播放清單那樣，不用回到網頁就能接著看。([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Markdown 檔案會像網頁一樣在分頁中以排版好的樣式開啟：可以是你 Mac 上的 .md 檔案，也可以是網站以 Markdown 傳送、或在 .md 網址以純文字傳送的檔案。表格、待辦清單和程式碼的顯示和 GitHub 上一樣，檔案旁邊的連結和圖片都能用，點按頂部的「原始文字」會顯示純文字。分割顯示、尋找、縮放、列印和閱讀器都可以使用，檔案裡的任何內容都無法執行。([#566](https://github.com/ZigaoWang/zigzag/issues/566))
 - 和 Safari 一樣，在支援通行密鑰的網站上，Mac 上儲存的通行密鑰會顯示在登入框下方：選一個，用 Touch ID 登入。只有當你在那裡選擇「使用儲存的通行密鑰」，或在「設定 › 密碼」中點按「允許」時，Zigzag 才會向 macOS 要求取用權限，之後它會列在「系統設定 › 隱私權與安全性」中，你可以在那裡更改。([#559](https://github.com/ZigaoWang/zigzag/issues/559))
+- 「設定 › 搜尋」中的「網站搜尋」列出可以在網址列輸入關鍵字後按下 Tab 鍵搜尋的網站，例如 yt 搜尋 YouTube。你可以用名稱、關鍵字和搜尋網址加入自己的網站，編輯或刪除它們，也可以關閉用不到的 Zigzag 內建網站。它們會和其他設定一起同步和備份。([#583](https://github.com/ZigaoWang/zigzag/issues/583))
 
 ### 修正
 - 載入線只在網頁真的有進展時才會前進。不再回應的網站會讓它停在原處，不會慢慢爬向終點；沒有新內容送達時，載入線會輕輕地明暗起伏。感謝 [Lakeland97](https://github.com/Lakeland97)。 ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

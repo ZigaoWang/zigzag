@@ -16,6 +16,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 网站提供上一个和下一个时，小播放器会显示“上一个视频”和“下一个视频”，就像 YouTube 播放列表那样，不用回到网页就能接着看。([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Markdown 文件会像网页一样在标签页中以排版好的样式打开：可以是你 Mac 上的 .md 文件，也可以是网站以 Markdown 发送、或在 .md 地址以纯文本发送的文件。表格、任务列表和代码的显示和 GitHub 上一样，文件旁边的链接和图片都能用，点按顶部的“源文本”会显示纯文本。分屏浏览、查找、缩放、打印和阅读器都可以使用，文件里的任何内容都无法运行。([#566](https://github.com/ZigaoWang/zigzag/issues/566))
 - 和 Safari 一样，在支持通行密钥的网站上，Mac 上存储的通行密钥会显示在登录框下方：选一个，用触控 ID 登录。只有当你在那里选择“使用存储的通行密钥”，或在“设置 › 密码”中点按“允许”时，Zigzag 才会向 macOS 请求访问权限，之后它会列在“系统设置 › 隐私与安全性”中，你可以在那里更改。([#559](https://github.com/ZigaoWang/zigzag/issues/559))
+- “设置 › 搜索”中的“网站搜索”列出了可以在地址栏输入关键词后按下 Tab 键搜索的网站，比如 yt 搜索 YouTube。你可以用名称、关键词和搜索地址添加自己的网站，编辑或删除它们，也可以关闭用不到的 Zigzag 自带网站。它们会和其他设置一起同步和备份。([#583](https://github.com/ZigaoWang/zigzag/issues/583))
 
 ### 修复
 - 加载线只在网页真正有进展时才会前进。不再回应的网站会让它停在原处，不会慢慢爬向终点；没有新内容到达时，加载线会轻轻地明暗起伏。感谢 [Lakeland97](https://github.com/Lakeland97)。 ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

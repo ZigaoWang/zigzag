@@ -8,6 +8,7 @@ CHANGELOG.md를 한국어로 옮긴 Zigzag의 릴리스 노트입니다. 앱에�
 - 사이트가 이전 및 다음을 제공하면 YouTube의 재생목록처럼 미니 플레이어에 ‘이전 비디오’와 ‘다음 비디오’가 표시되므로, 페이지로 돌아가지 않고도 넘어갈 수 있습니다. ([#565](https://github.com/ZigaoWang/zigzag/issues/565))
 - Markdown 파일이 페이지처럼 탭에서 서식이 적용된 채로 열립니다. Mac에 있는 .md 파일이나, 사이트가 Markdown 또는 .md 주소의 일반 텍스트로 보내는 파일이 해당됩니다. 표, 작업 목록, 코드는 GitHub에서처럼 보이고, 파일 옆의 링크와 사진도 작동하며, 상단의 ‘소스’를 누르면 일반 텍스트가 표시됩니다. Split View, 찾기, 확대/축소, 프린트, 읽기 도우미에서도 작동하며, 파일 안의 어떤 것도 실행될 수 없습니다. ([#566](https://github.com/ZigaoWang/zigzag/issues/566))
 - Safari에서처럼 패스키를 지원하는 사이트에서 Mac에 저장된 패스키가 로그인 필드 아래에 나타납니다. 하나를 선택하고 Touch ID로 로그인하세요. Zigzag는 그곳에서 ‘저장된 패스키 사용’을 선택하거나 ‘설정 › 암호’에서 ‘허용’을 선택할 때만 macOS에 접근을 요청하며, 그 후에는 ‘시스템 설정 › 개인정보 보호 및 보안’에 표시되어 그곳에서 변경할 수 있습니다. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
+- ‘설정 › 검색’의 ‘사이트 검색’에 주소 막대에서 키워드를 입력하고 Tab 키를 눌러 검색할 수 있는 사이트가 표시됩니다. 예를 들어 yt는 YouTube입니다. 이름, 키워드, 검색 주소로 직접 사이트를 추가하고 편집하거나 삭제할 수 있으며, 사용하지 않는 Zigzag 사이트는 끌 수 있습니다. 다른 설정과 함께 동기화되고 백업됩니다. ([#583](https://github.com/ZigaoWang/zigzag/issues/583))
 
 ### 수정 사항
 - 로딩 줄은 이제 페이지가 실제로 진행될 때만 움직입니다. 응답을 멈춘 사이트에서는 끝을 향해 슬금슬금 나아가지 않고 그 자리에 멈추며, 아무것도 도착하지 않는 동안에는 줄이 은은하게 흐려졌다 밝아집니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
