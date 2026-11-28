@@ -516,6 +516,65 @@ struct EdgeSidebarTests {
         #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === there })
     }
 
+    /// A space switch while a page is out keeps the page's place: the page goes back to its tab, and the new space's
+    /// empty page stands where it was, with or without the keyboard, until a row's page comes out over it.
+    @Test func aSpaceSwitchKeepsThePagesPlaceOnTheNewSpace() async throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        let (panel, host) = try panelParts()
+        let other = Library.shared.addSpace(name: "Edge blank").id
+        let there = manager.newTab(url: URL(string: "https://example.test/there"), spaceID: other, select: false)
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let wide = panel.frame
+        let pill = panel.convertToScreen(host.convert(host.pageFrame, to: nil))
+        EdgeSidebar.debugPageHasKeyboard = false
+        defer { EdgeSidebar.debugPageHasKeyboard = nil }
+
+        manager.switchToSpace(other)
+        #expect(EdgeSidebar.shared.pagePreview == nil)
+        #expect(tabs[1].host === controller)
+        #expect(EdgeSidebar.shared.blankPageSpace == other)
+        #expect(EdgeSidebar.shared.blankPageWindow?.frame == pill)
+        #expect(EdgeSidebar.shared.blankPageWindow?.isVisible == true)
+        try? await Task.sleep(for: .milliseconds(300))
+        #expect(panel.frame == wide)
+        #expect(host.pageShowing)
+
+        // The next rest brings that row's page out in the same place, over the empty page, which then goes.
+        EdgeSidebar.shared.hover(there, in: controller)
+        #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === there })
+        #expect(EdgeSidebar.shared.pagePreview?.window?.frame == pill)
+        #expect(await until(3) { EdgeSidebar.shared.blankPageSpace == nil })
+        #expect(panel.frame == wide)
+    }
+
+    /// Esc, or a row with no page, puts the empty page away as it would a page, and the sidebar stays out.
+    @Test func theEmptyPageGoesAsAPageDoes() async throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a"])
+        defer { done() }
+        let (_, host) = try panelParts()
+        let first = Library.shared.spaces[0].id
+        let other = Library.shared.addSpace(name: "Edge blank esc").id
+        _ = manager.newTab(url: URL(string: "https://example.test/there"), spaceID: other, select: false)
+        EdgeSidebar.shared.previewNow(tabs[0], in: controller)
+        manager.switchToSpace(other)
+        #expect(EdgeSidebar.shared.blankPageSpace == other)
+        // Back again: the empty page follows to the space shown.
+        manager.switchToSpace(first)
+        #expect(EdgeSidebar.shared.blankPageSpace == first)
+        #expect(EdgeSidebar.shared.dismissPreview())
+        #expect(EdgeSidebar.shared.blankPageSpace == nil)
+        #expect(EdgeSidebar.shared.isShowing)
+        #expect(!host.pageShowing)
+
+        EdgeSidebar.shared.previewNow(tabs[0], in: controller)
+        manager.switchToSpace(other)
+        let empty = manager.newTab(url: nil, spaceID: other)
+        EdgeSidebar.shared.hover(empty, in: controller)
+        #expect(await until(3) { EdgeSidebar.shared.blankPageSpace == nil })
+        #expect(EdgeSidebar.shared.isShowing)
+    }
+
     /// With no page out, a rest begun on a row just before a space switch brings nothing out after it.
     @Test func aRestBegunBeforeASpaceSwitchShowsNothing() async throws {
         let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])

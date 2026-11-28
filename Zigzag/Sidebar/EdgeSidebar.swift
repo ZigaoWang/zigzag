@@ -170,9 +170,16 @@ final class EdgeSidebar {
     private var previewPanelFrame: NSRect = .zero
     /// A menu from the panel is open: the page, a window above the panel, is ordered out so it can't cover it.
     private var menuCoversPage = false
+    /// After a space switch, the new space's empty page in the page's place, until a row's page comes out over it.
+    private var blank: EdgeBlankPage?
+    /// A page, or the empty page, is out beside the sidebar.
+    private var pageIsOut: Bool { preview != nil || blank != nil }
 
     /// The page beside the panel, if one is out.
     var pagePreview: MiniWindowController? { preview }
+    /// The empty page standing in the page's place after a space switch, for tests.
+    var blankPageSpace: UUID? { blank?.spaceID }
+    var blankPageWindow: NSWindow? { blank?.window }
 
     private init() {}
 
@@ -331,11 +338,12 @@ final class EdgeSidebar {
         if Self.debugHoldsOpen { held = true }
         #endif
         // The menu's room goes with the menu; the page's room stays while a page is out.
-        let frame = preview == nil ? cardPanelFrame : previewPanelFrame
+        let frame = pageIsOut ? previewPanelFrame : cardPanelFrame
         if MenuPanel.current == nil, panel.frame != frame { panel.setFrame(frame, display: true) }
         if MenuPanel.current == nil, menuCoversPage {
             menuCoversPage = false
             preview?.layoutInDock()
+            if preview == nil { blank?.window.order(.above, relativeTo: panel.windowNumber) }
         }
         // The panel gets no mouse moves with another app in front, so the preview's strip follows from here.
         let point = pointer
@@ -389,7 +397,7 @@ final class EdgeSidebar {
     /// Esc in the panel puts the page away first.
     @discardableResult
     func dismissPreview() -> Bool {
-        guard preview != nil else { return false }
+        guard pageIsOut else { return false }
         closePreview()
         return true
     }
@@ -448,7 +456,7 @@ final class EdgeSidebar {
         host.layoutSubtreeIfNeeded()
         guard let mini = MiniWindowController.openPreview(of: tab, from: controller, dockedIn: self,
                                                            reveal: false, deferPage: !live) else {
-            if previous == nil { narrowPanel() }
+            if previous == nil, blank == nil { narrowPanel() }
             return
         }
         if !live {
@@ -463,8 +471,12 @@ final class EdgeSidebar {
         preview = mini
         previewTab = tab
         mini.layoutInDock(force: true)
-        mini.revealDockedPage(fromRight: shownOnRight) { [weak self, weak previous] in
-            // The page before stays under the fold until it is covered.
+        mini.revealDockedPage(fromRight: shownOnRight) { [weak self, weak previous, weak mini] in
+            // The page before, or the empty page, stays under the fold until it is covered.
+            if let self, let mini, self.preview === mini {
+                self.blank?.close()
+                self.blank = nil
+            }
             guard let previous else { return }
             previous.onInPageMiniClosed = nil
             previous.onInPageMiniDetached = nil
@@ -478,7 +490,7 @@ final class EdgeSidebar {
     private func schedulePreviewClose(evenOnRows: Bool = false) {
         closeWork?.cancel()
         closeWork = nil
-        guard preview != nil else { return }
+        guard pageIsOut else { return }
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -544,6 +556,11 @@ final class EdgeSidebar {
         previewWork = nil
         closeWork?.cancel()
         closeWork = nil
+        if let blank {
+            blank.close()
+            self.blank = nil
+            if preview == nil { narrowPanel() }
+        }
         guard let mini = preview, !mini.isLeavingDock else { return }
         preview = nil
         previewTab = nil
@@ -561,6 +578,8 @@ final class EdgeSidebar {
     /// The preview closed itself (Esc, its close button, Open in Zigzag) or finished folding away.
     private func previewClosed(_ closing: MiniWindowController?) {
         if let closing, let preview, preview !== closing { return }
+        // A page that went before the switch never takes the empty page's room away.
+        if closing != nil, preview == nil, blank != nil { return }
         let movedOut = preview?.pageMovedOut == true
         preview = nil
         previewTab = nil
@@ -585,6 +604,15 @@ final class EdgeSidebar {
         panel.setFrame(cardPanelFrame, display: true)
     }
 
+    /// The space's empty page in the page's place, put there before the page leaves so nothing shows through.
+    private func showBlankPage(of space: SpaceInfo) {
+        guard isShowing, let panel, let host, host.pageShowing else { return }
+        let page = blank ?? EdgeBlankPage()
+        page.show(space, at: panel.convertToScreen(host.convert(host.pageFrame, to: nil)), over: panel,
+                  covered: menuCoversPage)
+        blank = page
+    }
+
     /// A tab of the space the panel's list shows; a favorite belongs to every space.
     private static func isInShownSpace(_ tab: Tab, of controller: BrowserWindowController) -> Bool {
         tab.isFavorite || tab.spaceID == controller.tabManager.currentSpaceID
@@ -593,12 +621,27 @@ final class EdgeSidebar {
     private func managerChanged(_ change: TabManager.Change) {
         if change == .space {
             // The row it came from is no longer on screen: its page goes back to its tab at once, and a rest begun on
-            // a row of the space left never brings that row's page out. The sidebar stays.
+            // a row of the space left never brings that row's page out. The sidebar stays, and so does the page's
+            // place: the new space's empty page stands in it until a row's page comes out over it.
             hoverCheck += 1
-            closePreview(animated: false)
+            previewWork?.cancel()
+            previewWork = nil
+            closeWork?.cancel()
+            closeWork = nil
+            let wasOut = blank != nil || preview.map { !$0.isLeavingDock } == true
+            if wasOut, let target, let space = Library.shared.space(target.tabManager.currentSpaceID) { showBlankPage(of: space) }
+            if let mini = preview {
+                preview = nil
+                previewTab = nil
+                if !mini.isLeavingDock {
+                    mini.onInPageMiniClosed = nil
+                    mini.onInPageMiniDetached = nil
+                    mini.closeInPage(focusBack: pageHasKeyboard(mini), animated: false)
+                }
+            }
             // A page still folding back goes home now too, rather than showing through the switch.
             for mini in MiniWindowController.all where mini.isLeavingDock && mini.isDocked(in: self) { mini.endBorrowingNow() }
-            if preview == nil { narrowPanel() }
+            if blank == nil { narrowPanel() }
             return
         }
         if change == .structure, preview != nil, previewTab?.isClosed == true { closePreview(animated: false) }
@@ -681,6 +724,7 @@ final class EdgeSidebar {
         panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: width, onRight: shownOnRight), display: true)
         menuCoversPage = true
         preview?.layoutInDock()
+        blank?.window.orderOut(nil)
     }
 
     /// Downloads from the panel: the list in the panel's window, over the mirror's lane, not in the window behind.
@@ -910,6 +954,66 @@ extension EdgeSidebar: MiniDockHosting {
     func dockFocusPage() {
         guard isShowing, let panel else { return }
         panel.makeKey()
+    }
+}
+
+/// The page's place beside the sidebar after a space switch: the new space's empty page, its tint or picture and the
+/// wordmark, as a window shows a space with no tab. A window of its own above the panel, like the page's, so a row's
+/// page folds in over it.
+final class EdgeBlankPage {
+    let window: NSWindow
+    private let backdrop = EmptyPageBackdrop()
+    private let mark = EmptySpaceMark()
+    private(set) var spaceID: UUID?
+
+    init() {
+        let window = NSWindow(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        // Clicks go to the panel under it, which keeps the page's room.
+        window.ignoresMouseEvents = true
+        window.isReleasedWhenClosed = false
+        window.animationBehavior = .none
+        window.collectionBehavior = [.fullScreenAuxiliary, .transient, .ignoresCycle]
+        window.isExcludedFromWindowsMenu = true
+        let content = NSView()
+        content.wantsLayer = true
+        content.layer?.cornerRadius = Tokens.Radius.large
+        content.layer?.cornerCurve = .continuous
+        content.layer?.masksToBounds = true
+        content.addSubview(backdrop)
+        content.addSubview(mark)
+        window.contentView = content
+        backdrop.onPictureChange = { [weak mark] shown in mark?.onPicture = shown }
+        backdrop.isActive = true
+        self.window = window
+    }
+
+    func show(_ space: SpaceInfo, at frame: NSRect, over parent: NSWindow, covered: Bool) {
+        spaceID = space.id
+        let kept = Library.shared.space(space.id) ?? space
+        backdrop.isActive = true
+        backdrop.show(ground: EmptyPage.ground(for: kept, isPrivate: false),
+                      picture: EmptyPage.picture(for: kept, isPrivate: false), animated: false)
+        window.level = parent.level
+        window.setFrame(frame, display: false)
+        let bounds = NSRect(origin: .zero, size: frame.size)
+        backdrop.frame = bounds
+        let size = EmptySpaceMark.size
+        mark.frame = NSRect(x: round(bounds.midX - size.width / 2), y: round(bounds.midY - size.height / 2),
+                            width: size.width, height: size.height)
+        if window.parent !== parent { parent.addChildWindow(window, ordered: .above) }
+        if covered { window.orderOut(nil) } else { window.order(.above, relativeTo: parent.windowNumber) }
+        window.display()
+        window.invalidateShadow()
+    }
+
+    func close() {
+        backdrop.isActive = false
+        window.parent?.removeChildWindow(window)
+        window.orderOut(nil)
+        spaceID = nil
     }
 }
 
