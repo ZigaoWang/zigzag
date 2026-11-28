@@ -440,6 +440,21 @@ enum FoldStyle {
     static let chevronGap = Tokens.Space.x2
     /// The room a header gives its chevron at its trailing end, past its content.
     static var chevronRoom: CGFloat { chevronSide + chevronGap }
+    /// A hover inside a box: inset from its edges on every side, its corners concentric with the box's.
+    static let hoverInset = Tokens.Space.x1
+    static var hoverRadius: CGFloat { radius - hoverInset }
+
+    /// The fill a row in a box shows under the pointer, inset so it never reaches the box's corners.
+    static func hoverShape() -> ColorView {
+        let shape = PassThroughColorView()
+        shape.layer?.cornerRadius = hoverRadius
+        shape.layer?.cornerCurve = .continuous
+        return shape
+    }
+
+    private final class PassThroughColorView: ColorView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
     /// A short list opens its boxes; a longer one starts folded.
     static let openUpTo = 3
     /// From this many boxes, the list gets a search of its own.
@@ -489,6 +504,7 @@ enum FoldStyle {
 final class FoldHeader: InteractiveView {
     let content: NSView
     private let chevron = NSImageView()
+    private let hover = FoldStyle.hoverShape()
     /// Folded or open, as the chevron shows: right or down.
     var isOpen = false { didSet { if oldValue != isOpen { refresh() } } }
     /// Asked to open (true) or fold.
@@ -507,6 +523,7 @@ final class FoldHeader: InteractiveView {
         self.content = content
         super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Page.groupRowHeight))
         chevron.imageScaling = .scaleNone
+        addSubview(hover)
         addSubview(content)
         addSubview(chevron)
         onClick = { [weak self] _ in
@@ -523,6 +540,7 @@ final class FoldHeader: InteractiveView {
 
     override func layout() {
         super.layout()
+        hover.frame = bounds.insetBy(dx: FoldStyle.hoverInset, dy: FoldStyle.hoverInset)
         content.frame = NSRect(x: 0, y: 0, width: max(0, bounds.width - FoldStyle.chevronRoom), height: bounds.height)
         // The glyph's own width, so its right edge sits the same pad in from the box as the picture does on the left.
         let side = FoldStyle.chevronSide, glyph = min(side, ceil(chevron.image?.size.width ?? side))
@@ -539,7 +557,7 @@ final class FoldHeader: InteractiveView {
     override var acceptsFirstResponder: Bool { !isLeaf && super.acceptsFirstResponder }
 
     override func stateDidChange(animated: Bool) {
-        layer?.backgroundColor = !isLeaf && (isHovered || isPressed) ? cgColor(isPressed ? Tokens.Color.pressedFill : Tokens.Color.hoverFill) : nil
+        hover.color = !isLeaf && (isHovered || isPressed) ? (isPressed ? Tokens.Color.pressedFill : Tokens.Color.hoverFill) : nil
         chevron.contentTintColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
     }
 
@@ -721,7 +739,14 @@ final class FoldBox: NSView, SettingsSizedRow, SettingsFilteredRow, SettingsSear
     private func headerHeight(_ width: CGFloat) -> CGFloat { headerRow.height(for: rowWidth(width)) }
 
     /// Rows inside stop where the header's content does, so their controls line up with its own, clear of the chevron.
-    private func rowWidth(_ width: CGFloat) -> CGFloat { max(0, width - FoldStyle.chevronRoom) }
+    /// With nothing in the header but the chevron (a menu's shortcuts), they run the box's width, so their keys end
+    /// on the chevron's edge, as far in from the box as their titles.
+    private func rowWidth(_ width: CGFloat) -> CGFloat { headerHasControl ? max(0, width - FoldStyle.chevronRoom) : width }
+
+    private var headerHasControl: Bool {
+        let control = headerRow.control
+        return control.fittingSize.width > 0 || control.intrinsicContentSize.width > 0
+    }
 
     /// Shown when every word is in its name or in one of its rows; then open to just those rows. No words: as it
     /// was, folded or open as chosen. Rows not made yet are made only when their words could match.
@@ -6194,6 +6219,7 @@ final class ShortcutRow: InteractiveView, FoldRow {
     private let note = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
     private var caps: [KeyCap] = []
     private let field = ColorView(color: .clear)
+    private let hover = FoldStyle.hoverShape()
     private let fieldLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: .compact, toolTip: String(localized: "Back to Zigzag’s Shortcut", comment: "Tooltip of the button that puts a changed shortcut back, in Settings › Shortcuts."))
     /// An × beside the keys while the pointer is on the row or you're typing new ones: the command keeps no shortcut,
@@ -6240,8 +6266,10 @@ final class ShortcutRow: InteractiveView, FoldRow {
     private func setup(keys: [String]) {
         self.keys = keys
         title.wrapWhenLong()
+        // The keyboard's ring follows these corners; the hover has its own, inset.
         layer?.cornerRadius = Tokens.Radius.group
         layer?.cornerCurve = .continuous
+        addSubview(hover)
         addSubview(title)
         addSubview(note)
         note.isHidden = true
@@ -6282,6 +6310,7 @@ final class ShortcutRow: InteractiveView, FoldRow {
         super.layout()
         let pad = Tokens.Page.groupPad
         let h = Tokens.Page.controlHeight
+        hover.frame = bounds.insetBy(dx: FoldStyle.hoverInset, dy: FoldStyle.hoverInset)
         var x = bounds.width - pad
         if isRecording {
             let w: CGFloat = 168
@@ -6365,7 +6394,7 @@ final class ShortcutRow: InteractiveView, FoldRow {
     private func refresh() {
         let editable = item != nil
         let fill: NSColor? = isRecording ? nil : editable && isPressed ? Tokens.Color.pressedFill : editable && isHovered ? Tokens.Color.hoverFill : nil
-        layer?.backgroundColor = fill.map { cgColor($0) }
+        hover.color = fill
         caps.forEach { $0.isHidden = isRecording }
         let none = caps.isEmpty && editable
         field.isHidden = !(isRecording || none)
