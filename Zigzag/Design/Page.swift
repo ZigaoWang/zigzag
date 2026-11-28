@@ -324,7 +324,11 @@ enum PageStyle {
     .page-header > .inner { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center;
                             gap: 8px; padding: var(--header-top) var(--gutter) var(--header-bottom); }
     .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); margin-right: auto; min-width: 0; }
-    .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.023em; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* In the control height's line, as PageTitleView sets it, so the header is as tall as the native pages'; 1px up
+       sets its capitals on the search field's middle, as Label.centeredY does. Room below, taken back by the margin,
+       keeps descenders out of the clip the ellipsis needs. */
+    .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.023em; line-height: var(--control-height); position: relative; top: -1px;
+                     margin: 0 0 calc(-1 * var(--space-2)); padding-bottom: var(--space-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
     /* Controls keep 1px more under their words than over them: flex centers the line box, and the system font draws its
