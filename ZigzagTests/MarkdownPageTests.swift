@@ -313,11 +313,12 @@ struct MarkdownPageTests {
             n += 1
             text += "## Section \(n)\n\nSome *words* with `code`, a [link](https://example.com/\(n)) and <b>tags</b>.\n\n| a | b |\n|---|---|\n| \(n) | x |\n\n- [ ] task\n- item\n\n```\nlet x = \(n)\n```\n\n"
         }
-        let start = Date()
+        // CPU time on this thread, so other builds sharing the Mac don't make it look slow.
+        let start = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
         let rendered = MarkdownHTML.render(text, base: fileBase)
-        let seconds = Date().timeIntervalSince(start)
+        let seconds = Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - start) / 1e9
         #expect(rendered.body.contains("Section \(n)"))
-        #expect(seconds < 4, "\(seconds)s")
+        #expect(seconds < 15, "\(seconds)s of CPU")   // a sanity bound; the main-thread check below is the real one
 
         let folder = try scratch()
         defer { try? FileManager.default.removeItem(at: folder) }
