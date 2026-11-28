@@ -229,7 +229,7 @@ final class BridgeOmnibox: BridgeNamespace {
         }), siteSearchKeys: Self.siteSearchKeys)
     }
 
-    private static let siteSearchKeys = Set(SiteSearch.all.flatMap(\.keys))
+    private static var siteSearchKeys: Set<String> { Set(SiteSearch.all.flatMap(\.keys)) }
 
     func icon(for extensionID: String) -> NSImage? {
         host.context(for: extensionID)?.webExtension.icon(for: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon))
