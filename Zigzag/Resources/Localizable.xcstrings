@@ -3879,6 +3879,17 @@
         }
       }
     },
+    "Temporary, cleared by macOS" : {
+      "comment" : "Under a download's name in the downloads panel: the file was saved in a temporary folder macOS clears, like one handed on to an app. It is not kept like other downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "临时文件，macOS 会清除"
+          }
+        }
+      }
+    },
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too." : {
       "comment" : "Explanation under “Removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it. The rest keeps syncing.",
       "localizations" : {

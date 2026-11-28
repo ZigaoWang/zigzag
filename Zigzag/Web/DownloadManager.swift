@@ -44,6 +44,16 @@ final class DownloadItem {
         state == .finished && !(destination.map { FileManager.default.fileExists(atPath: $0.path) } ?? false)
     }
 
+    /// The file waits in Zigzag's folder in the system's temporary folder, because a File handoff put it there
+    /// (#589). It is a real download — listed, openable, draggable — but macOS clears that folder, so its row says
+    /// so rather than letting it look like a file you chose to keep. Read from where the file is rather than
+    /// saved beside the item: the path is the one fact that can't disagree with itself, and a list restored after
+    /// a relaunch knows it without any new stored field.
+    var waitsInTemporaryFolder: Bool {
+        guard let path = destination?.standardizedFileURL.path else { return false }
+        return path.hasPrefix(DownloadManager.handoffFolder.standardizedFileURL.path + "/")
+    }
+
     /// Seconds until done at the current speed, once there's enough to tell.
     var secondsLeft: Double? {
         guard state == .downloading, speed > 1, totalBytes > completedBytes else { return nil }
@@ -179,8 +189,17 @@ final class DownloadManager: NSObject {
     /// survives a reboot — so it is temporary by design, while the file is still there to be found and opened if you
     /// want it, which deleting it five minutes after the handoff would not allow. It is deliberately not Downloads:
     /// a metafile handed to rTorrent is a carrier, not something you asked to keep.
+    ///
+    /// Pure: the path is worked out here and the folder made only by `ensureHandoffFolder`. Asking whether a file is
+    /// in it is a question a download's row may ask while it draws, and drawing must not make directories.
     static var handoffFolder: URL {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("Handoffs", isDirectory: true)
+        FileManager.default.temporaryDirectory.appendingPathComponent("Handoffs", isDirectory: true)
+    }
+
+    /// Makes the handoff folder, readable only by its owner, and answers it. Called where a handoff is about to be
+    /// saved into it, never to ask where it is.
+    static func ensureHandoffFolder() -> URL {
+        let base = handoffFolder
         if !FileManager.default.fileExists(atPath: base.path) {
             try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true,
                                                       attributes: [.posixPermissions: 0o700])
@@ -737,7 +756,7 @@ extension DownloadManager: WKDownloadDelegate {
         if fileHandoff != nil {
             // A File handoff's file goes where the handoff will look for it, never into Downloads (#589): it is a
             // carrier for the app or service, and macOS clears the temporary folder it waits in.
-            destination = Self.uniqueDestination(for: name, in: Self.handoffFolder, avoiding: inProgress)
+            destination = Self.uniqueDestination(for: name, in: Self.ensureHandoffFolder(), avoiding: inProgress)
         } else if let folder = Self.aiAppsFolder(for: item(for: download)) {
             // AI apps' files stay in their profile's own folder, and no one is asked where.
             let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
@@ -862,12 +881,16 @@ extension DownloadManager: WKDownloadDelegate {
             item.totalBytes = size
             item.completedBytes = size
         }
-        if let destination = item.destination, item.fileHandoff == nil {
-            // A File handoff's file is a carrier, not a download you asked to keep (#589): it is not marked as
-            // downloaded — no Downloads stack entry, no history — since it waits in the system's temporary folder.
+        if let destination = item.destination {
+            // A File handoff's file is marked like any download because it is one: the quarantine note and Where From
+            // make it open safely and say where it came from, which matters more for a file in a folder people rarely
+            // look in (#589). Only the Dock bounce below is skipped, and for a different reason: the Downloads stack
+            // mirrors ~/Downloads, so a file in the temporary folder has nothing to bounce to.
             Self.markDownloaded(destination, from: item.sourceURL, page: download.originalRequest?.mainDocumentURL, isPrivate: item.isPrivate)
             // Bounce the Downloads stack in the Dock, like every Mac browser.
-            if !item.isForAIApps { DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path) }
+            if !item.isForAIApps, !item.waitsInTemporaryFolder {
+                DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path)
+            }
         }
         changed.send(item)
         if item.opensWhenFinished { openWhenFinished(item) }

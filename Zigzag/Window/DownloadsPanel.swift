@@ -148,8 +148,14 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             let size = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
             let site = item.sourceURL.flatMap { ["http", "https"].contains($0.scheme ?? "") ? $0.host() : nil }
                 .map { $0.withoutWWW }
-            status.stringValue = isFresh ? String(localized: "Just downloaded", comment: "Under a download's name in the downloads panel: the file has just finished downloading.")
-                : site.map { String(localized: "\(size) from \($0)", comment: "Under a download's name in the downloads panel: the file's size and the site it came from, like 9 MB from example.com.") } ?? size
+            if item.waitsInTemporaryFolder {
+                // It is a real download and stays listed, but macOS clears the folder it waits in, so the row says
+                // so instead of letting it look like a file you chose to keep (#589). Show in Finder still finds it.
+                status.stringValue = String(localized: "Temporary, cleared by macOS", comment: "Under a download's name in the downloads panel: the file was saved in a temporary folder macOS clears, like one handed on to an app. It is not kept like other downloads.")
+            } else {
+                status.stringValue = isFresh ? String(localized: "Just downloaded", comment: "Under a download's name in the downloads panel: the file has just finished downloading.")
+                    : site.map { String(localized: "\(size) from \($0)", comment: "Under a download's name in the downloads panel: the file's size and the site it came from, like 9 MB from example.com.") } ?? size
+            }
             actionButton.symbol = "magnifyingglass"
             actionButton.toolTip = String(localized: "Show in Finder", comment: "Tooltip of a download's button in the downloads panel: shows the file in Finder.")
         case .failed, .cancelled:

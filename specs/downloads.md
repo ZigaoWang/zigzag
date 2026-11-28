@@ -83,6 +83,9 @@
   Test: HandoffFolderTests.askingAgainKeepsTheFolderAndItsFiles
   Test: HandoffFolderTests.twoFilesOfOneNameGetTheirOwnPlaces
   Test: DownloadRuleTests.onlyDownloadsHandOffASavedFile
+- A File handoff's file in the downloads panel → listed like any other download, and its row says it is temporary and that macOS clears it, rather than the file being kept out of the list; Show in Finder still finds it, so a file you want is reachable before the system clears the folder.
+  Test: HandoffFolderTests.aHandoffFileIsMarkedTemporaryWhereverTheFolderIs
+  Test: HandoffFolderTests.theMarkIsReadFromWhereTheFileIs
 - A File handoff's templates → `{file}` is the saved file's path and `{file_url}` its file URL, while `{link}` stays the address.
   Test: DownloadRuleTests.fileTokensAreTheSavedFileAndNothingWithoutOne
 - `{file_raw}` → the saved file's own bytes, base64, for a service that loads the metafile itself; an XML-RPC body sends it as `<base64>` and a JSON-RPC body as base64 text.

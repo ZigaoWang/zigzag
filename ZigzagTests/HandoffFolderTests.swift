@@ -8,7 +8,7 @@ import Testing
 struct HandoffFolderTests {
     /// The folder exists after asking for it, it is the system's temporary folder, and only its owner may look in.
     @Test func theHandoffFolderIsInTheSystemTemporaryFolderAndPrivate() throws {
-        let folder = DownloadManager.handoffFolder
+        let folder = DownloadManager.ensureHandoffFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var isFolder: ObjCBool = false
         #expect(FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder))
@@ -24,18 +24,18 @@ struct HandoffFolderTests {
     /// Asking twice is the same folder, and files already in it are not disturbed: a second handoff arriving while
     /// the first is still waiting must not clear the first's file.
     @Test func askingAgainKeepsTheFolderAndItsFiles() throws {
-        let folder = DownloadManager.handoffFolder
+        let folder = DownloadManager.ensureHandoffFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let kept = folder.appendingPathComponent("waiting.torrent")
         try Data("torrent".utf8).write(to: kept)
-        #expect(DownloadManager.handoffFolder == folder)
+        #expect(DownloadManager.ensureHandoffFolder() == folder)
         #expect(FileManager.default.fileExists(atPath: kept.path))
     }
 
     /// A name already taken in the handoff folder gets one of its own, as anywhere else: two handoffs of the same
     /// metafile name would otherwise be one file handed twice.
     @Test func twoFilesOfOneNameGetTheirOwnPlaces() throws {
-        let folder = DownloadManager.handoffFolder
+        let folder = DownloadManager.ensureHandoffFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         try Data("first".utf8).write(to: folder.appendingPathComponent("chart.torrent"))
         let second = DownloadManager.uniqueDestination(for: "chart.torrent", in: folder)
@@ -48,5 +48,32 @@ struct HandoffFolderTests {
     @Test func theHandoffFolderIsNotWhereDownloadsGo() {
         #expect(DownloadManager.handoffFolder != DownloadManager.folder)
         #expect(!DownloadManager.folder.path.contains("/Handoffs"))
+    }
+
+    /// A handoff's file is a real download and says so: its row is marked temporary rather than the file being kept
+    /// out of the list (#589). A file anywhere else — Downloads, a rule's own folder — is not marked.
+    @Test func aHandoffFileIsMarkedTemporaryWhereverTheFolderIs() {
+        let folder = DownloadManager.handoffFolder.standardizedFileURL.path
+        func isTemporary(_ path: String) -> Bool {
+            URL(fileURLWithPath: path).standardizedFileURL.path.hasPrefix(folder + "/")
+        }
+        #expect(isTemporary(folder + "/chart.torrent"))
+        #expect(!isTemporary("/Users/someone/Downloads/chart.torrent"))
+        // A folder whose name merely starts the same way is not the handoff folder.
+        #expect(!isTemporary(folder + "-2024/chart.torrent"))
+    }
+
+    /// The mark is read from the path, so it survives a relaunch with no new stored field: a list saved and read
+    /// back knows a handoff's file is temporary, and one whose handoff folder has since been cleared is marked
+    /// missing instead — which is the truth about it.
+    @Test func theMarkIsReadFromWhereTheFileIs() {
+        let folder = DownloadManager.handoffFolder.standardizedFileURL.path
+        #expect(DownloadManager.handoffFolder.path.hasPrefix(FileManager.default.temporaryDirectory
+            .appendingPathComponent("Handoffs").path))
+        #expect(folder.hasSuffix("/Handoffs"))
+        // A file beside the folder, whose name merely starts the same way, is not in it.
+        let lookalike = DownloadManager.handoffFolder.deletingLastPathComponent()
+            .appendingPathComponent("Handoffs-2024/chart.torrent")
+        #expect(!lookalike.standardizedFileURL.path.hasPrefix(folder + "/"))
     }
 }
