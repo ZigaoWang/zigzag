@@ -1,0 +1,83 @@
+# Builds Zigzag and runs its tests on every pull request and on every push to main and the release branches.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, "release/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its run still going; runs on main and the release branches all finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Build and test
+    # GitHub's arm64 image with Xcode 27 on macOS 27: 3 cores, 7 GB of memory.
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      # Suites a CI machine can't run, separated by spaces:
+      # PasswordStoreTests needs the keychain access group, which only a real development profile gives.
+      ZZ_SKIP_SUITES: PasswordStoreTests
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode 27.2
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          xcodebuild -version
+
+      - name: Sign ad hoc, without a team or profile
+        run: scripts/ci-prepare.sh
+
+      - name: Restore Swift packages
+        uses: actions/cache@v6
+        with:
+          path: build/dd/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('Zigzag.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
+      # Each run's suite times, which test.sh uses to split the suites evenly across its test processes.
+      - name: Restore suite times
+        uses: actions/cache@v6
+        with:
+          path: build/test-times
+          key: test-times-${{ github.run_id }}
+          restore-keys: test-times-
+
+      # Two test processes plus the pseudo-localized one, which fits the runner's 3 cores.
+      - name: Build and run the tests
+        run: scripts/test.sh -j 2
+
+      - name: Upload the test logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-logs
+          path: build/test-logs
+          retention-days: 14
+
+  strings:
+    name: Strings and release notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # On a pull request this only warns: maintainers translate new strings before a release (CONTRIBUTING.md).
+      - name: Check every string is translated
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        run: python3 scripts/check-strings.py || { echo "::warning::Strings or release notes need work, see the log"; exit 1; }
+
+      - name: Check the Unreleased notes match in every language
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        run: python3 scripts/check-strings.py --notes Unreleased || { echo "::warning::Strings or release notes need work, see the log"; exit 1; }
