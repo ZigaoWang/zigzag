@@ -24,6 +24,9 @@
 - ⌘W on the last tab of a space → the space's most recent page, else the space shows empty.
   Test: TabCloseSelectionTests.closingTheLastTabGoesToTheSpacesRecentPageElseEmpty
   Test: EverydayFlowsTests.closingTheLastTabOfASpace
+- A space showing empty → its card has the space's color or picture with the ZIGZAG wordmark from the first frame, served as Zigzag's own page; a private window's card is the plain private one, never the space's picture.
+  Test: ViewportPageTests.aPrivateWindowIgnoresTheSpace
+  Test: ViewportPageTests.theMarkIsTheNativeMarksSize
 - Close a tab → its page is let go at once, so WebKit can end its process; ⇧⌘T loads it again with its history.
   Test: PageReleaseTests.aClosedTabLetsGoOfItsPageAndItself
 
