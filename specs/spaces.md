@@ -68,8 +68,11 @@
   Test: SpaceProfileTests.aNewProfileForASpaceIsNamedAfterItAndHoldsIt
 - Give new spaces their own profile in Settings › Spaces → off by default; on, each new space gets a profile with its name and color.
   Test: SpaceProfileTests.aNewSpaceCanComeWithItsOwnProfile
-- Only one profile → no space names it; with two or more, every space says which it's on.
+- Spaces all on one profile → no space names it, even with other profiles kept; with spaces on two or more, every space says which it's on.
   Test: SpaceProfileTests.withOneProfileNothingNamesIt
+  Test: SpaceProfileTests.aProfileNoSpaceIsOnNamesNothing
+- Delete a space with a profile of its own → nothing asks; the profile and its data stay in Settings › Profiles, where you can remove it, so ⌘Z brings the space back whole.
+  No test yet.
 
 ## Sidebar
 - Sidebar position in Settings › Appearance, or View › Move Sidebar to Right → Left or Right; Left until changed.

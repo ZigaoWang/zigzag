@@ -2144,6 +2144,10 @@ final class Library {
     var profiles: [ProfileInfo] { directory.all }
     /// Whether there's more than the first profile: only then does anything in the window speak of profiles.
     var hasManyProfiles: Bool { directory.all.count > 1 }
+    /// The profile's name to show beside a space, if any (`ProfileDirectory.shownName`).
+    func shownProfileName(ofSpace id: UUID, spaceName: String) -> String? {
+        directory.shownName(among: yourSpaces.map(\.id), ofSpace: id, spaceName: spaceName)
+    }
     /// More than one profile besides AI Apps: where your spaces are listed under their profiles.
     var hasManyOfYourProfiles: Bool { directory.all.filter { !$0.isHeadless }.count > 1 }
 

@@ -583,7 +583,7 @@ enum SidebarMenus {
         // A private window borrows a space's look but keeps nothing: it can't change the spaces you keep.
         guard let space = Library.shared.space(id), !controller.tabManager.isPrivate else { return menu }
         // Its profile on top once there's more than one, as the Move to Space menus head each profile's spaces.
-        if let profile = Library.shared.directory.shownName(ofSpace: id, spaceName: space.name) { menu.addItem(.sectionHeader(title: profile)) }
+        if let profile = Library.shared.shownProfileName(ofSpace: id, spaceName: space.name) { menu.addItem(.sectionHeader(title: profile)) }
         typealias C = BrowserWindowController
         let isCurrent = id == controller.tabManager.currentSpaceID
         // Every space's menu shows the menu bar's keys, as a tab's does.
