@@ -17,13 +17,13 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 - Als een download klaar is, komt het downloadpaneel uit de knop Downloads met alleen dat bestand, met Toon alle downloads voor de rest, en verdwijnt het na een paar seconden. Open je het zelf, dan staat het nieuwste bovenaan: de downloads van het laatste uur en wat nog binnenkomt, met eerdere onder Toon alle downloads. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - Een venster zonder open tabbladen toont nu een eigen pagina van Zigzag, zoals de geschiedenis en de instellingen: de kleur of afbeelding van de space met het ZIGZAG-woordmerk, vanaf het eerste moment in de lichte en de donkere weergave. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
-### Gewijzigd
 - Geschiedenis, Archief en Instellingen zien eruit als één app: Geschiedenis en Archief zijn licht of donker met het venster, zoals Instellingen, en niet meer alleen met de Mac, en hun kop is uitgelijnd met die van Instellingen. In Instellingen blijft de markering van een inklapbaar vak (een menu in Toetscombinaties, de toestemmingen van een site) binnen de afgeronde hoeken, en eindigen de toetsen van een menu even ver van de rand van het vak als de namen beginnen. ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
 
 ### Opgelost
 - De laadlijn beweegt alleen nog als de pagina vordert. Bij een site die niet meer antwoordt blijft ze staan in plaats van naar het einde te kruipen, en zolang er niets binnenkomt, wordt ze zacht lichter en donkerder. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag stopt niet meer af en toe als je een tabblad sluit of er een in de slaapstand gaat, wanneer Schermtijd van macOS een probleem heeft met het loslaten van de pagina.
 - Een geïnstalleerde app op een schijf die niet is aangesloten, blijft in Instellingen › Algemeen › Geïnstalleerde apps staan, gemarkeerd met Op een schijf die niet is aangesloten, en werkt weer zodra de schijf terug is. Eerder verdween hij uit de lijst, samen met de keuze voor de gereedschapsbalk, tot je de app opende. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
+- ⌘Z na typen op een pagina sluit Zigzag niet meer af en toe af.
 
 ## [0.10.0] - 2026-11-25
 

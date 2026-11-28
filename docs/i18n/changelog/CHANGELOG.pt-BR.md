@@ -17,13 +17,13 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 - Quando um download termina, o painel de downloads sai do botão Downloads mostrando só esse arquivo, com Mostrar todos os downloads para o resto, e some alguns segundos depois. Aberto por você, ele mostra os mais recentes no topo: os downloads da última hora e os que ainda estão em andamento, com os anteriores em Mostrar todos os downloads. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - Uma janela sem abas abertas agora mostra uma página do próprio Zigzag, como o Histórico e os Ajustes: a cor ou a imagem do espaço com o logotipo ZIGZAG, presente desde o primeiro instante nos modos claro e escuro. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
-### Alterado
 - Histórico, Arquivo e Ajustes parecem um só app: o Histórico e o Arquivo ficam claros ou escuros com a janela, como os Ajustes, e não só com o Mac, e o cabeçalho fica alinhado com o dos Ajustes. Nos Ajustes, o destaque de uma caixa recolhível (um menu em Atalhos, as permissões de um site) fica dentro dos cantos arredondados, e as teclas de um menu terminam à mesma distância da borda da caixa em que os nomes começam. ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
 
 ### Corrigido
 - A linha de carregamento só avança quando a página avança. Num site que parou de responder, ela fica parada em vez de se arrastar até o fim, e enquanto nada chega ela esmaece e volta suavemente. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - O Zigzag não fecha mais de vez em quando ao fechar uma aba ou quando uma é suspensa, se o Tempo de Uso do macOS tiver um problema ao liberar a página.
 - Um app instalado em um disco que não está conectado continua em Ajustes › Geral › Apps instalados, marcado como Em um disco que não está conectado, e volta a funcionar assim que o disco volta. Antes, ele saía da lista, junto com a opção da barra de ferramentas, até você abrir o app. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
+- ⌘Z depois de digitar em uma página não fecha mais o Zigzag de vez em quando.
 
 ## [0.10.0] - 2026-11-25
 

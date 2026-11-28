@@ -17,13 +17,13 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 - Quand un téléchargement se termine, le panneau des téléchargements sort du bouton Téléchargements sur ce seul fichier, avec Afficher tous les téléchargements pour le reste, et disparaît quelques secondes plus tard. Ouvert par vous, il affiche les plus récents en haut : les téléchargements de la dernière heure et ceux encore en cours, les plus anciens étant sous Afficher tous les téléchargements. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - Une fenêtre sans onglet ouvert affiche désormais une page propre à Zigzag, comme l’historique et les réglages : la couleur ou l’image de l’espace avec le logotype ZIGZAG, présente dès le premier instant en mode clair comme en mode sombre. Merci à [Lakeland97](https://github.com/Lakeland97). ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
-### Modifications
 - L’historique, l’archive et les réglages ont l’air d’une seule app : l’historique et l’archive sont clairs ou sombres avec la fenêtre, comme les réglages, et non plus avec le Mac seul, et leur en-tête est aligné sur celui des réglages. Dans les réglages, la surbrillance d’une zone repliable (un menu dans Raccourcis, les autorisations d’un site) reste dans ses coins arrondis, et les touches d’un menu se terminent aussi loin du bord de la zone que leurs noms commencent. ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
 
 ### Corrections
 - La ligne de chargement n’avance plus que lorsque la page avance. Sur un site qui ne répond plus, elle reste immobile au lieu de ramper vers la fin, et tant que rien n’arrive, elle pâlit et se ravive doucement. Merci à [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag ne quitte plus de temps en temps quand vous fermez un onglet ou qu’un onglet se met en veille, lorsque Temps d’écran de macOS rencontre un problème en libérant la page.
 - Une app installée sur un disque qui n’est pas connecté reste dans Réglages › Général › Apps installées, marquée Sur un disque qui n’est pas connecté, et fonctionne de nouveau dès que le disque revient. Avant, elle quittait la liste, avec son choix de barre d’outils, jusqu’à ce que vous ouvriez l’app. Merci à [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
+- ⌘Z après une saisie dans une page ne fait plus quitter Zigzag de temps en temps.
 
 ## [0.10.0] - 2026-11-25
 

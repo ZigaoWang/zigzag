@@ -17,13 +17,13 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 - Gdy pobieranie się kończy, panel pobranych wysuwa się z przycisku „Pobrane” i pokazuje tylko ten plik, z „Pokaż wszystkie pobrane” dla reszty, a po kilku sekundach znika. Otwarty przez ciebie pokazuje najnowsze na górze: pobrane w ostatniej godzinie i te, które wciąż trwają, a wcześniejsze w „Pokaż wszystkie pobrane”. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - Okno bez otwartych kart pokazuje teraz własną stronę Zigzaga, tak jak historia i ustawienia: kolor lub obraz przestrzeni z logotypem ZIGZAG, widoczny od pierwszej chwili w trybie jasnym i ciemnym. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
-### Zmieniono
 - Historia, Archiwum i Ustawienia wyglądają jak jedna aplikacja: Historia i Archiwum są jasne lub ciemne razem z oknem, tak jak Ustawienia, a nie tylko z Makiem, a ich nagłówek jest wyrównany z nagłówkiem Ustawień. W Ustawieniach podświetlenie zwijanego pola (menu w Skrótach, uprawnienia witryny) mieści się w jego zaokrąglonych rogach, a klawisze menu kończą się w tej samej odległości od krawędzi pola, w jakiej zaczynają się nazwy. ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
 
 ### Naprawiono
 - Linia ładowania przesuwa się tylko wtedy, gdy strona faktycznie się wczytuje. Przy witrynie, która przestała odpowiadać, stoi w miejscu zamiast pełznąć ku końcowi, a dopóki nic nie dociera, łagodnie przygasa i jaśnieje. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag nie kończy już czasem działania, gdy zamykasz kartę lub karta usypia, a Czas przed ekranem w macOS napotka problem przy zwalnianiu strony.
 - Zainstalowana aplikacja na dysku, który nie jest podłączony, zostaje w Ustawienia › Ogólne › Zainstalowane aplikacje z opisem „Na dysku, który nie jest podłączony” i działa znowu, gdy tylko dysk wróci. Wcześniej znikała z listy razem z wyborem paska narzędzi, dopóki nie otworzyło się aplikacji. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
+- ⌘Z po pisaniu na stronie nie zamyka już czasem Zigzaga.
 
 ## [0.10.0] - 2026-11-25
 

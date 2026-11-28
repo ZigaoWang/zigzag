@@ -17,13 +17,13 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 - Cuando termina una descarga, el panel de descargas sale del botón Descargas mostrando solo ese archivo, con Mostrar todas las descargas para el resto, y se cierra unos segundos después. Si lo abres tú, muestra lo más reciente arriba: las descargas de la última hora y las que siguen en curso, con las anteriores en Mostrar todas las descargas. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 - Una ventana sin pestañas abiertas muestra ahora una página propia de Zigzag, como el historial y los ajustes: el color o la imagen del espacio con el logotipo ZIGZAG, presente desde el primer momento en modo claro y oscuro. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
-### Cambios
 - El historial, el archivo y los ajustes parecen una sola app: el historial y el archivo son claros u oscuros con la ventana, como los ajustes, y no solo con el Mac, y su cabecera está alineada con la de los ajustes. En los ajustes, el resaltado de un recuadro plegable (un menú en Atajos, los permisos de un sitio) queda dentro de sus esquinas redondeadas, y las teclas de un menú terminan tan lejos del borde del recuadro como empiezan sus nombres. ([#584](https://github.com/ZigaoWang/zigzag/issues/584))
 
 ### Correcciones
 - La línea de carga solo avanza cuando la página avanza. Si un sitio deja de responder, se queda quieta en vez de arrastrarse hacia el final, y mientras no llega nada se atenúa y se aviva suavemente. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
 - Zigzag ya no se cierra de vez en cuando al cerrar una pestaña o cuando una se suspende, si Tiempo de uso de macOS tiene un problema al soltar la página.
 - Una app instalada en un disco que no está conectado se queda en Ajustes › General › Apps instaladas, marcada como En un disco que no está conectado, y vuelve a funcionar en cuanto el disco vuelve. Antes salía de la lista, con su opción de barra de herramientas, hasta que abrías la app. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#574](https://github.com/ZigaoWang/zigzag/issues/574))
+- ⌘Z después de escribir en una página ya no cierra Zigzag de vez en cuando.
 
 ## [0.10.0] - 2026-11-25
 
