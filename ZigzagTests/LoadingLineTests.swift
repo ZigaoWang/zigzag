@@ -26,16 +26,30 @@ struct LoadingLineTests {
         }
     }
 
-    /// The page is the only thing that moves it, and it moves it both ways. WebKit's estimate only rises within one
-    /// load, but a new request in the same tab starts it over (`ProgressTracker::progressStarted` sets
-    /// `initialProgressValue`, 0.1), so a smaller value does arrive and the line shows it rather than keeping the
-    /// larger one. A line that can't go back keeps a number nothing is at — which is what made the creep permanent.
-    @Test func theLineFollowsThePageBackwardsToo() async throws {
+    /// A new request mid-load reports WebKit's starting 0.1 for a moment and then the load's own value again
+    /// (measured: 0.50, 0.10, 0.50 within 5 ms). The line doesn't dip and bounce back for it.
+    @Test func aMomentaryRestartDoesNotDipTheLine() async throws {
         try await line { card in
-            card.debugShowLoading(true, progress: 0.7)
-            #expect(card.debugProgress == 0.7)
-            card.debugShowLoading(true, progress: 0.2)
-            #expect(card.debugProgress == 0.2)
+            card.debugShowLoading(true, progress: 0.5)
+            card.debugShowLoading(true, progress: 0.1)
+            #expect(card.debugProgress == 0.5)
+            card.debugShowLoading(true, progress: 0.5)
+            #expect(card.debugProgress == 0.5)
+            try await Task.sleep(for: .milliseconds(300))
+            #expect(card.debugProgress == 0.5)
+        }
+    }
+
+    /// A new page opened while the last one is still finishing starts over at 0.1 and stays there until it answers
+    /// (measured: 0.86, then 0.10 for 245 ms). The line goes back with it rather than keeping the old page's number.
+    @Test func aNewPageMidLoadTakesTheLineBack() async throws {
+        try await line { card in
+            card.debugShowLoading(true, progress: 0.86)
+            card.debugShowLoading(true, progress: 0.1)
+            try await Task.sleep(for: .milliseconds(300))
+            #expect(card.debugProgress == 0.1)
+            card.debugShowLoading(true, progress: 0.23)
+            #expect(card.debugProgress == 0.23)
         }
     }
 
@@ -49,12 +63,39 @@ struct LoadingLineTests {
         }
     }
 
-    /// Done is the whole line, from wherever it was.
+    /// Held still, the line shows it's waiting; the next visible step ends the wait.
+    @Test func aStillLineShowsItsWaitingUntilThePageMoves() async throws {
+        try await line { card in
+            card.debugShowLoading(true, progress: 0.1)
+            #expect(!card.debugIsWaiting)
+            try await Task.sleep(for: .milliseconds(1300))
+            #expect(card.debugIsWaiting)
+            // Too little to see is still waiting.
+            card.debugShowLoading(true, progress: 0.102)
+            #expect(card.debugIsWaiting)
+            card.debugShowLoading(true, progress: 0.3)
+            #expect(!card.debugIsWaiting)
+        }
+    }
+
+    /// A page that keeps moving never looks like it's waiting.
+    @Test func aMovingLineNeverWaits() async throws {
+        try await line { card in
+            for step in 1...6 {
+                card.debugShowLoading(true, progress: 0.1 + Double(step) * 0.1)
+                try await Task.sleep(for: .milliseconds(400))
+                #expect(!card.debugIsWaiting)
+            }
+        }
+    }
+
+    /// Done is the whole line, from wherever it was, and the wait is over.
     @Test func theLineFinishesWhereItWas() async throws {
         try await line { card in
             card.debugShowLoading(true, progress: 0.35)
             card.debugShowLoading(false, progress: 0.35)
             #expect(card.debugProgress == 1)
+            #expect(!card.debugIsWaiting)
         }
     }
 }

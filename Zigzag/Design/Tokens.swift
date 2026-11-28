@@ -830,6 +830,11 @@ enum Tokens {
         static let previewDelay: TimeInterval = 0.6
         /// How long the pointer can stray off the floating sidebar before it slides away.
         static let edgeHideDelay: TimeInterval = 0.05
+        /// How long the page's loading line holds still before it breathes, and each half of a breath.
+        static let progressWait: TimeInterval = 1
+        static let progressBreath: TimeInterval = 0.9
+        /// How long a lower loading value has to hold before the line goes back to it.
+        static let progressDrop: TimeInterval = 0.1
         /// Motion that isn't an answer to anything you did: the wordmark drawing itself, the guided tour's beat, a
         /// space's atmosphere drifting. Never on the way of something you asked for.
         enum Ambient {

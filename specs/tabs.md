@@ -433,11 +433,15 @@
   Test: IMECommitTests.aFieldLeavesOtherTextOverMarkedLettersAlone
 
 ## The loading line
-- A page loads → the line along the card's top edge is where the page is, and only there: it doesn't move between WebKit's steps, so a page that stops arriving holds still, and a site that never answers never looks nearly done. Reduce Motion changes nothing here, because there was never extra motion to leave out.
+- A page loads → the line along the card's top edge is where WebKit says the page is, and only there: it doesn't move between WebKit's steps, so a page that stops arriving holds still, and a site that never answers stays at the start, as Report a Problem says it's waiting for the server, never looking nearly done.
   Test: LoadingLineTests.theLineStaysWhereThePageStopped
   Test: LoadingLineTests.aPageThatNeverAnswersStaysAtTheStart
-- A new request in the same tab starts the estimate over, so a smaller value arrives → the line goes back with it, never sticking at the higher one.
-  Test: LoadingLineTests.theLineFollowsThePageBackwardsToo
+- The line hasn't visibly grown for a second → it breathes, fading softly in and out where it is, until the page moves it again; with Reduce Motion it dims instead. A page that keeps moving never breathes.
+  Test: LoadingLineTests.aStillLineShowsItsWaitingUntilThePageMoves
+  Test: LoadingLineTests.aMovingLineNeverWaits
+- A new page opened while the last one is still loading starts over → the line goes back with it; a lower value WebKit takes back within a tenth of a second leaves the line where it is, never dipping and bouncing back.
+  Test: LoadingLineTests.aNewPageMidLoadTakesTheLineBack
+  Test: LoadingLineTests.aMomentaryRestartDoesNotDipTheLine
 - The load finishes → the line is whole, from wherever it was, and fades.
   Test: LoadingLineTests.theLineFinishesWhereItWas
 

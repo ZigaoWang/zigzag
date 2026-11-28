@@ -263,7 +263,7 @@ number of its own (`scripts/check-motion.sh` fails on one):
 
 Two curves, one family: `Motion.easeOut` (0.23, 1, 0.32, 1) for what answers or appears, and for every fade and
 color change; `Motion.drawer` (0.32, 0.72, 0, 1) for what travels. Outside the roles: the download's flight and
-progress ring, the page's loading line (`progressCreep`), and ambient brand motion (`Motion.Ambient`).
+progress ring, the page's loading line breathing while it waits (`progressWait`, `progressBreath`), and ambient brand motion (`Motion.Ambient`).
 
 The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's HIG:
 

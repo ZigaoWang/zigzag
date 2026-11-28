@@ -322,15 +322,23 @@ final class PageCardView: NSView {
 
     /// Page loading, in the space's accent: a thin line along the card's top edge that grows with the load and fades
     /// when done. It only moves when the page does: a stalled load holds it still, so a dead site and a slow one
-    /// don't look alike (#548).
+    /// don't look alike (#548). Held still for a while, it breathes, so a wait reads as a wait.
     private let progressLine = CALayer()
     private var progress: CGFloat = 0
     private var isShowingProgress = false
+    /// Where the line last visibly grew, and the wait that starts it breathing when it doesn't grow again.
+    private var lastStep: CGFloat = 0
+    private var stillness: DispatchWorkItem?
+    private var isWaiting = false
+    /// A lower value than the line shows, waiting to see if it holds.
+    private var pendingDrop: CGFloat?
+    private var drop: DispatchWorkItem?
 
     #if DEBUG
     /// Tests show the line a load's state and read where it is, without a WebKit page to follow.
     func debugShowLoading(_ loading: Bool, progress value: Double) { setLoading(loading, progress: value) }
     var debugProgress: CGFloat { progress }
+    var debugIsWaiting: Bool { isWaiting }
     #endif
 
     /// The page whose load the line shows: the one in this card, whichever tab is selected. In split view each card
@@ -354,6 +362,8 @@ final class PageCardView: NSView {
 
     /// The line gone at once, wherever it was.
     private func resetLoading() {
+        stopWaiting()
+        cancelDrop()
         progressLine.removeAllAnimations()
         isShowingProgress = false
         progress = 0
@@ -379,16 +389,50 @@ final class PageCardView: NSView {
             // A fresh load starts from the left edge.
             isShowingProgress = true
             progress = 0
+            lastStep = 0
             Tokens.Motion.withoutAnimation { progressLine.opacity = 1; layoutProgress() }
         }
-        // A page that isn't moving doesn't move the line: no step to take, and nothing to fade.
+        // A lower value mid-load is a new request starting over, or WebKit's 0.1 for one it hands back to the load
+        // already going a few milliseconds later: the line goes back only once the lower value holds.
+        if loading, target < progress {
+            pendingDrop = target
+            if drop == nil {
+                let item = DispatchWorkItem { [weak self] in
+                    guard let self, let value = self.pendingDrop, self.isShowingProgress else { return }
+                    self.drop = nil
+                    self.pendingDrop = nil
+                    self.move(to: value, loading: true)
+                }
+                drop = item
+                DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.progressDrop, execute: item)
+            }
+            return
+        }
+        cancelDrop()
         if loading, target == progress { return }
+        move(to: target, loading: loading)
+    }
+
+    private func cancelDrop() {
+        drop?.cancel()
+        drop = nil
+        pendingDrop = nil
+    }
+
+    private func move(to target: CGFloat, loading: Bool) {
+        let back = target < progress
         progress = target
         CATransaction.begin()
         CATransaction.setAnimationDuration(loading ? Tokens.Motion.large : Tokens.Motion.standard)
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         layoutProgress()
         CATransaction.commit()
+        // Only a visible step counts as moving: bytes too few to show leave the line still, and waiting.
+        if !loading || back || progress - lastStep >= 0.01 {
+            lastStep = progress
+            stopWaiting()
+            if loading { waitForStillness() }
+        }
         guard !loading else { return }
         isShowingProgress = false
         CATransaction.begin()
@@ -396,6 +440,53 @@ final class PageCardView: NSView {
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         progressLine.opacity = 0
         CATransaction.commit()
+    }
+
+    /// Nothing visible from the page for `progressWait`: the line breathes until it moves again.
+    private func waitForStillness() {
+        stillness?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.startWaiting() }
+        stillness = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.progressWait, execute: item)
+    }
+
+    /// The line's opacity rising and falling in place, claiming no progress. With Reduce Motion it only dims.
+    private func startWaiting() {
+        guard isShowingProgress, !isWaiting else { return }
+        isWaiting = true
+        if Tokens.Motion.reduceMotion {
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(Tokens.Motion.crossfade)
+            progressLine.opacity = 0.5
+            CATransaction.commit()
+            return
+        }
+        let breath = CABasicAnimation(keyPath: "opacity")
+        breath.fromValue = 1
+        breath.toValue = 0.35
+        breath.duration = Tokens.Motion.progressBreath
+        breath.autoreverses = true
+        breath.repeatCount = .infinity
+        breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        progressLine.add(breath, forKey: "waiting")
+    }
+
+    private func stopWaiting() {
+        stillness?.cancel()
+        stillness = nil
+        guard isWaiting else { return }
+        isWaiting = false
+        // Back to full from wherever the breath was, not in a jump.
+        let current = progressLine.presentation()?.opacity ?? progressLine.opacity
+        progressLine.removeAnimation(forKey: "waiting")
+        guard isShowingProgress else { return }
+        Tokens.Motion.withoutAnimation { progressLine.opacity = 1 }
+        let back = CABasicAnimation(keyPath: "opacity")
+        back.fromValue = current
+        back.toValue = 1
+        back.duration = Tokens.Motion.state
+        back.timingFunction = Tokens.Motion.easeOut
+        progressLine.add(back, forKey: "waited")
     }
 
     private func layoutProgress() {
