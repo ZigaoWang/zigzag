@@ -210,11 +210,28 @@
   Test: FramePacingTests.aPageKeepingUpStaysAtTheFullRate
   Test: FramePacingTests.anotherSiteStartsOver
 
+## Mini player
+- Leave a tab while a video you pressed play on (or turned the sound of up) plays with its sound on, at least 320 by 180 and half of it in view → it follows you into the mini player.
+  Test: MiniPlayerTests.aVideoYouStartedFollows
+  Test: MiniPlayerPageTests.aVideoYouStartedFollows
+- A video the page started itself with its sound on (one opened from a thumbnail) → it follows once heard for 10 seconds, if it's at least a minute long or live.
+  Test: MiniPlayerTests.aLongVideoHeardAWhileFollows
+- A feed's muted autoplay, even one you pressed → it never follows.
+  Test: MiniPlayerTests.aMutedAutoplayFeedNeverFollows
+  Test: MiniPlayerPageTests.aMutedAutoplayFeedNeverFollows
+- A shop's small product video, or a short one that played by itself → it never follows.
+  Test: MiniPlayerTests.aSmallProductVideoNeverFollows
+  Test: MiniPlayerPageTests.aSmallProductVideoNeverFollows
+- A card's preview inside a link → it never follows.
+  Test: MiniPlayerTests.aHomepagesHoverPreviewNeverFollows
+
 ## Mini player when you leave
 - Show a mini player when you leave Zigzag on, and switch to another app with the window covered, minimized, hidden or on a desktop no longer showing → after a moment the watched video moves into the mini player.
   Test: AutoPictureInPictureTests.movesOnlyOnceTheWindowIsOutOfSight
 - The same, with the window still in view on another display → the video stays in its page until that window goes out of sight.
   Test: AutoPictureInPictureTests.aWindowInViewOnAnotherDisplayKeepsItsVideo
+- The same, with a video you're not watching (muted, small, or started by the page a moment ago) → it stays in its page.
+  Test: AutoPictureInPictureTests.leavesVideosYoureNotWatching
 
 ## Previous and next in the mini player
 - A video in the mini player whose page set its own previous or next (the Media Session API's `previoustrack`, `nexttrack`) → Previous and Next buttons beside its 15-second skips, as in Safari's and Chrome's picture in picture; pressing one, its right-click menu's item or ⌘← / ⌘→ runs the page's own.

@@ -22,6 +22,8 @@ nonisolated struct PageVideo: Equatable, Sendable {
     var isInLink = false
     /// The page's disablePictureInPicture attribute is set.
     var blocksPictureInPicture = false
+    /// When it began playing with its sound on, without a pause or a mute since.
+    var heardSince: Date?
     /// Its CSS object-fit.
     var fit = "contain"
     var time: Double = 0
@@ -29,8 +31,8 @@ nonisolated struct PageVideo: Equatable, Sendable {
     var duration: Double?
 
     init(index: Int, rect: CGRect, natural: CGSize, isPlaying: Bool, hasEnded: Bool = false, isMuted: Bool = false, loops: Bool = false,
-         autoplays: Bool = false, hasControls: Bool = false, isStartedByUser: Bool = false, isInLink: Bool = false, blocksPictureInPicture: Bool = false, fit: String = "contain",
-         time: Double = 0, duration: Double? = nil) {
+         autoplays: Bool = false, hasControls: Bool = false, isStartedByUser: Bool = false, isInLink: Bool = false, blocksPictureInPicture: Bool = false, heardSince: Date? = nil,
+         fit: String = "contain", time: Double = 0, duration: Double? = nil) {
         self.index = index
         self.rect = rect
         self.natural = natural
@@ -43,6 +45,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
         self.isStartedByUser = isStartedByUser
         self.isInLink = isInLink
         self.blocksPictureInPicture = blocksPictureInPicture
+        self.heardSince = heardSince
         self.fit = fit
         self.time = time
         self.duration = duration
@@ -53,17 +56,27 @@ nonisolated struct PageVideo: Equatable, Sendable {
         guard let o = value as? [String: Any], let index = o["i"] as? Int else { return nil }
         func number(_ key: String) -> Double { (o[key] as? NSNumber)?.doubleValue ?? 0 }
         func flag(_ key: String) -> Bool { o[key] as? Bool ?? false }
-        let duration = number("d")
+        let duration = number("d"), heard = number("a")
         self.init(index: index, rect: CGRect(x: number("x"), y: number("y"), width: number("w"), height: number("h")),
                   natural: CGSize(width: number("vw"), height: number("vh")), isPlaying: flag("playing"), hasEnded: flag("ended"),
                   isMuted: flag("muted"), loops: flag("loop"), autoplays: flag("autoplay"), hasControls: flag("controls"),
-                  isStartedByUser: flag("user"), isInLink: flag("link"), blocksPictureInPicture: flag("nopip"), fit: o["fit"] as? String ?? "contain", time: number("t"), duration: duration > 0 ? duration : nil)
+                  isStartedByUser: flag("user"), isInLink: flag("link"), blocksPictureInPicture: flag("nopip"),
+                  heardSince: heard > 0 ? Date(timeIntervalSince1970: heard / 1000) : nil, fit: o["fit"] as? String ?? "contain", time: number("t"), duration: duration > 0 ? duration : nil)
     }
 
-    /// Something you were watching, not a page's own motion: one you started or turned up yourself, or one you can
-    /// hear that isn't a link's preview. A muted autoplay, a page's moving background, and the preview a card plays
-    /// as the pointer passes over it are not.
-    var isWatched: Bool { isStartedByUser || (!isMuted && !isInLink) }
+    /// One you're watching, as Chrome's and Arc's automatic picture in picture have it (#582): playing with its sound
+    /// on, the size of a real player (`MiniPlayerLayout.isWatchedSize`), not a link's preview, and either started or
+    /// turned up by you, or a long or live video heard for `MiniPlayerLayout.heardLong`. A muted autoplay feed, a
+    /// shop's short product video, a page's moving background and a card's preview are not.
+    func isWatched(now: Date = Date()) -> Bool {
+        guard !isMuted, !isInLink, MiniPlayerLayout.isWatchedSize(rect.size) else { return false }
+        if isStartedByUser { return true }
+        guard let heardSince, now.timeIntervalSince(heardSince) >= MiniPlayerLayout.heardLong else { return false }
+        return duration.map { $0 >= MiniPlayerLayout.longVideo } ?? true
+    }
+
+    /// One the card goes on with once it shows a page: one you can hear, or one you started (a feed's next clip).
+    var carriesOn: Bool { !isInLink && (isStartedByUser || !isMuted) }
 }
 
 /// The arithmetic of the mini player: which video follows you out of a tab, how big its card is, where the card sits,
@@ -71,6 +84,25 @@ nonisolated struct PageVideo: Equatable, Sendable {
 nonisolated enum MiniPlayerLayout {
     /// Narrower than this, a video isn't the thing on the page (a thumbnail, an avatar).
     static let smallestVideo = CGSize(width: 120, height: 68)
+    /// A video you're watching is at least this big on the page in CSS pixels (this area, its shorter side at least
+    /// `watchedSide`): a product shot, a preview or a small clip in a feed never follows you out.
+    static let watchedSize = CGSize(width: 320, height: 180)
+    static let watchedSide: CGFloat = 150
+    /// A video no one started follows once heard this long, if it's at least `longVideo` long or live.
+    static let heardLong: TimeInterval = 10
+    static let longVideo: TimeInterval = 60
+    /// At least this share of it is in view.
+    static let inViewShare: CGFloat = 0.5
+
+    static func isWatchedSize(_ size: CGSize) -> Bool {
+        size.width * size.height >= watchedSize.width * watchedSize.height && min(size.width, size.height) >= watchedSide
+    }
+
+    /// Whether at least half of it is in view.
+    static func isInView(_ rect: CGRect, viewport: CGSize) -> Bool {
+        let area = rect.width * rect.height
+        return area > 0 && visibleArea(rect, viewport: viewport) >= area * inViewShare
+    }
     /// The card's width: a third of the page area, within these.
     static let minimumWidth: CGFloat = 240
     static let maximumWidth: CGFloat = 480
@@ -107,10 +139,19 @@ nonisolated enum MiniPlayerLayout {
             && video.rect.width >= smallestVideo.width && video.rect.height >= smallestVideo.height
     }
 
-    /// Whether it would follow you out of its tab: playing, big enough, and one you were watching.
-    static func follows(_ video: PageVideo) -> Bool {
-        plays(video) && video.isWatched
+    /// Whether it would follow you out of its tab: playing, one you're watching (`PageVideo.isWatched`), and at
+    /// least half of it in view.
+    static func follows(_ video: PageVideo, in viewport: CGSize, now: Date = Date()) -> Bool {
+        plays(video) && video.isWatched(now: now) && isInView(video.rect, viewport: viewport)
     }
+
+    /// Whether the card, once showing, takes it: the next clip of a feed it's following.
+    static func carriesOn(_ video: PageVideo, in viewport: CGSize) -> Bool {
+        plays(video) && video.carriesOn
+    }
+
+    /// Any video playing a picture.
+    static func plays(_ video: PageVideo, in viewport: CGSize) -> Bool { plays(video) }
 
     /// Whether the card keeps its video. Short-video feeds (Douyin, TikTok, Reels) play the next clip in another
     /// element: once this one stops and another plays, the card switches instead of showing a stopped or black frame. A
@@ -122,16 +163,18 @@ nonisolated enum MiniPlayerLayout {
     /// The video leaving a tab takes along, and the index of its frame among `frames` (each frame's viewport and
     /// videos): none while the page is on its way out (`leavingPage`, a link followed: what's still playing is the
     /// page you're done with), or floats or fills the screen with a video itself.
-    static func followed(in frames: [(viewport: CGSize, videos: [PageVideo])], leavingPage: Bool, presentingItself: Bool) -> (frame: Int, video: PageVideo)? {
+    static func followed(in frames: [(viewport: CGSize, videos: [PageVideo])], leavingPage: Bool, presentingItself: Bool,
+                         now: Date = Date()) -> (frame: Int, video: PageVideo)? {
         guard !leavingPage, !presentingItself else { return nil }
-        return best(in: frames, by: follows)
+        return best(in: frames) { follows($0, in: $1, now: now) }
     }
 
     /// Across frames, by `choose`: each frame's best by its own viewport, then the best of those.
-    static func best(in frames: [(viewport: CGSize, videos: [PageVideo])], by rule: (PageVideo) -> Bool) -> (frame: Int, video: PageVideo)? {
+    static func best(in frames: [(viewport: CGSize, videos: [PageVideo])], by rule: (PageVideo, CGSize) -> Bool) -> (frame: Int, video: PageVideo)? {
         let found = frames.indices.compactMap { i in choose(frames[i].videos, viewport: frames[i].viewport, by: rule).map { (frame: i, video: $0) } }
         let everything = CGSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
-        guard let winner = choose(found.map(\.video), viewport: everything, by: rule) else { return nil }
+        // Each already passed in its own frame.
+        guard let winner = choose(found.map(\.video), viewport: everything, by: { _, _ in true }) else { return nil }
         return found.first { $0.video == winner }
     }
 
@@ -143,8 +186,8 @@ nonisolated enum MiniPlayerLayout {
 
     /// The one to follow you: of those that would, one you can hear before a silent one, then the one that shows the
     /// most, then the biggest.
-    static func choose(_ videos: [PageVideo], viewport: CGSize, by rule: (PageVideo) -> Bool = follows) -> PageVideo? {
-        videos.filter(rule).max { a, b in
+    static func choose(_ videos: [PageVideo], viewport: CGSize, by rule: (PageVideo, CGSize) -> Bool = { follows($0, in: $1) }) -> PageVideo? {
+        videos.filter { rule($0, viewport) }.max { a, b in
             if a.isMuted != b.isMuted { return a.isMuted }
             let seenA = visibleArea(a.rect, viewport: viewport), seenB = visibleArea(b.rect, viewport: viewport)
             if seenA != seenB { return seenA < seenB }

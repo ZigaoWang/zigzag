@@ -393,4 +393,127 @@ struct MiniPlayerPageTests {
         #expect(await MediaSessionActions.shared.run(.next, in: nil, of: webView) == false)
         #expect(try await ran(in: webView).isEmpty)
     }
+
+    // MARK: Which video follows you out (#582)
+
+    /// Plays every video on the page from a canvas (no sound track, so nothing is ever heard), as the page's own
+    /// script would; `muted` marks a feed that autoplays muted.
+    private static func playing(_ body: String) -> String {
+        """
+        <html><head><style>body{margin:0} video{display:block;object-fit:cover}</style></head><body>\(body)
+        <script>
+        const c = document.createElement('canvas'); c.width = 640; c.height = 360;
+        const g = c.getContext('2d'); let n = 0;
+        setInterval(() => { g.fillStyle = `hsl(${n++ % 360} 60% 50%)`; g.fillRect(0, 0, 640, 360); }, 30);
+        window.stream = c.captureStream(30);
+        window.start = (v) => { v.srcObject = window.stream; return v.play(); };
+        document.querySelectorAll('video[data-autoplay]').forEach((v) => window.start(v));
+        document.querySelectorAll('video[data-click]').forEach((v) => v.addEventListener('pointerdown', () => window.start(v)));
+        </script></body></html>
+        """
+    }
+
+    /// A page in an offscreen window, so the pointer can press on it, with the videos' reports reaching `PageVideos`.
+    private func open(_ html: String) async -> (WKWebView, NSWindow) {
+        let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: 1000, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let configuration = WKWebViewConfiguration()
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.userContentController.addUserScript(PageVideos.script)
+        configuration.userContentController.add(PageVideos.shared, contentWorld: .defaultClient, name: PageVideos.messageName)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700), configuration: configuration)
+        window.contentView = webView
+        window.orderFrontRegardless()
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString(html, baseURL: URL(string: "https://videos.test/"))
+        }
+        return (webView, window)
+    }
+
+    private func close(_ webView: WKWebView, _ window: NSWindow) {
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: PageVideos.messageName, contentWorld: .defaultClient)
+        window.orderOut(nil)
+    }
+
+    /// The page's videos once `count` of them play.
+    private func playingVideos(_ count: Int, in webView: WKWebView) async throws -> [PageVideo] {
+        var videos: [PageVideo] = []
+        for _ in 0..<80 {
+            videos = PageVideos.shared.frames(in: webView).first(where: \.isMain)?.videos ?? []
+            if videos.filter(\.isPlaying).count >= count { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        return videos
+    }
+
+    private func followed(in webView: WKWebView) -> PageVideo? {
+        PageVideos.shared.followed(in: webView, leavingPage: false)?.video
+    }
+
+    /// A feed whose clips autoplay muted as you scroll (x.com): a press on the page as you go doesn't make any of them
+    /// one you started, and none follows you out.
+    @Test func aMutedAutoplayFeedNeverFollows() async throws {
+        let (webView, window) = await open(Self.playing((0..<3).map { _ in
+            "<article style='height:420px'><video data-autoplay muted playsinline style='width:516px;height:290px'></video></article>"
+        }.joined()))
+        defer { close(webView, window) }
+        let videos = try await playingVideos(3, in: webView)
+        #expect(videos.filter(\.isPlaying).count == 3)
+        #expect(videos.allSatisfy { $0.isMuted && !$0.isStartedByUser && $0.heardSince == nil })
+        #expect(followed(in: webView) == nil)
+    }
+
+    /// A shop's product video beside its pictures, playing with its sound on by itself (Taobao): it's heard, but it's
+    /// small and no one started it, so it never follows.
+    @Test func aSmallProductVideoNeverFollows() async throws {
+        let (webView, window) = await open(Self.playing("""
+        <div style='display:flex;gap:12px;padding:40px'><video data-autoplay playsinline style='width:300px;height:170px'></video>
+        <img style='width:300px;height:300px;background:#ddd'></div>
+        """))
+        defer { close(webView, window) }
+        let videos = try await playingVideos(1, in: webView)
+        #expect(videos.first?.isPlaying == true)
+        #expect(videos.first?.isMuted == false)
+        #expect(videos.first?.heardSince != nil)
+        #expect(videos.first?.isStartedByUser == false)
+        #expect(followed(in: webView) == nil)
+    }
+
+    /// A video you press play on yourself (YouTube, Bilibili): it's yours, and it follows you out at once. A press
+    /// somewhere else on the page before another one starts doesn't count for that one.
+    @Test func aVideoYouStartedFollows() async throws {
+        let (webView, window) = await open(Self.playing("""
+        <video id='main' data-click playsinline style='width:640px;height:360px'></video>
+        <p id='text' style='height:200px'>About this video</p>
+        <video id='other' playsinline style='width:640px;height:360px'></video>
+        """))
+        defer { close(webView, window) }
+        // A real press, as the pointer makes it, on the first video: y runs up in the window.
+        func press(at point: NSPoint) {
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                     windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) else { continue }
+                window.sendEvent(event)
+            }
+        }
+        press(at: NSPoint(x: 320, y: 700 - 180))
+        let videos = try await playingVideos(1, in: webView)
+        #expect(videos.first?.isPlaying == true)
+        #expect(videos.first?.isStartedByUser == true)
+        #expect(followed(in: webView)?.index == 0)
+        // A press on the text, then the page starts the second video itself: not one you started.
+        try await script("document.getElementById('main').pause(); return true", in: webView)
+        press(at: NSPoint(x: 320, y: 700 - 460))
+        _ = try await webView.callAsyncJavaScript("window.start(document.getElementById('other')); return true", arguments: [:], in: nil, contentWorld: .page)
+        var other: PageVideo?
+        for _ in 0..<80 {
+            other = PageVideos.shared.frames(in: webView).first(where: \.isMain)?.videos.first { $0.index == 1 && $0.isPlaying }
+            if other != nil { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(other?.isStartedByUser == false)
+    }
 }

@@ -621,7 +621,7 @@ final class MiniPlayer {
             if let same = frame.videos.first(where: { $0.index == videoIndex }), same.natural.width > 0 {
                 return MiniPlayerLayout.keeps(same, whilePlaying: elsewhere?.video) ? same : nil
             }
-            return elsewhere == nil ? MiniPlayerLayout.choose(frame.videos, viewport: frame.viewport) : nil
+            return elsewhere == nil ? MiniPlayerLayout.choose(frame.videos, viewport: frame.viewport, by: MiniPlayerLayout.carriesOn) : nil
         } ?? elsewhere.map { found in
             frameID = found.frame.id
             frameOrigin = .zero

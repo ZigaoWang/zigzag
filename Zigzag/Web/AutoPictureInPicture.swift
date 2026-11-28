@@ -6,7 +6,8 @@ import WebKit
 /// leave Zigzag. Only for a real switch: Zigzag must stay in the background for `AutoPictureInPictureModel.delay`,
 /// with a regular app in front (not a system prompt, Spotlight, menu bar, Notification Center or a Zigzag web app),
 /// and the window out of sight (`AutoPictureInPictureModel.isOutOfSight`, #496).
-/// Muted, paused or offscreen videos stay, as do ones already in Picture in Picture or full screen, and an existing
+/// Only a video you're watching moves (`PageVideo.isWatched`, #582): muted, paused, small or offscreen videos stay,
+/// as do ones already in Picture in Picture or full screen, and an existing
 /// mini player isn't replaced. If the mini player can't take the video, nothing happens; Picture in Picture never
 /// starts automatically.
 final class AutoPictureInPicture {
@@ -162,7 +163,7 @@ final class AutoPictureInPicture {
         let followed = PageVideos.shared.followed(in: webView, leavingPage: tab.isLeavingPage)
         let page = AutoPictureInPictureModel.Page(
             video: followed?.video,
-            isInView: followed.map { MiniPlayerLayout.visibleArea($0.video.rect, viewport: $0.frame.viewport) > 0 } ?? false,
+            isInView: followed.map { MiniPlayerLayout.isInView($0.video.rect, viewport: $0.frame.viewport) } ?? false,
             isTabMuted: tab.isMuted,
             // A page with The Whole Screen stays in its space, as one in WebKit's full screen does.
             isPresentingItself: PageVideos.shared.isPresentingItself(webView) || controller.hasWholeScreen(tab),
@@ -225,7 +226,7 @@ nonisolated struct AutoPictureInPictureModel {
     struct Page {
         /// The watched video (`MiniPlayerLayout.followed`), if playing and not in a link.
         var video: PageVideo?
-        /// Partly visible in the page.
+        /// At least half of it in view (`MiniPlayerLayout.isInView`).
         var isInView: Bool
         /// Muted from the sidebar.
         var isTabMuted: Bool
@@ -271,11 +272,11 @@ nonisolated struct AutoPictureInPictureModel {
         return app.isRegular && !app.isZigzag && !app.isZigzagWebApp
     }
 
-    /// Setting on, a watched video playing in view with sound, not already presented elsewhere, and the mini player
-    /// free.
-    static func moves(_ page: Page, isOn: Bool) -> Bool {
+    /// Setting on, a video you're watching (`PageVideo.isWatched`) playing at least half in view, not already
+    /// presented elsewhere, and the mini player free.
+    static func moves(_ page: Page, isOn: Bool, now: Date = Date()) -> Bool {
         guard isOn, let video = page.video, page.isInView, !page.isTabMuted, !page.isPresentingItself, !page.isMiniPlayerBusy else { return false }
-        return MiniPlayerLayout.follows(video) && !video.isMuted && !video.blocksPictureInPicture
+        return MiniPlayerLayout.plays(video) && video.isWatched(now: now) && !video.blocksPictureInPicture
     }
 
     /// Whether `page`'s video moves. If so it's owned until you return.
