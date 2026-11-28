@@ -447,26 +447,34 @@ final class BrowserRootView: SpaceFrameView {
             refreshGlassFrame()
             emptyBackdrop.isActive = isEmpty
             showBlankPage(isEmpty)
+            // The native mark only shows while the served page hasn't drawn over it.
+            let hint: CGFloat = isEmpty && blankPage?.isCovering != true ? 1 : 0
             // Animate in-place changes; a new or restored window shows it immediately.
             guard window?.isVisible == true else {
-                emptyHint.alphaValue = isEmpty ? 1 : 0
+                emptyHint.alphaValue = hint
                 emptyBackdrop.alphaValue = isEmpty ? 1 : 0
+                blankPage?.alphaValue = isEmpty ? 1 : 0
                 return
             }
             Tokens.Motion.animate(Tokens.Motion.change) {
-                self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
+                self.emptyHint.animator().alphaValue = hint
                 self.emptyBackdrop.animator().alphaValue = self.isEmpty ? 1 : 0
+                if self.isEmpty { self.blankPage?.animator().alphaValue = 1 }
             }
         }
     }
+
+    /// The look the empty card was last asked for, so the served page made later draws the same one.
+    private var emptyLook: (space: SpaceInfo, isPrivate: Bool, ground: NSColor)?
 
     /// Shows `space`'s empty page tint and picture; none in a private window.
     func showEmptyPage(of space: SpaceInfo, isPrivate: Bool, animated: Bool) {
         // Use the library's copy: one being edited is a snapshot from when the editor opened.
         let kept = Library.shared.space(space.id) ?? space
-        emptyBackdrop.show(ground: EmptyPage.ground(for: space, isPrivate: isPrivate),
-                           picture: EmptyPage.picture(for: kept, isPrivate: isPrivate), animated: animated && window?.isVisible == true)
-        blankPage?.request(space: kept, isPrivate: isPrivate)
+        let ground = EmptyPage.ground(for: space, isPrivate: isPrivate)
+        emptyBackdrop.show(ground: ground, picture: EmptyPage.picture(for: kept, isPrivate: isPrivate), animated: animated && window?.isVisible == true)
+        emptyLook = (kept, isPrivate, ground)
+        blankPage?.request(space: kept, isPrivate: isPrivate, ground: ground)
     }
 
     /// Partway through a swipe: the empty page's wash `share` of the way to `next`'s. Its picture changes on landing.
@@ -477,13 +485,15 @@ final class BrowserRootView: SpaceFrameView {
         // A served page has one ground, not a share of two: the native wash shows while the fingers are down, and the
         // page comes back on landing as the space arrived at is drawn.
         blankPage?.showWash()
-        emptyHint.alphaValue = 1
+        if isEmpty { emptyHint.alphaValue = 1 }
     }
 
     /// The empty card's page, made once and reused: a window that never sits empty never makes one.
     private func showBlankPage(_ on: Bool) {
         guard on else {
             blankPage?.setActive(false)
+            // Faded in again with the backdrop the next time the card is empty.
+            blankPage?.alphaValue = 0
             return
         }
         let page: BlankPageView
@@ -491,9 +501,11 @@ final class BrowserRootView: SpaceFrameView {
             page = kept
         } else {
             let made = BlankPageView()
+            made.alphaValue = 0
             made.onCover = { [weak self] covered in
                 // The page draws the same mark on the same ground: the native one goes so the two never double.
                 guard let self, self.isEmpty else { return }
+                self.emptyHint.layer?.removeAllAnimations()
                 self.emptyHint.alphaValue = covered ? 0 : 1
             }
             // In the page card, where a page sits: the card's shape, its moves and its place in the layout are the
@@ -502,10 +514,13 @@ final class BrowserRootView: SpaceFrameView {
             blankPage = made
             page = made
         }
-        page.setActive(true)
-        if let controller = window?.windowController as? BrowserWindowController {
-            page.request(space: controller.tabManager.currentSpace, isPrivate: controller.tabManager.isPrivate)
+        if let look = emptyLook {
+            page.request(space: look.space, isPrivate: look.isPrivate, ground: look.ground)
+        } else if let controller = window?.windowController as? BrowserWindowController {
+            let space = controller.tabManager.currentSpace, isPrivate = controller.tabManager.isPrivate
+            page.request(space: space, isPrivate: isPrivate, ground: EmptyPage.ground(for: space, isPrivate: isPrivate))
         }
+        page.setActive(true)
     }
 
     /// Desk view hides the pages while their picture flies into or out of a card, so the two never show at once.

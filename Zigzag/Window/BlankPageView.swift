@@ -26,17 +26,38 @@ final class BlankPageView: NSView {
         var isPrivate: Bool
         /// The picture's file, so a space whose picture changed is served again; nil is a space with none.
         var picture: String?
+        /// The ground in both appearances (`ViewportPage.ground`), so a space whose color changed is served again.
+        var ground: String
+        /// The appearance it was drawn in: WebKit left the mark undrawn when the page changed appearance in place.
+        var dark = false
     }
+
+    /// The blank page keeps nothing, so it shares no profile's website data.
+    private static let store = WKWebsiteDataStore.nonPersistent()
 
     override var isFlipped: Bool { true }
 
     /// Nothing on the page is for clicking.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    /// Shows `space`'s blank page: served the first time the card is empty, and served again when the space, its
-    /// privacy or its picture changes, since the page is written with all three.
-    func request(space: SpaceInfo, isPrivate: Bool) {
-        asked = Look(space: space.id, isPrivate: isPrivate, picture: EmptyPage.picture(for: space, isPrivate: isPrivate))
+    /// Not read out, as the native mark isn't.
+    override func isAccessibilityElement() -> Bool { false }
+    override func accessibilityChildren() -> [Any]? { [] }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        sync()
+    }
+
+    /// Whether the served page is drawn over the card now.
+    var isCovering: Bool { toldCovering }
+
+    /// Shows `space`'s blank page: served the first time the card is empty, and served again when the space's look,
+    /// its privacy or its picture changes, since the page is written with all three.
+    /// `ground` is the color the native backdrop is drawn in, so the page matches it while a look is being edited.
+    func request(space: SpaceInfo, isPrivate: Bool, ground: NSColor) {
+        asked = Look(space: space.id, isPrivate: isPrivate, picture: EmptyPage.picture(for: space, isPrivate: isPrivate),
+                     ground: ViewportPage.ground(ground))
         sync()
     }
 
@@ -59,7 +80,8 @@ final class BlankPageView: NSView {
     // MARK: The page
 
     private func sync() {
-        guard isActive, let asked else { return }
+        guard isActive, var asked else { return }
+        asked.dark = effectiveAppearance.isDark
         guard let page else {
             load(asked)
             return
@@ -75,26 +97,27 @@ final class BlankPageView: NSView {
         // it has already been drawn for the space arrived at.
         setCovered(false)
         page.load(URLRequest(url: ViewportPage.blankURL(for: asked.space, isPrivate: asked.isPrivate,
-                                                        picture: asked.picture)))
+                                                        picture: asked.picture, ground: asked.ground)))
     }
 
     private func load(_ look: Look) {
         served = look
         let configuration = WKWebViewConfiguration()
-        // The handler that serves every other zigzag:// page serves this one too. None of a tab's own work: no site
-        // scripts, no content blockers, no history, because nothing here is a website.
-        HistoryPage.attach(to: configuration)
+        // The handler that serves every other zigzag:// page serves this one too, without their message bridges:
+        // the blank page asks Zigzag for nothing.
+        configuration.setURLSchemeHandler(HistoryPage.SchemeHandler.shared, forURLScheme: HistoryPage.scheme)
+        configuration.websiteDataStore = Self.store
         let page = WKWebView(frame: bounds, configuration: configuration)
         page.autoresizingMask = [.width, .height]
         // The card's ground is the page's own, so WebKit's white is never seen between the two.
         page.setValue(false, forKey: "drawsBackground")
-        page.setAccessibilityLabel(String(localized: "New tab", comment: "What the blank page is called to VoiceOver: the page a space shows with no tab open."))
+        page.setAccessibilityElement(false)
         page.navigationDelegate = self
         page.alphaValue = 0
         addSubview(page)
         self.page = page
         page.load(URLRequest(url: ViewportPage.blankURL(for: look.space, isPrivate: look.isPrivate,
-                                                        picture: look.picture)))
+                                                        picture: look.picture, ground: look.ground)))
     }
 
     /// Drawn or not, and not while a swipe paints the wash. The swap is instant, not faded: the page draws the same mark
@@ -112,6 +135,12 @@ final class BlankPageView: NSView {
 }
 
 extension BlankPageView: WKNavigationDelegate {
+    /// Only the blank page itself ever loads here.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(ViewportPage.isBlank(navigationAction.request.url) ? .allow : .cancel)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard webView === page else { return }
         // Drawn even if the card is showing a page now: the next empty card gets this drawing at once rather than
