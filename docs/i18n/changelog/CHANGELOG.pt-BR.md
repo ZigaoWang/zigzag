@@ -15,6 +15,7 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 
 ### Alterado
 - A barra de menus ficou mais curta: Arquivo e Visualizar mantêm o que você usa todo dia, e navegar e organizar abas, espaços e Split View têm cada um um submenu em Visualizar, ao lado de Desenvolvedor. Duplicar aba, Mover aba para nova janela e Suspender página agora ficam em Visualizar › Abas. Todo atalho funciona como antes, e Ajustes › Atalhos lista cada um com o seu submenu, como Abas › Aninhar aba. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+- Quando um download termina, o painel de downloads sai do botão Downloads mostrando só esse arquivo, com Mostrar todos os downloads para o resto, e some alguns segundos depois. Aberto por você, ele mostra os mais recentes no topo: os downloads da última hora e os que ainda estão em andamento, com os anteriores em Mostrar todos os downloads. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 
 ### Corrigido
 - A linha de carregamento só avança quando a página avança. Num site que parou de responder, ela fica parada em vez de se arrastar até o fim, e enquanto nada chega ela esmaece e volta suavemente. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

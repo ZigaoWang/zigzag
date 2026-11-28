@@ -15,6 +15,7 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 
 ### Geändert
 - Die Menüleiste ist kürzer: „Ablage“ und „Darstellung“ behalten, was du jeden Tag brauchst, und das Wechseln und Ordnen von Tabs, Spaces und Split View hat je ein Untermenü in „Darstellung“, neben „Entwickler“. „Tab duplizieren“, „Tab in neues Fenster bewegen“ und „Seite ruhen lassen“ sind jetzt unter „Darstellung“ › „Tabs“. Jeder Kurzbefehl funktioniert wie bisher, und „Einstellungen“ › „Kurzbefehle“ listet jeden mit seinem Untermenü auf, etwa „Tabs › Tab verschachteln“. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+- Ist ein Download fertig, kommt das Downloadfenster aus der Taste „Downloads“ und zeigt nur diese Datei, mit „Alle Downloads einblenden“ für den Rest, und verschwindet nach ein paar Sekunden. Öffnest du es selbst, steht das Neueste oben: die Downloads der letzten Stunde und alle, die noch laufen, ältere unter „Alle Downloads einblenden“. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 
 ### Behoben
 - Die Ladelinie bewegt sich nur noch, wenn die Seite vorankommt. Bei einer Website, die nicht mehr antwortet, bleibt sie stehen, statt aufs Ende zuzukriechen, und solange nichts ankommt, wird sie sanft heller und dunkler. Danke an [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

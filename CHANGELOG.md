@@ -16,6 +16,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Changed
 - The menu bar is shorter: File and View keep what you use every day, and going through and arranging tabs, spaces and split view each have a submenu in View, beside Developer. Duplicate Tab, Move Tab to New Window and Suspend Page are now in View › Tabs. Every shortcut works as before, and Settings › Shortcuts lists each one with its submenu, like Tabs › Nest Tab. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+- When a download finishes, the downloads panel comes out of the Downloads button on just that file, with Show All Downloads for the rest, and goes away a few seconds later. Opened yourself, it lists the newest first: the last hour's downloads and any still coming in, with earlier ones behind Show All Downloads. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 
 ### Fixed
 - The loading line moves only when the page does. A site that has stopped answering holds still instead of creeping toward the end, and while nothing arrives the line softly fades in and out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

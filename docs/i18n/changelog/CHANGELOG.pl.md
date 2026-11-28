@@ -15,6 +15,7 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ### Zmieniono
 - Pasek menu jest krótszy: „Plik” i „Widok” zachowują to, czego używasz na co dzień, a przechodzenie i porządkowanie kart, przestrzeni i Split View mają każde własne podmenu w „Widoku”, obok „Programisty”. „Duplikuj kartę”, „Przenieś kartę do nowego okna” i „Uśpij stronę” są teraz w „Widok” › „Karty”. Każdy skrót działa jak wcześniej, a „Ustawienia” › „Skróty” pokazują każdy razem z jego podmenu, na przykład „Karty › Zagnieźdź kartę”. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+- Gdy pobieranie się kończy, panel pobranych wysuwa się z przycisku „Pobrane” i pokazuje tylko ten plik, z „Pokaż wszystkie pobrane” dla reszty, a po kilku sekundach znika. Otwarty przez ciebie pokazuje najnowsze na górze: pobrane w ostatniej godzinie i te, które wciąż trwają, a wcześniejsze w „Pokaż wszystkie pobrane”. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 
 ### Naprawiono
 - Linia ładowania przesuwa się tylko wtedy, gdy strona faktycznie się wczytuje. Przy witrynie, która przestała odpowiadać, stoi w miejscu zamiast pełznąć ku końcowi, a dopóki nic nie dociera, łagodnie przygasa i jaśnieje. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

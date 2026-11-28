@@ -15,6 +15,7 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ### Modifiche
 - La barra dei menu è più corta: File e Vista tengono ciò che usi ogni giorno, e scorrere e ordinare pannelli, spazi e la vista divisa hanno ciascuno un sottomenu in Vista, accanto a Sviluppatore. Duplica pannello, Sposta pannello in una nuova finestra e Sospendi pagina ora sono in Vista › Pannelli. Ogni scorciatoia funziona come prima, e Impostazioni › Scorciatoie le elenca tutte con il loro sottomenu, come Pannelli › Annida pannello. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+- Quando un download finisce, il pannello dei download esce dal pulsante Download mostrando solo quel file, con Mostra tutti i download per il resto, e si chiude dopo qualche secondo. Aperto da te, mostra i più recenti in alto: i download dell’ultima ora e quelli ancora in corso, con i precedenti in Mostra tutti i download. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 
 ### Correzioni
 - La linea di caricamento avanza solo quando avanza la pagina. Con un sito che non risponde più resta ferma invece di strisciare verso la fine, e finché non arriva nulla si attenua e si ravviva piano. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

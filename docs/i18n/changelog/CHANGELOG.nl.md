@@ -15,6 +15,7 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ### Gewijzigd
 - De menubalk is korter: Archief en Weergave houden wat je elke dag gebruikt, en het doorlopen en ordenen van tabbladen, spaces en Split View hebben elk een submenu in Weergave, naast Ontwikkelaar. Dupliceer tabblad, Verplaats tabblad naar nieuw venster en Zet pagina in slaapstand staan nu in Weergave › Tabbladen. Elke toetscombinatie werkt zoals eerst, en Instellingen › Toetscombinaties toont ze allemaal met hun submenu, zoals Tabbladen › Zet onder tabblad erboven. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+- Als een download klaar is, komt het downloadpaneel uit de knop Downloads met alleen dat bestand, met Toon alle downloads voor de rest, en verdwijnt het na een paar seconden. Open je het zelf, dan staat het nieuwste bovenaan: de downloads van het laatste uur en wat nog binnenkomt, met eerdere onder Toon alle downloads. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 
 ### Opgelost
 - De laadlijn beweegt alleen nog als de pagina vordert. Bij een site die niet meer antwoordt blijft ze staan in plaats van naar het einde te kruipen, en zolang er niets binnenkomt, wordt ze zacht lichter en donkerder. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

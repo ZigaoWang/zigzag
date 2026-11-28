@@ -15,6 +15,7 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 
 ### Değişiklikler
 - Menü çubuğu kısaldı: Dosya ve Görünüm her gün kullandıklarınızı tutuyor; sekmeler, Space’ler ve Bölünmüş Görünüm arasında gezinme ve bunları düzenleme ise Görünüm’de, Geliştirici’nin yanında kendi alt menülerinde. Sekmeyi Çoğalt, Sekmeyi Yeni Pencereye Taşı ve Sayfayı Uykuya Al artık Görünüm › Sekmeler’de. Her kısayol eskisi gibi çalışıyor ve Ayarlar › Kısayollar her birini alt menüsüyle birlikte listeliyor, örneğin Sekmeler › Sekmeyi İç İçe Yerleştir. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+- Bir indirme bittiğinde indirilenler paneli İndirilenler düğmesinden açılıp yalnızca o dosyayı gösterir, geri kalanı Tüm İndirilenleri Göster’dedir ve panel birkaç saniye sonra kapanır. Kendiniz açtığınızda en yenisi en üstte olur: son bir saatin indirmeleri ve hâlâ süren indirmeler listelenir, daha eskiler Tüm İndirilenleri Göster’dedir. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 
 ### Düzeltmeler
 - Yükleme çizgisi artık yalnızca sayfa ilerlediğinde ilerliyor. Yanıt vermeyi bırakan bir sitede sona doğru sürünmek yerine yerinde duruyor ve hiçbir şey gelmediği sürece hafifçe sönüp parlıyor. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))

@@ -15,6 +15,7 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ### Modifications
 - La barre des menus est plus courte : Fichier et Présentation gardent ce que vous utilisez tous les jours, et parcourir et ranger les onglets, les espaces et Split View ont chacun un sous-menu dans Présentation, à côté de Développeur. Dupliquer l’onglet, Déplacer l’onglet vers une nouvelle fenêtre et Mettre la page en veille sont désormais dans Présentation › Onglets. Chaque raccourci fonctionne comme avant, et Réglages › Raccourcis les liste tous avec leur sous-menu, comme Onglets › Imbriquer l’onglet. ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
+- Quand un téléchargement se termine, le panneau des téléchargements sort du bouton Téléchargements sur ce seul fichier, avec Afficher tous les téléchargements pour le reste, et disparaît quelques secondes plus tard. Ouvert par vous, il affiche les plus récents en haut : les téléchargements de la dernière heure et ceux encore en cours, les plus anciens étant sous Afficher tous les téléchargements. ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
 
 ### Corrections
 - La ligne de chargement n’avance plus que lorsque la page avance. Sur un site qui ne répond plus, elle reste immobile au lieu de ramper vers la fin, et tant que rien n’arrive, elle pâlit et se ravive doucement. Merci à [Lakeland97](https://github.com/Lakeland97). ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
