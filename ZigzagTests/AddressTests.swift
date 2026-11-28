@@ -479,6 +479,26 @@ struct AddressTests {
         _ = window
     }
 
+    /// In the sidebar, the host starts on the rows' leading edge, where their icons do (#587).
+    @Test func theHostStartsWhereTheRowsDo() throws {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "http://127.0.0.1:9/address/edge")!, title: "Edge", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let sidebar = controller.sidebar
+        sidebar.address.show(url: tab.url, notSecure: false)
+        sidebar.layoutSubtreeIfNeeded()
+        let host = sidebar.convert(sidebar.address.labelFrame, from: sidebar.address).minX + Label.inset
+        let row = try #require(sidebar.list.row(for: tab) as? TabRowView)
+        let icon = sidebar.convert(row.icon.frame, from: row).minX
+        #expect(host == icon, "host \(host), row icon \(icon)")
+        #expect(icon == Tokens.Sidebar.iconColumn)
+    }
+
     /// The not-secure mark appearing before the same host: it glides right with its end already in place.
     @Test func onlyTheSameHostMovingRightGlides() {
         let old = NSRect(x: 10, y: 5, width: 150, height: 20), right = NSRect(x: 26, y: 5, width: 134, height: 20)

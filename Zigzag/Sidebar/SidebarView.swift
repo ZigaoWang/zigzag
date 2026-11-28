@@ -16,7 +16,7 @@ protocol SidebarDelegate: SidebarListDelegate {
 /// The address at the top of the sidebar. Shows only the domain; clicking opens the command bar.
 final class AddressView: InteractiveView {
     /// In the bar above the page, on the page's own color: a page's neutral field rather than the frame's wash.
-    var isOnPage = false { didSet { if isOnPage != oldValue { stateDidChange(animated: false) } } }
+    var isOnPage = false { didSet { if isOnPage != oldValue { stateDidChange(animated: false); needsLayout = true } } }
     private let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
     private var sizeObserver: NSObjectProtocol?
     private let lock = NSImageView()
@@ -598,9 +598,9 @@ final class AddressView: InteractiveView {
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         // Unframed, the buttons reach the ends, like the bar's other buttons.
         let end = buttonsOnly ? 0 : inset
-        // The host sits clear of the field's rounded edge, as far in as the buttons are from its right end, so the
-        // text has room to breathe. After the not-secure mark when there is one.
-        var x = Tokens.Space.x3
+        // In the sidebar the host starts on the rows' icon column, so the address and the rows share one leading
+        // edge (#587); above the page, clear of the field's rounded edge. After the not-secure mark when there is one.
+        var x = isOnPage ? Tokens.Space.x3 : Tokens.Sidebar.rowInset
         let lockFrame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
         if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
 
