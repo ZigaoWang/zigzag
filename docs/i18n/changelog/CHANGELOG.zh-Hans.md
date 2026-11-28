@@ -24,6 +24,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 更改
 - 菜单栏更简洁了：“文件”和“显示”只留下每天都会用到的项目，浏览和整理标签页、空间和分屏浏览的项目各有一个子菜单，和“开发者”一起放在“显示”中。“复制标签页”“将标签页移到新窗口”和“让页面休眠”现在位于“显示 › 标签页”。所有快捷键照常可用，“设置 › 快捷键”会连同子菜单列出每一个，例如“标签页 › 嵌套标签页”。 ([#585](https://github.com/ZigaoWang/zigzag/issues/585))
 - 下载完成时，下载面板会从“下载”按钮弹出，只显示刚下载的文件，其余的在“显示所有下载”中，几秒后自动收起。自己打开时，最新的排在最上面：列出最近一小时的下载和仍在进行的下载，更早的在“显示所有下载”中。 ([#586](https://github.com/ZigaoWang/zigzag/issues/586))
+- 没有打开标签页的窗口现在显示 Zigzag 自己的一个页面，和历史记录、设置一样：空间的颜色或图片，加上 ZIGZAG 字标，浅色和深色下都是一打开就在。感谢 [Lakeland97](https://github.com/Lakeland97)。 ([#555](https://github.com/ZigaoWang/zigzag/issues/555), [#562](https://github.com/ZigaoWang/zigzag/pull/562))
 
 ### 修复
 - 加载线只在网页真正有进展时才会前进。不再回应的网站会让它停在原处，不会慢慢爬向终点；没有新内容到达时，加载线会轻轻地明暗起伏。感谢 [Lakeland97](https://github.com/Lakeland97)。 ([#548](https://github.com/ZigaoWang/zigzag/issues/548), [#575](https://github.com/ZigaoWang/zigzag/pull/575))
