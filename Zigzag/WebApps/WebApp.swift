@@ -134,6 +134,41 @@ nonisolated enum WebApps {
         return true
     }
 
+    /// The disk a path is on when it isn't the startup disk, as "/Volumes/<name>", with the links along the path
+    /// followed, also ones to a disk that isn't there. Nil for the startup disk.
+    static func volumeRoot(of path: String) -> String? {
+        let parts = followingLinks(path).split(separator: "/")
+        guard parts.count >= 2, parts[0] == "Volumes" else { return nil }
+        return "/Volumes/\(parts[1])"
+    }
+
+    /// The path with each link along it followed, also when a link points at something that isn't there now.
+    static func followingLinks(_ path: String) -> String {
+        func components(_ path: String) -> [String] { path.split(separator: "/").map(String.init).filter { $0 != "." } }
+        var done = "/"
+        var rest = components(path)
+        var hops = 0
+        while !rest.isEmpty {
+            let part = rest.removeFirst()
+            if part == ".." { done = (done as NSString).deletingLastPathComponent; continue }
+            let next = (done as NSString).appendingPathComponent(part)
+            if hops < 32, let target = try? FileManager.default.destinationOfSymbolicLink(atPath: next) {
+                hops += 1
+                rest = components(target.hasPrefix("/") ? target : (done as NSString).appendingPathComponent(target)) + rest
+                done = "/"
+            } else {
+                done = next
+            }
+        }
+        return done
+    }
+
+    /// The disks mounted now, as their mount points ("/Volumes/<name>").
+    static func mountedVolumes() -> Set<String> {
+        let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: []) ?? []
+        return Set(urls.map { $0.standardizedFileURL.path })
+    }
+
     /// Where a link from the app's window goes: true to the browser, false to stay. Only a link you click to another
     /// site leaves; a sign-in page, and anything the site does on its own (redirects, forms), stay in the window.
     static func opensInBrowser(_ url: URL, from here: URL, isLinkClick: Bool) -> Bool {
@@ -144,16 +179,36 @@ nonisolated enum WebApps {
 
 /// The list of installed apps, kept in WebApps.json in Zigzag's data folder.
 final class WebAppStore {
-    static let shared = WebAppStore(file: Paths.file("WebApps.json"))
+    static let shared = WebAppStore(file: Paths.file("WebApps.json"), volumes: NSWorkspace.shared.notificationCenter)
 
     private let file: URL
     private(set) var apps: [WebApp]
-    /// Sent when one is installed or removed.
+    /// Sent when one is installed or removed, and when a disk is connected or ejected.
     let changed = Signal<Void>()
+    /// The disks mounted now (`WebApps.mountedVolumes`); tests give their own.
+    var mountedVolumes: () -> Set<String> = WebApps.mountedVolumes
+    private var volumeWatch: VolumeWatch?
 
-    init(file: URL) {
+    /// `volumes`: where disks being connected and ejected are heard, NSWorkspace's for the shared list.
+    init(file: URL, volumes: NotificationCenter? = nil) {
         self.file = file
         apps = JSONStore.load([WebApp].self, from: file) ?? []
+        volumeWatch = volumes.map { VolumeWatch(center: $0) { [weak self] in self?.changed.send() } }
+    }
+
+    /// Hears disks being connected and ejected until it goes away.
+    private nonisolated final class VolumeWatch {
+        private let center: NotificationCenter
+        private let observers: [NSObjectProtocol]
+
+        init(center: NotificationCenter, then run: @escaping @MainActor () -> Void) {
+            self.center = center
+            observers = [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification].map { name in
+                center.addObserver(forName: name, object: nil, queue: .main) { _ in MainActor.assumeIsolated { run() } }
+            }
+        }
+
+        deinit { observers.forEach(center.removeObserver) }
     }
 
     func app(_ id: String) -> WebApp? { apps.first { $0.id == id } }
@@ -198,9 +253,19 @@ final class WebAppStore {
         return true
     }
 
-    /// Apps that were thrown away in Finder leave the list.
+    /// Where an app's bundle is: found, on a disk that isn't connected now, or gone.
+    enum Place: Equatable { case found(URL), diskNotConnected, gone }
+
+    func place(of app: WebApp, host: String = Bundle.main.bundleIdentifier ?? "") -> Place {
+        if let bundle = bundle(of: app, host: host) { return .found(bundle) }
+        if let root = WebApps.volumeRoot(of: app.bundlePath), !mountedVolumes().contains(root) { return .diskNotConnected }
+        return .gone
+    }
+
+    /// Apps that were thrown away in Finder leave the list. One on a disk that isn't connected stays, and is back
+    /// when the disk is.
     func pruneMissing() {
-        let gone = apps.filter { bundle(of: $0) == nil }.map(\.id)
+        let gone = apps.filter { place(of: $0) == .gone }.map(\.id)
         guard !gone.isEmpty else { return }
         apps.removeAll { gone.contains($0.id) }
         persist()

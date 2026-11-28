@@ -310,3 +310,76 @@ extension WebAppTests {
         #expect(WebAppWindowController.newTabStaysInApp(URL(string: "https://www.figma.com/file/1")!, from: URL(string: "https://figma.com/")!))
     }
 }
+
+/// An app on a disk that isn't connected (#574): it stays listed and saved, and only one gone from a connected disk
+/// leaves. The disks are made up; no real one is touched.
+extension WebAppTests {
+    private func record(at path: String) -> WebApp {
+        WebApp(id: "0123456789abcdef", name: "Example", url: URL(string: "https://example.com/")!, profileID: profile,
+               spaceID: UUID(), bundlePath: path, created: Date())
+    }
+
+    private func madeUpDisk() -> String { "/Volumes/ZigzagTestDisk-\(UUID().uuidString)" }
+
+    @Test func anAppOnADiskThatIsntConnectedStaysListed() {
+        let dir = scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("WebApps.json")
+        let disk = madeUpDisk()
+        let store = WebAppStore(file: file)
+        store.mountedVolumes = { [] }
+        store.save(record(at: "\(disk)/Applications/Zigzag Apps/Example.app"))
+        #expect(store.place(of: store.apps[0], host: host) == .diskNotConnected)
+        store.pruneMissing()
+        #expect(store.apps.count == 1)
+        #expect(WebAppStore(file: file).apps.count == 1)
+    }
+
+    @Test func anAppGoneFromAConnectedDiskLeaves() {
+        let dir = scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let disk = madeUpDisk()
+        let store = WebAppStore(file: dir.appendingPathComponent("WebApps.json"))
+        store.mountedVolumes = { [disk] }
+        store.save(record(at: "\(disk)/Applications/Example.app"))
+        #expect(store.place(of: store.apps[0], host: host) == .gone)
+        store.pruneMissing()
+        #expect(store.apps.isEmpty)
+        // On the startup disk, too.
+        store.save(record(at: dir.appendingPathComponent("Example.app").path))
+        store.pruneMissing()
+        #expect(store.apps.isEmpty)
+    }
+
+    @Test func aFolderLinkedToADiskThatIsntThereCounts() throws {
+        let dir = scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let disk = madeUpDisk()
+        let link = dir.appendingPathComponent("Applications")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "\(disk)/Applications")
+        let path = link.appendingPathComponent("Zigzag Apps/Example.app").path
+        #expect(WebApps.volumeRoot(of: path) == disk)
+        #expect(WebApps.volumeRoot(of: "\(disk)/Example.app") == disk)
+        #expect(WebApps.volumeRoot(of: "/Applications/Zigzag Apps/Example.app") == nil)
+        #expect(WebApps.volumeRoot(of: "/Volumes") == nil)
+        let store = WebAppStore(file: dir.appendingPathComponent("WebApps.json"))
+        store.mountedVolumes = { [] }
+        store.save(record(at: path))
+        store.pruneMissing()
+        #expect(store.apps.count == 1)
+    }
+
+    @Test func connectingOrEjectingADiskUpdatesTheList() {
+        let dir = scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let center = NotificationCenter()
+        let store = WebAppStore(file: dir.appendingPathComponent("WebApps.json"), volumes: center)
+        var heard = 0
+        let token = store.changed.observe { heard += 1 }
+        center.post(name: NSWorkspace.didMountNotification, object: nil)
+        #expect(heard == 1)
+        center.post(name: NSWorkspace.didUnmountNotification, object: nil)
+        #expect(heard == 2)
+        _ = token
+    }
+}

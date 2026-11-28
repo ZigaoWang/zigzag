@@ -5947,11 +5947,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let store = WebAppStore.shared
         store.pruneMissing()
         for app in store.apps.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) {
+            let place = store.place(of: app)
+            // On a disk that isn't connected: it stays listed, and Open and Show in Finder wait for the disk.
+            let offline = place == .diskNotConnected
             let remove = PillButton(title: String(localized: "Remove…", comment: "Button on an installed app's row in Settings › General › Installed Apps."))
             remove.setAccessibilityLabel(String(localized: "Remove “\(app.name)”", comment: "VoiceOver label of the Remove button on an installed app's row in Settings › General; the app's name."))
             remove.onClick = { [weak self] _ in
                 self?.confirm(title: String(localized: "Remove \(app.name)?", comment: "Title of the sheet that removes a site installed as an app. The placeholder is the app's name."),
-                              message: String(localized: "The app is deleted from your Applications folder. You stay signed in to the site in Zigzag.", comment: "Message of the sheet that removes a site installed as an app."),
+                              message: offline
+                                  ? String(localized: "It leaves this list, and the app stays on its disk. You stay signed in to the site in Zigzag.", comment: "Message of the sheet that removes a site installed as an app whose disk isn't connected, so the app itself can't be deleted.")
+                                  : String(localized: "The app is deleted from your Applications folder. You stay signed in to the site in Zigzag.", comment: "Message of the sheet that removes a site installed as an app."),
                               action: String(localized: "Remove", comment: "Button of the sheet that removes a site installed as an app.")) {
                     WebAppStore.shared.remove(app.id)
                 }
@@ -5959,6 +5964,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             var detail = app.url.host() ?? app.url.absoluteString
             if hasManyProfiles, let profile = Library.shared.directory.profile(app.profileID) {
                 detail = String(localized: "\(detail) on \(profile.displayName)", comment: "Under an installed app in Settings › General with more than one profile: the site, then the profile it uses, like “github.com on Work”.")
+            }
+            if offline {
+                detail = String(localized: "On a disk that isn’t connected", comment: "Under an installed app in Settings › General, in place of its site, when the app is on an external disk that isn't connected now.")
             }
             // Its toolbar, on or off: off, the app's window is just the page with the traffic lights over it.
             let toolbarLabel = Label(String(localized: "Toolbar", comment: "Beside the switch on an installed app's row in Settings › General: whether its window shows back, forward, reload and its name on top."),
@@ -5970,10 +5978,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let finder = PillButton(title: String(localized: "Show in Finder", comment: "Button on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder."))
             finder.setAccessibilityLabel(String(localized: "Show “\(app.name)” in Finder", comment: "VoiceOver label of the Show in Finder button on an installed app's row in Settings › General; the app's name."))
             finder.onClick = { _ in WebAppStore.shared.revealInFinder(app) }
-            let controls = NSStackView(views: [toolbarLabel, toolbar, Self.openButton(for: app), finder, remove])
+            let open = Self.openButton(for: app)
+            open.isEnabled = !offline
+            finder.isEnabled = !offline
+            let controls = NSStackView(views: [toolbarLabel, toolbar, open, finder, remove])
             controls.spacing = Tokens.Space.x2
             controls.setCustomSpacing(Tokens.Space.x4, after: toolbar)
-            let icon = store.bundle(of: app).map { NSWorkspace.shared.icon(forFile: $0.path) } ?? SettingsIcon.symbol("app")
+            var icon = SettingsIcon.symbol("app")
+            if case .found(let bundle) = place { icon = NSWorkspace.shared.icon(forFile: bundle.path) }
             let row = FormRow(title: app.name, detail: detail, icon: icon, control: controls)
             row.keywords = String(localized: "web app dock install application", comment: "Words that find Installed Apps with Find a setting in Settings. Not shown.")
             webAppsGroup.add(row)

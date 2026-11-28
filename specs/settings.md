@@ -26,3 +26,13 @@
   Test: AppearanceSwitchesTests.onTheFloatingSidebarIsTwoThirdsHighInTheMiddle
 - Shorter floating sidebar → the choice is kept.
   Test: AppearanceSwitchesTests.theShorterFloatingSidebarIsKept
+
+## Installed Apps
+- An installed app on a disk that isn't connected → it stays in Settings › General › Installed Apps and in what's saved, marked On a disk that isn't connected, with Open and Show in Finder off until the disk is back.
+  Test: WebAppTests.anAppOnADiskThatIsntConnectedStaysListed
+- A folder of apps linked to a disk that isn't connected, like ~/Applications on an external disk → its apps count as on that disk and stay listed.
+  Test: WebAppTests.aFolderLinkedToADiskThatIsntThereCounts
+- A disk connected or ejected → the list updates at once; an app back on its disk works again.
+  Test: WebAppTests.connectingOrEjectingADiskUpdatesTheList
+- An installed app deleted from a disk that is connected, or from the startup disk → it leaves the list the next time Settings shows it.
+  Test: WebAppTests.anAppGoneFromAConnectedDiskLeaves
