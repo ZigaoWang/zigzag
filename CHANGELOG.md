@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Passkeys saved on your Mac show up under sign-in fields on sites that offer them, as in Safari: pick one and sign in with Touch ID. Zigzag asks macOS for access only when you choose Use a Saved Passkey there or Allow in Settings › Passwords, and is then listed in System Settings › Privacy & Security, where you can change it. ([#559](https://github.com/ZigaoWang/zigzag/issues/559))
 
 ### Fixed
+- A download that stalls shows the progress it actually reached, in the panel's row and the sidebar's ring, instead of the figure from a quarter of a second before it stopped. ([#571](https://github.com/ZigaoWang/zigzag/issues/571))
 - Zigzag no longer quits now and then as you close a tab or one goes to sleep, when macOS's Screen Time hits a problem letting go of the page.
 
 ## [0.10.0] - 2026-11-25

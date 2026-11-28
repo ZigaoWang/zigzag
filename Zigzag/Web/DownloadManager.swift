@@ -283,37 +283,35 @@ final class DownloadManager: NSObject {
     private func attach(_ download: WKDownload, to item: DownloadItem) {
         item.download = download
         // A fast download reports hundreds of times a second; the row, the Dock and every window hear of it four
-        // times a second, which is as often as anyone can read it.
-        let lastSent = OSAllocatedUnfairLock(initialState: Date.distantPast)
-        item.progressObservation = download.progress.observe(\.fractionCompleted) { [weak self, weak item] progress, _ in
-            let fraction = progress.fractionCompleted
-            let completed = progress.completedUnitCount
-            let total = progress.totalUnitCount
-            let due = lastSent.withLock { last -> Bool in
-                let now = Date()
-                guard fraction >= 1 || now.timeIntervalSince(last) >= 0.25 else { return false }
-                last = now
-                return true
-            }
-            guard due else { return }
+        // times a second, which is as often as anyone can read it. The throttle sends the last sample of a burst
+        // when its interval ends, so a download WebKit stops reporting on still shows the progress it reached
+        // rather than the value from a quarter of a second before it stalled.
+        let throttle = ProgressThrottle { [weak self, weak item] sample in
             DispatchQueue.main.async {
                 guard let item else { return }
                 let now = Date()
                 if let last = item.lastSample {
                     let elapsed = now.timeIntervalSince(last.at)
                     if elapsed >= 0.5 {
-                        let instant = Double(max(0, completed - last.bytes)) / elapsed
+                        let instant = Double(max(0, sample.completed - last.bytes)) / elapsed
                         item.speed = item.speed == 0 ? instant : item.speed * 0.75 + instant * 0.25
-                        item.lastSample = (now, completed)
+                        item.lastSample = (now, sample.completed)
                     }
                 } else {
-                    item.lastSample = (now, completed)
+                    item.lastSample = (now, sample.completed)
                 }
-                item.fractionCompleted = fraction
-                item.completedBytes = completed
-                item.totalBytes = total
+                item.fractionCompleted = sample.fraction
+                item.completedBytes = sample.completed
+                item.totalBytes = sample.total
                 self?.changed.send(item)
             }
+        }
+        item.progressObservation = download.progress.observe(\.fractionCompleted) { progress, _ in
+            throttle.report(ProgressThrottle.Sample(
+                fraction: progress.fractionCompleted,
+                completed: progress.completedUnitCount,
+                total: progress.totalUnitCount
+            ))
         }
     }
 
