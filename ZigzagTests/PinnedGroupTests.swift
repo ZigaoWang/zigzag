@@ -454,6 +454,40 @@ import Testing
         }
     }
 
+    /// A color as drawn in a view: its sRGB parts.
+    private func drawn(_ color: NSColor?, in view: NSView) -> [CGFloat] {
+        var parts: [CGFloat] = []
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            if let c = color?.usingColorSpace(.sRGB) { parts = [c.redComponent, c.greenComponent, c.blueComponent, c.alphaComponent] }
+        }
+        return parts
+    }
+
+    /// A pinned page that isn't loaded reads dimmer than one that is, icon and title, until it's loaded (#577).
+    @Test func anUnloadedPinsRowIsDimmedAndALoadedOneIsnt() throws {
+        try inWindow(["0", "1", "2"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.select(tabs[0])
+            manager.bookmarkTab(tabs[1], in: space)
+            manager.bookmarkTab(tabs[2], in: space)
+            tabs[1].ensureWebView()
+            controller.sidebar.list.reload(animated: false)
+            controller.sidebar.layoutSubtreeIfNeeded()
+            let loadedID = try #require(tabs[1].bookmarkID), unloadedID = try #require(tabs[2].bookmarkID)
+            let loaded = try #require(controller.sidebar.list.row(forBookmark: loadedID) as? TabRowView)
+            let unloaded = try #require(controller.sidebar.list.row(forBookmark: unloadedID) as? TabRowView)
+            #expect(!loaded.isUnloaded && unloaded.isUnloaded)
+            #expect(loaded.icon.alphaValue == 1)
+            #expect(unloaded.icon.alphaValue == Tokens.Opacity.unloaded)
+            #expect(drawn(unloaded.title.textColor, in: unloaded) == drawn(Brand.Theme.for(unloaded).quietInk, in: unloaded))
+            #expect(drawn(loaded.title.textColor, in: loaded) == drawn(Brand.Theme.for(loaded).rowInk, in: loaded))
+            tabs[2].ensureWebView()
+            controller.sidebar.list.refreshRows()
+            #expect(unloaded.icon.alphaValue == 1)
+            #expect(drawn(unloaded.title.textColor, in: unloaded) == drawn(Brand.Theme.for(unloaded).rowInk, in: unloaded))
+        }
+    }
+
     /// ⌘D on a tab of a group, with the section folded: one folder row with its pages, still folded; ⌘Z undoes it.
     @Test func commandDWithPinsFoldedPinsOneFolder() throws {
         try inFoldedWindow(["0", "1", "2", "3"]) { controller, tabs, space in

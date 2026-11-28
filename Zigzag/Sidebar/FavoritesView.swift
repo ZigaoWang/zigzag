@@ -468,16 +468,15 @@ final class FavoriteTile: InteractiveView {
     private(set) var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
 
     /// Tile style in tab row terms: the current one gets the selected card, a loaded one the open edge, others neither.
-    /// Icons stay full strength; faded ones looked washed out rather than closed.
     enum Look: Equatable { case closed, open, selected }
 
     static func look(selected: Bool, loaded: [Bool]) -> Look {
         selected ? .selected : TabRowView.showsOpenEdge(pinned: true, loaded: loaded) ? .open : .closed
     }
 
-    /// How strong a tile's icons are drawn.
+    /// How strong a tile's icons are drawn: dimmed while none of its pages is loaded, as a pinned row is (#577).
     static func iconAlpha(_ look: Look, hovered: Bool) -> CGFloat {
-        1
+        look == .closed ? Tokens.Opacity.unloaded : 1
     }
 
     /// Whether the open page has left its saved URL (`TabManager.isAway`, as pinned rows): neither the saved URL nor where

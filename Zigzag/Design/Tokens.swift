@@ -1265,6 +1265,8 @@ enum Tokens {
         /// What a panel opened over the sidebar (downloads, the site panel) sits on: stepped back, still readable,
         /// so the panel reads first without the tabs vanishing.
         static let receded: CGFloat = 0.4
+        /// A pinned page's or favorite's icon while its page isn't loaded, as Arc and Safari dim theirs (#577).
+        static let unloaded: CGFloat = 0.55
     }
 
     // MARK: - Fading

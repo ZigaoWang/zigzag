@@ -243,12 +243,13 @@ struct BookmarkTitleTests {
         #expect(FavoriteTile.look(selected: false, loaded: [false, false]) == .closed)
     }
 
-    @Test func aTileIconIsNeverFaded() {
-        // Never faded; a closed favorite has no edge instead.
-        #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == 1)
-        #expect(FavoriteTile.iconAlpha(.closed, hovered: true) == 1)
+    @Test func aTileIconIsDimmedOnlyWhileItsPageIsntLoaded() {
+        // Not loaded: dimmed, under the pointer too, as a pinned row is (#577). Loaded or the one you're on: full.
+        #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == Tokens.Opacity.unloaded)
+        #expect(FavoriteTile.iconAlpha(.closed, hovered: true) == Tokens.Opacity.unloaded)
         #expect(FavoriteTile.iconAlpha(.open, hovered: false) == 1)
         #expect(FavoriteTile.iconAlpha(.selected, hovered: false) == 1)
+        #expect(Tokens.Opacity.unloaded < 1)
     }
 
     @Test func onItsSavedPageItIsNotAway() {
